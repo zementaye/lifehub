@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Life Hub{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="grid">
+  <div class="card">
+    <h3>Body</h3>
+    {% if bmi %}
+      <div class="stat-row">
+        <div class="stat"><span class="stat-value">{{ latest_weight.weight_kg }}<small>kg</small></span><span class="stat-label">Latest weight</span></div>
+        <div class="stat"><span class="stat-value">{{ bmi }}</span><span class="stat-label">BMI · {{ bmi_category }}</span></div>
+      </div>
+    {% else %}
+      <p class="muted">Add your height and a weight entry on the Health page to see your BMI.</p>
+    {% endif %}
+    <a class="link" href="{{ url_for('health') }}">Go to Health →</a>
+  </div>
+
+  <div class="card">
+    <h3>Today's Nutrition</h3>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-value">{{ totals.calories | round | int }}</span><span class="stat-label">calories</span></div>
+      <div class="stat"><span class="stat-value">{{ totals.protein_g | round | int }}g</span><span class="stat-label">protein</span></div>
+      <div class="stat"><span class="stat-value">{{ totals.carbs_g | round | int }}g</span><span class="stat-label">carbs</span></div>
+      <div class="stat"><span class="stat-value">{{ totals.fat_g | round | int }}g</span><span class="stat-label">fat</span></div>
+    </div>
+    <a class="link" href="{{ url_for('nutrition') }}">Log food →</a>
+  </div>
+
+  <div class="card">
+    <h3>Today's Habits</h3>
+    {% if habit_status %}
+      <ul class="checklist">
+        {% for hs in habit_status %}
+          <li class="{{ 'done' if hs.done }}">{{ '✅' if hs.done else '⬜' }} {{ hs.habit.title }}{% if hs.streak > 0 %} <span class="streak-badge">🔥 {{ hs.streak }}</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">No habits yet.</p>
+    {% endif %}
+    <a class="link" href="{{ url_for('habits') }}">Go to Habits →</a>
+  </div>
+
+  <div class="card">
+    <h3>Upcoming Reminders</h3>
+    {% if upcoming_reminders %}
+      <ul class="plain-list">
+        {% for r in upcoming_reminders %}
+          <li><strong>{{ r.title }}</strong><span class="muted"> — {{ r.next_due }}</span></li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">No upcoming reminders.</p>
+    {% endif %}
+    <a class="link" href="{{ url_for('reminders') }}">Manage reminders →</a>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Vault — Life Hub{% endblock %}
+{% block content %}
+<h1>Digital ID Vault</h1>
+<p class="muted">Photos of your license, national ID, and other documents — for when you forget the physical copy.</p>
+
+<div class="card">
+  <h3>Add a Document</h3>
+  <form method="post" action="{{ url_for('vault_upload') }}" enctype="multipart/form-data" class="inline-form" id="vault-upload-form">
+    <label>Label <input type="text" name="label" placeholder="e.g. Driver's License" required></label>
+    <label>Notes <input type="text" name="notes" placeholder="optional"></label>
+    <label>Expiry date <input type="date" name="expiry_date" id="expiry-input"></label>
+    <label class="checkbox-label"><input type="checkbox" name="make_reminder" checked> Remind me when it expires</label>
+  </form>
+
+  <div id="dropzone" class="dropzone">
+    <input type="file" name="file" accept="image/*,.pdf" required id="vault-file" form="vault-upload-form">
+    <div id="dropzone-empty">
+      <div class="dropzone-icon">📎</div>
+      <p><strong>Drag &amp; drop</strong> a photo or PDF here<br>or click to browse</p>
+    </div>
+    <div id="dropzone-filled" style="display:none;">
+      <img id="vault-preview" style="display:none;">
+      <div id="vault-file-info"></div>
+      <button type="button" id="dropzone-clear" class="btn-icon">✕ Remove</button>
+    </div>
+  </div>
+
+  <button type="submit" form="vault-upload-form" style="margin-top:12px;">Save</button>
+</div>
+
+<div class="grid">
+  {% for d in docs %}
+    <div class="card doc-card">
+      <h4>{{ d.label }}</h4>
+      {% if d.filename.rsplit('.',1)[-1].lower() == 'pdf' %}
+        <a href="{{ url_for('vault_file', filename=d.filename) }}" target="_blank" class="link">📄 View PDF</a>
+      {% else %}
+        <a href="{{ url_for('vault_file', filename=d.filename) }}" target="_blank">
+          <img src="{{ url_for('vault_file', filename=d.filename) }}" class="doc-thumb" alt="{{ d.label }}">
+        </a>
+      {% endif %}
+      {% if d.notes %}<p class="muted">{{ d.notes }}</p>{% endif %}
+      {% if d.expiry_date %}<p class="muted">📅 Expires {{ d.expiry_date }}</p>{% endif %}
+      <form method="post" action="{{ url_for('vault_delete', doc_id=d.id) }}" onsubmit="return confirm('Delete {{ d.label }}?');">
+        <button class="btn-icon" title="Delete">🗑️ Delete</button>
+      </form>
+    </div>
+  {% else %}
+    <p class="muted">No documents saved yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('vault-file');
+const emptyState = document.getElementById('dropzone-empty');
+const filledState = document.getElementById('dropzone-filled');
+const preview = document.getElementById('vault-preview');
+const fileInfo = document.getElementById('vault-file-info');
+
+function showFile(file) {
+  if (!file) return;
+  emptyState.style.display = 'none';
+  filledState.style.display = 'flex';
+  if (file.type.startsWith('image/')) {
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+  const sizeKb = Math.round(file.size / 1024);
+  fileInfo.textContent = `${file.name} (${sizeKb} KB)`;
+}
+
+function clearFile() {
+  fileInput.value = '';
+  emptyState.style.display = 'block';
+  filledState.style.display = 'none';
+  preview.src = '';
+}
+
+fileInput.addEventListener('change', () => showFile(fileInput.files[0]));
+
+document.getElementById('dropzone-clear').addEventListener('click', (e) => {
+  e.stopPropagation();
+  clearFile();
+});
+
+dropzone.addEventListener('click', (e) => {
+  if (e.target.id !== 'dropzone-clear') fileInput.click();
+});
+
+['dragenter', 'dragover'].forEach(evt =>
+  dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropzone.classList.add('drag-active');
+  })
+);
+
+['dragleave', 'drop'].forEach(evt =>
+  dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropzone.classList.remove('drag-active');
+  })
+);
+
+dropzone.addEventListener('drop', (e) => {
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    fileInput.files = files;
+    showFile(files[0]);
+  }
+});
+</script>
+{% endblock %}

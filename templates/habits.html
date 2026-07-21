@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Habits — Life Hub{% endblock %}
+{% block content %}
+<h1>Habits &amp; To-Dos</h1>
+
+<div class="card">
+  <h3>New Habit</h3>
+  <form method="post" action="{{ url_for('add_habit') }}" class="inline-form">
+    <label>Title <input type="text" name="title" placeholder="e.g. Learn French for 50 min" required></label>
+    <label>Frequency
+      <select name="frequency">
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+      </select>
+    </label>
+    <button type="submit">Add</button>
+  </form>
+</div>
+
+<div class="grid">
+  {% for group_name, group_freq in [('Daily', 'daily'), ('Weekly', 'weekly'), ('Monthly', 'monthly')] %}
+    {% set items = status | selectattr('habit.frequency', 'equalto', group_freq) | list %}
+    {% if items %}
+      <div class="card wide">
+        <h3>{{ group_name }}</h3>
+        <ul class="checklist interactive">
+          {% for hs in items %}
+            <li class="{{ 'done' if hs.done }}">
+              <form method="post" action="{{ url_for('uncheck_habit' if hs.done else 'checkin_habit', habit_id=hs.habit.id) }}" class="checkbox-form">
+                <button type="submit" class="checkbox-btn">{{ '✅' if hs.done else '⬜' }}</button>
+              </form>
+              <span>{{ hs.habit.title }}</span>
+              {% if hs.streak > 0 %}<span class="streak-badge">🔥 {{ hs.streak }}</span>{% endif %}
+              <form method="post" action="{{ url_for('delete_habit', habit_id=hs.habit.id) }}" class="delete-form">
+                <button class="btn-icon" title="Remove habit">🗑️</button>
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  {% endfor %}
+  {% if not status %}
+    <p class="muted">No habits yet — add one above.</p>
+  {% endif %}
+</div>
+{% endblock %}

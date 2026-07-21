@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Settings — Life Hub{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+
+<div class="card wide">
+  <h3>Notifications (Telegram)</h3>
+  <p class="muted">Point this at any bot you own. Message <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> to find your own chat ID.</p>
+  <form method="post" action="{{ url_for('save_settings') }}" class="inline-form">
+    <label>Bot token <input type="text" name="tg_bot_token" value="{{ values.tg_bot_token }}" placeholder="123456:ABC-..."></label>
+    <label>Your chat ID <input type="text" name="tg_chat_id" value="{{ values.tg_chat_id }}" placeholder="e.g. 123456789"></label>
+    <button type="submit">Save</button>
+  </form>
+  <form method="post" action="{{ url_for('test_notify') }}" style="margin-top:10px;">
+    <button type="submit" class="secondary">Send test notification</button>
+  </form>
+</div>
+
+<div class="card wide">
+  <h3>Backup</h3>
+  <p class="muted">Download everything in the app as a single JSON file.</p>
+  <a href="{{ url_for('export_data') }}"><button type="button">Download backup (JSON)</button></a>
+</div>
+
+<div class="card wide">
+  <h3>Nutrition Goals</h3>
+  <form method="post" action="{{ url_for('save_settings') }}" class="inline-form">
+    <label>Daily calorie target <input type="number" name="nutrition_goal_calories" value="{{ values.nutrition_goal_calories }}" placeholder="optional"></label>
+    <label>Daily protein target (g) <input type="number" name="nutrition_goal_protein" value="{{ values.nutrition_goal_protein }}" placeholder="optional"></label>
+    <button type="submit">Save</button>
+  </form>
+</div>
+
+<div class="card wide">
+  <h3>Scheduling</h3>
+  <form method="post" action="{{ url_for('save_settings') }}" class="inline-form">
+    <label>Timezone <input type="text" name="timezone" value="{{ values.timezone }}" placeholder="Africa/Addis_Ababa"></label>
+    <label>Currency <input type="text" name="currency" value="{{ values.currency }}" placeholder="ETB"></label>
+    <label>Reminder send hour (0-23)
+      <input type="number" name="reminder_hour" min="0" max="23" value="{{ values.reminder_hour }}">
+    </label>
+    <label>Habit nudge hour (0-23)
+      <input type="number" name="nudge_hour" min="0" max="23" value="{{ values.nudge_hour }}">
+    </label>
+    <label>Week ends on
+      <select name="week_end_day">
+        <option value="0" {{ 'selected' if values.week_end_day|string == '0' }}>Monday</option>
+        <option value="1" {{ 'selected' if values.week_end_day|string == '1' }}>Tuesday</option>
+        <option value="2" {{ 'selected' if values.week_end_day|string == '2' }}>Wednesday</option>
+        <option value="3" {{ 'selected' if values.week_end_day|string == '3' }}>Thursday</option>
+        <option value="4" {{ 'selected' if values.week_end_day|string == '4' }}>Friday</option>
+        <option value="5" {{ 'selected' if values.week_end_day|string == '5' }}>Saturday</option>
+        <option value="6" {{ 'selected' if values.week_end_day|string == '6' }}>Sunday</option>
+      </select>
+    </label>
+    <button type="submit">Save</button>
+  </form>
+  <p class="muted">Weekly habits are checked for completion on the day the week "ends." Monthly habits are checked on the last day of the month.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Life Hub{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <a href="{{ url_for('dashboard') }}" class="brand">🧭 Life Hub</a>
+  <nav class="topnav">
+    <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}">Dashboard</a>
+    <a href="{{ url_for('health') }}" class="{{ 'active' if request.endpoint=='health' }}">Health</a>
+    <a href="{{ url_for('nutrition') }}" class="{{ 'active' if request.endpoint=='nutrition' }}">Nutrition</a>
+    <a href="{{ url_for('vault') }}" class="{{ 'active' if request.endpoint=='vault' }}">Vault</a>
+    <a href="{{ url_for('budget') }}" class="{{ 'active' if request.endpoint=='budget' }}">Budget</a>
+    <a href="{{ url_for('reminders') }}" class="{{ 'active' if request.endpoint=='reminders' }}">Reminders</a>
+    <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}">Habits</a>
+    <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">Settings</a>
+  </nav>
+</header>
+
+<main class="content">
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div class="flash">
+        {% for m in messages %}<div class="flash-msg">{{ m }}</div>{% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</main>
+
+<nav class="bottomnav">
+  <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}"><span>🏠</span>Home</a>
+  <a href="{{ url_for('health') }}" class="{{ 'active' if request.endpoint=='health' }}"><span>💪</span>Health</a>
+  <a href="{{ url_for('nutrition') }}" class="{{ 'active' if request.endpoint=='nutrition' }}"><span>🍽️</span>Food</a>
+  <a href="{{ url_for('vault') }}" class="{{ 'active' if request.endpoint=='vault' }}"><span>🪪</span>Vault</a>
+  <a href="{{ url_for('budget') }}" class="{{ 'active' if request.endpoint=='budget' }}"><span>💰</span>Budget</a>
+  <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}"><span>✅</span>Habits</a>
+</nav>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

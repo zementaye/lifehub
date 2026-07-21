@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Budget — Life Hub{% endblock %}
+{% block content %}
+<h1>Budget</h1>
+
+<div class="card">
+  <form method="get" class="inline-form">
+    <label>Month <input type="month" name="month" value="{{ month }}" onchange="this.form.submit()"></label>
+  </form>
+  <div class="stat-row">
+    <div class="stat"><span class="stat-value">{{ income_total | round | int }}</span><span class="stat-label">Income ({{ currency }})</span></div>
+    <div class="stat"><span class="stat-value">{{ expense_total | round | int }}</span><span class="stat-label">Expenses ({{ currency }})</span></div>
+    <div class="stat"><span class="stat-value" style="color: {{ 'var(--danger)' if net < 0 else 'var(--primary)' }};">{{ net | round | int }}</span><span class="stat-label">Net</span></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>Log a Transaction</h3>
+    <form method="post" action="{{ url_for('add_transaction') }}" class="inline-form">
+      <input type="hidden" name="month" value="{{ month }}">
+      <label>Date <input type="date" name="date" value="{{ month }}-01"></label>
+      <label>Type
+        <select name="type" id="txn-type" onchange="document.getElementById('cat-field').style.display = this.value==='expense' ? 'flex' : 'none';">
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+        </select>
+      </label>
+      <label>Amount ({{ currency }}) <input type="number" step="0.01" name="amount" required></label>
+      <label id="cat-field">Category
+        <select name="category_id">
+          <option value="">— none —</option>
+          {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Description <input type="text" name="description" placeholder="optional"></label>
+      <button type="submit">Add</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>New Category</h3>
+    <form method="post" action="{{ url_for('add_budget_category') }}" class="inline-form">
+      <label>Name <input type="text" name="name" placeholder="e.g. Food" required></label>
+      <label>Monthly limit ({{ currency }}) <input type="number" step="0.01" name="monthly_limit" placeholder="optional"></label>
+      <button type="submit">Add</button>
+    </form>
+
+    {% if categories %}
+      <ul class="plain-list" style="margin-top:12px;">
+        {% for c in categories %}
+          <li>
+            {{ c.name }}{% if c.monthly_limit %} <span class="muted">— limit {{ c.monthly_limit | round | int }} {{ currency }}</span>{% endif %}
+            <form method="post" action="{{ url_for('delete_budget_category', cat_id=c.id) }}" style="display:inline; float:right;">
+              <button class="btn-icon" title="Delete">🗑️</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</div>
+
+{% if category_spend %}
+<div class="card wide">
+  <h3>Spend vs. Limit ({{ month }})</h3>
+  {% for cs in category_spend %}
+    {% if cs.limit %}
+      <div class="budget-bar-row">
+        <div class="budget-bar-label">
+          <span>{{ cs.category.name }}</span>
+          <span class="{{ 'over' if cs.over }}">{{ cs.spent | round | int }} / {{ cs.limit | round | int }} {{ currency }}</span>
+        </div>
+        <div class="budget-bar-track">
+          <div class="budget-bar-fill {{ 'over' if cs.over }}" style="width: {{ cs.pct }}%;"></div>
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="card wide">
+  <h3>Recurring — Jobs, Salary &amp; Bills</h3>
+  <p class="muted">Auto-logs itself as a transaction each month on the day you set (e.g. payday, rent due date).</p>
+  <form method="post" action="{{ url_for('add_recurring_transaction') }}" class="inline-form">
+    <label>Title <input type="text" name="title" placeholder="e.g. Design job salary, Rent" required></label>
+    <label>Type
+      <select name="type" id="rec-type" onchange="document.getElementById('rec-cat-field').style.display = this.value==='expense' ? 'flex' : 'none';">
+        <option value="income">Income (job/salary)</option>
+        <option value="expense">Expense (bill)</option>
+      </select>
+    </label>
+    <label>Amount ({{ currency }}) <input type="number" step="0.01" name="amount" required></label>
+    <label id="rec-cat-field" style="display:none;">Category
+      <select name="category_id">
+        <option value="">— none —</option>
+        {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Day of month <input type="number" name="day_of_month" min="1" max="28" value="1"></label>
+    <label>Starting month <input type="month" name="start_date" value="{{ month }}"></label>
+    <button type="submit">Add</button>
+  </form>
+
+  {% if recurring %}
+    <table class="table" style="margin-top:14px;">
+      <thead><tr><th>Title</th><th>Type</th><th>Amount</th><th>Day</th><th>Next run</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for r in recurring %}
+        <tr class="{{ '' if r.active else 'muted' }}">
+          <td>{{ r.title }}</td>
+          <td>{{ '💰 Income' if r.type == 'income' else '💸 Expense' }}{% if r.category_name %} · {{ r.category_name }}{% endif %}</td>
+          <td>{{ r.amount | round | int }} {{ currency }}</td>
+          <td>{{ r.day_of_month }}</td>
+          <td>{{ r.next_run }}</td>
+          <td>{{ 'Active' if r.active else 'Paused' }}</td>
+          <td class="row-actions">
+            <form method="post" action="{{ url_for('toggle_recurring_transaction', rid=r.id) }}">
+              <button class="btn-icon" title="{{ 'Pause' if r.active else 'Resume' }}">{{ '⏸️' if r.active else '▶️' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('delete_recurring_transaction', rid=r.id) }}">
+              <button class="btn-icon" title="Delete">🗑️</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No recurring jobs/bills set up yet.</p>
+  {% endif %}
+</div>
+
+<div class="card wide">
+  <h3>Transactions — {{ month }}</h3>
+  {% if txns %}
+    <table class="table">
+      <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Amount</th><th></th></tr></thead>
+      <tbody>
+      {% for t in txns %}
+        <tr>
+          <td>{{ t.date }}</td>
+          <td>{{ '💰 Income' if t.type == 'income' else '💸 Expense' }}</td>
+          <td>{{ t.category_name or '—' }}</td>
+          <td class="muted">{{ t.description or '' }}</td>
+          <td>{{ t.amount | round(2) }} {{ currency }}</td>
+          <td>
+            <form method="post" action="{{ url_for('delete_transaction', txn_id=t.id) }}">
+              <input type="hidden" name="month" value="{{ month }}">
+              <button class="btn-icon" title="Delete">🗑️</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No transactions for this month yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
