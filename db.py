@@ -4,6 +4,11 @@ from contextlib import contextmanager
 
 import config
 
+USE_TURSO = bool(config.TURSO_DATABASE_URL and config.TURSO_AUTH_TOKEN)
+
+if USE_TURSO:
+    import libsql
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -131,11 +136,78 @@ _MIGRATIONS = [
 ]
 
 
+class _Row(dict):
+    """dict subclass so row['col'] works like sqlite3.Row. Jinja's attribute
+    lookup (row.col) falls back to __getitem__ when getattr fails, so
+    templates that use dot-notation on rows keep working unchanged too."""
+
+    def __getattr__(self, item):
+        try:
+            return self[item]
+        except KeyError:
+            raise AttributeError(item)
+
+
+class _TursoCursor:
+    """Wraps a libsql cursor so .fetchone()/.fetchall()/iteration return
+    dict-like _Row objects instead of plain tuples, matching sqlite3.Row
+    behavior that the rest of the app (and templates) rely on."""
+
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self._cols = [d[0] for d in cursor.description] if cursor.description else []
+
+    def _wrap(self, raw):
+        return None if raw is None else _Row(zip(self._cols, raw))
+
+    def fetchone(self):
+        return self._wrap(self._cursor.fetchone())
+
+    def fetchall(self):
+        return [self._wrap(r) for r in self._cursor.fetchall()]
+
+    def __iter__(self):
+        for r in self._cursor:
+            yield self._wrap(r)
+
+
+class _TursoConn:
+    """Thin wrapper around a libsql connection so it can be used as a
+    drop-in replacement for a sqlite3 connection in get_conn() callers."""
+
+    def __init__(self, raw_conn):
+        self._conn = raw_conn
+
+    def execute(self, sql, params=()):
+        return _TursoCursor(self._conn.execute(sql, params))
+
+    def executescript(self, script):
+        # libsql doesn't support executescript; split and run statements
+        # one at a time instead. Fine here since SCHEMA has no ';' inside
+        # string literals.
+        for stmt in filter(None, (s.strip() for s in script.split(";"))):
+            self._conn.execute(stmt)
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+
 @contextmanager
 def get_conn():
-    conn = sqlite3.connect(config.DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    if USE_TURSO:
+        raw_conn = libsql.connect(
+            database=config.TURSO_DATABASE_URL,
+            auth_token=config.TURSO_AUTH_TOKEN,
+        )
+        conn = _TursoConn(raw_conn)
+    else:
+        raw_conn = sqlite3.connect(config.DB_PATH)
+        raw_conn.row_factory = sqlite3.Row
+        raw_conn.execute("PRAGMA foreign_keys = ON")
+        conn = raw_conn
     try:
         yield conn
         conn.commit()
