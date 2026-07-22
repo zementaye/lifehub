@@ -66,6 +66,38 @@ after that it remembers you via a cookie, no password screen, nothing to type ag
 Bookmark the link with the key included and you'll never see it. Anyone without that
 exact link is blocked. It's not bank-grade security, but it stops search engines,
 guessed URLs, and casual snooping — a meaningful step up from wide open, while staying
+
+## Persisting data on Render's free tier (no paid disk) with Turso
+
+If you're on Render's free tier, the filesystem resets whenever the instance spins
+down from inactivity — not just on redeploys. Without a paid disk, your sqlite
+database gets wiped repeatedly. `db.py` supports an alternative: point it at
+[Turso](https://turso.tech), a free hosted SQLite-compatible database, instead of a
+local file.
+
+**This only covers the database** (weight logs, budget entries, habits, reminders,
+settings, etc). Uploaded ID vault **photos are still local files** and still reset on
+Render's free tier — Turso doesn't store files. If you need those to persist too,
+you'd still need a paid disk (or separate object storage like Cloudflare R2).
+
+### Setup
+1. Create a free account at [turso.tech](https://turso.tech) and install their CLI, or
+   use the dashboard.
+2. Create a database, e.g. `turso db create lifehub`.
+3. Get the connection URL: `turso db show lifehub --url` → looks like
+   `libsql://lifehub-yourname.turso.io`.
+4. Create an auth token: `turso db tokens create lifehub`.
+5. In Render's Environment tab, set:
+   - `TURSO_DATABASE_URL` = the URL from step 3
+   - `TURSO_AUTH_TOKEN` = the token from step 4
+6. Leave `DATA_DIR` unset. Redeploy (or restart the service).
+
+That's it — no code changes needed on your end. `db.py` automatically detects both
+env vars and switches from local sqlite to Turso; the app behaves identically either
+way, and every existing page/query keeps working unchanged.
+
+To go back to local sqlite (e.g. for local testing), just unset those two env vars.
+
 just as simple to use day-to-day.
 
 ## Notes on the recurring logic
