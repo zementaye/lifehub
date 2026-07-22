@@ -6,14 +6,22 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).parent
 
-# Where the sqlite DB and uploaded files live. Point this at a Railway volume
-# (e.g. /data) in production so it survives redeploys.
+# Where the sqlite DB and uploaded files live. Point this at a Railway/Render
+# volume (e.g. /data) in production so it survives redeploys.
 DATA_DIR = Path(os.environ.get("DATA_DIR", BASE_DIR))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH = DATA_DIR / "lifehub.db"
 UPLOAD_DIR = DATA_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# ── Turso (remote SQLite-compatible DB) ─────────────────────────────────
+# If both of these are set, db.py talks to Turso over the network instead of
+# a local sqlite file, so your data survives Render's free-tier restarts.
+# Uploaded files (ID vault photos) still live on local disk and are NOT
+# covered by this — they still reset unless you add a paid disk.
+TURSO_DATABASE_URL = os.environ.get("TURSO_DATABASE_URL", "")
+TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "")
 
 # ── Telegram notifications ──────────────────────────────────────────────
 # Point this at any bot you own (new or existing) — reminders/habit nudges
