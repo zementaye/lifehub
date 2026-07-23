@@ -39,8 +39,11 @@
     results.forEach((r) => {
       const div = document.createElement('div');
       div.className = 'search-result';
-      div.innerHTML = `<div class="sr-name">${escapeHtml(r.name)}</div>
-        <div class="sr-macro">${Math.round(r.calories)} cal · ${round1(r.protein_g)}g protein · ${round1(r.carbs_g)}g carbs · ${round1(r.fat_g)}g fat (per 100g / serving)</div>`;
+      const tag = r.generic
+        ? '<span class="tag">generic</span>'
+        : `<span class="tag">branded${r.brand ? ': ' + escapeHtml(r.brand) : ''}</span>`;
+      div.innerHTML = `<div class="sr-name">${escapeHtml(r.name)} ${tag}</div>
+        <div class="sr-macro">${Math.round(r.calories)} cal · ${round1(r.protein_g)}g protein · ${round1(r.carbs_g)}g carbs · ${round1(r.fat_g)}g fat — per 100g</div>`;
       div.addEventListener('click', () => selectFood(r));
       resultsBox.appendChild(div);
     });
@@ -53,7 +56,7 @@
     document.getElementById('log-carbs').value = r.carbs_g;
     document.getElementById('log-fat').value = r.fat_g;
     document.getElementById('log-fiber').value = r.fiber_g;
-    preview.textContent = `Selected: ${r.name} (${Math.round(r.calories)} cal per serving as listed)`;
+    preview.textContent = `Selected: ${r.name} — ${Math.round(r.calories)} cal per 100g. "Servings" below multiplies this per-100g value, so for a ~50g item like 1 egg, enter 0.5.`;
     logForm.style.display = 'flex';
   }
 
