@@ -167,8 +167,11 @@ class _TursoCursor:
         return [self._wrap(r) for r in self._cursor.fetchall()]
 
     def __iter__(self):
-        for r in self._cursor:
-            yield self._wrap(r)
+        # The real libsql Cursor object doesn't support direct iteration
+        # (unlike sqlite3's cursor), only .fetchone()/.fetchall(). Route
+        # through our own fetchall() so callers that do `for row in conn.execute(...)`
+        # still work.
+        return iter(self.fetchall())
 
 
 class _TursoConn:
