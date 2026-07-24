@@ -1,4 +1,5 @@
 import sqlite3
+import threading
 import time
 from contextlib import contextmanager
 
@@ -198,24 +199,45 @@ class _TursoConn:
         self._conn.close()
 
 
-@contextmanager
-def get_conn():
-    if USE_TURSO:
+_turso_conn = None
+_turso_lock = threading.Lock()
+
+
+def _get_turso_conn():
+    global _turso_conn
+    if _turso_conn is None:
         raw_conn = libsql.connect(
             database=config.TURSO_DATABASE_URL,
             auth_token=config.TURSO_AUTH_TOKEN,
         )
-        conn = _TursoConn(raw_conn)
+        _turso_conn = _TursoConn(raw_conn)
+    return _turso_conn
+
+
+@contextmanager
+def get_conn():
+    if USE_TURSO:
+        # Opening a brand-new libsql connection on every call spins up a new
+        # Rust/Tokio runtime each time, and doing that concurrently from two
+        # threads (the Flask request thread + the APScheduler background
+        # thread that runs scheduler.py's "tick" job) causes an internal
+        # deadlock ("failed to join thread: Resource deadlock avoided"),
+        # which crashes the gunicorn worker. Fix: keep ONE connection alive
+        # for the life of the process, and serialize access to it with a
+        # lock so only one thread touches it at a time.
+        with _turso_lock:
+            conn = _get_turso_conn()
+            yield conn
+            conn.commit()
     else:
         raw_conn = sqlite3.connect(config.DB_PATH)
         raw_conn.row_factory = sqlite3.Row
         raw_conn.execute("PRAGMA foreign_keys = ON")
-        conn = raw_conn
-    try:
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
+        try:
+            yield raw_conn
+            raw_conn.commit()
+        finally:
+            raw_conn.close()
 
 
 def init_db() -> None:
