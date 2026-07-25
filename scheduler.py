@@ -189,12 +189,18 @@ def get_habit_status_batch(habits: list) -> dict:
 
         result[h["id"]] = {"done": done, "streak": streak}
     return result
+
+
+def get_incomplete_habits() -> list[str]:
+    today = today_local()
     weekly_day = today.weekday() == get_week_end_day()
     monthly_day = is_last_day_of_month(today)
 
     incomplete = []
     with db.get_conn() as conn:
-        habits = conn.execute("SELECT * FROM habits WHERE active = 1").fetchall()
+        habits = conn.execute(
+            "SELECT * FROM habits WHERE active = 1 AND reminder_hour IS NULL"
+        ).fetchall()
         for h in habits:
             freq = h["frequency"]
             if freq == "weekly" and not weekly_day:
@@ -210,6 +216,90 @@ def get_habit_status_batch(habits: list) -> dict:
             if not done:
                 incomplete.append(h["title"])
     return incomplete
+
+
+def check_individual_habit_reminders() -> None:
+    """Habits with their own reminder_hour set (e.g. 'Morning Prayer' at 7,
+    'Bible Study' at 20) get pinged individually at that exact hour instead
+    of being lumped into the one shared evening digest. Self-contained
+    dedupe (like check_recurring_transactions) so it's safe to call every
+    15-minute tick rather than needing its own top-level hour gate."""
+    today = today_local()
+    now_hour = datetime.now(get_tz()).hour
+    weekly_day = today.weekday() == get_week_end_day()
+    monthly_day = is_last_day_of_month(today)
+
+    with db.get_conn() as conn:
+        habits = conn.execute(
+            "SELECT * FROM habits WHERE active = 1 AND reminder_hour = ?", (now_hour,)
+        ).fetchall()
+
+        for h in habits:
+            freq = h["frequency"]
+            if freq == "weekly" and not weekly_day:
+                continue
+            if freq == "monthly" and not monthly_day:
+                continue
+
+            dedupe_key = f"habit_reminder_sent:{h['id']}:{today.isoformat()}"
+            if db.get_setting(dedupe_key):
+                continue
+
+            pkey = period_key_for(freq, today)
+            done = conn.execute(
+                "SELECT 1 FROM habit_checkins WHERE habit_id = ? AND period_key = ?",
+                (h["id"], pkey),
+            ).fetchone()
+            if done:
+                continue
+
+            if telegram_notify.send(f"⏰ Reminder: <b>{h['title']}</b>"):
+                db.set_setting(dedupe_key, "1")
+
+
+def check_document_expiries() -> None:
+    """Vault documents with an expiry date get a reminder at 1 month out,
+    2 weeks out, and then daily for the final 7 days — matching how you'd
+    actually want to be nagged about a license renewal. Stops early if
+    you've acknowledged that expiry date (see /vault/<id>/acknowledge), and
+    naturally resets whenever you renew (update the expiry date to a new
+    one) since that no longer matches the acknowledged date."""
+    today = today_local()
+    with db.get_conn() as conn:
+        docs = conn.execute(
+            "SELECT * FROM documents WHERE expiry_date IS NOT NULL"
+        ).fetchall()
+
+    for d in docs:
+        try:
+            expiry = date.fromisoformat(d["expiry_date"])
+        except ValueError:
+            continue
+
+        if d["expiry_ack_date"] == d["expiry_date"]:
+            continue  # already acknowledged this expiry cycle
+
+        days_left = (expiry - today).days
+        if days_left < 0 or days_left > 30:
+            continue
+        if not (days_left in (30, 14) or days_left <= 7):
+            continue
+
+        dedupe_key = f"doc_expiry_sent:{d['id']}:{today.isoformat()}"
+        if db.get_setting(dedupe_key):
+            continue
+
+        if days_left == 0:
+            msg = f"⚠️ <b>{d['label']}</b> expires <b>today</b>."
+        elif days_left <= 7:
+            msg = f"⚠️ <b>{d['label']}</b> expires in {days_left} day{'s' if days_left != 1 else ''}."
+        elif days_left == 14:
+            msg = f"📅 <b>{d['label']}</b> expires in 2 weeks."
+        else:  # 30
+            msg = f"📅 <b>{d['label']}</b> expires in 1 month."
+
+        if telegram_notify.send(msg):
+            db.set_setting(dedupe_key, "1")
 
 
 def get_overbudget_categories() -> list[str]:
@@ -299,6 +389,7 @@ def tick() -> None:
         try:
             check_reminders()
             check_recurring_transactions()
+            check_document_expiries()
         finally:
             db.set_setting("last_reminder_run", today.isoformat())
 
@@ -307,6 +398,10 @@ def tick() -> None:
             send_evening_digest()
         finally:
             db.set_setting("last_habit_run", today.isoformat())
+
+    # Self-contained dedupe, safe to call every tick regardless of hour —
+    # it only actually sends when now_hour matches a habit's own reminder_hour.
+    check_individual_habit_reminders()
 
 
 def start_scheduler() -> BackgroundScheduler:
