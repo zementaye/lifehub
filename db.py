@@ -121,7 +121,9 @@ CREATE TABLE IF NOT EXISTS recurring_transactions (
     type TEXT NOT NULL,           -- 'income' or 'expense'
     amount REAL NOT NULL,
     category_id INTEGER,          -- expenses only
-    day_of_month INTEGER NOT NULL DEFAULT 1,  -- 1-28, which day it posts each month
+    frequency TEXT NOT NULL DEFAULT 'monthly',  -- 'monthly' or 'weekly'
+    day_of_month INTEGER NOT NULL DEFAULT 1,  -- 1-28, used when frequency = 'monthly'
+    day_of_week INTEGER,          -- 0=Mon .. 6=Sun, used when frequency = 'weekly'
     next_run TEXT NOT NULL,       -- ISO date of the next auto-log
     active INTEGER NOT NULL DEFAULT 1,
     created_at REAL NOT NULL,
@@ -133,6 +135,8 @@ CREATE TABLE IF NOT EXISTS recurring_transactions (
 # to existing databases that predate the column.
 _MIGRATIONS = [
     ("documents", "expiry_date", "TEXT"),
+    ("recurring_transactions", "frequency", "TEXT NOT NULL DEFAULT 'monthly'"),
+    ("recurring_transactions", "day_of_week", "INTEGER"),
 ]
 
 
