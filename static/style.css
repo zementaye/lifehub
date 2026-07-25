@@ -174,6 +174,36 @@ button.btn-icon {
 }
 button.btn-icon:hover { background: #f1efe8; }
 
+.savings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.savings-goal-card { padding: 14px; }
+.savings-goal-card .budget-bar-label { margin-bottom: 8px; }
+.savings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.savings-actions form {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 130px;
+}
+.savings-actions input {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+.savings-actions button { padding: 6px 10px; font-size: 0.82rem; white-space: nowrap; }
+
 hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
 /* Tables */
