@@ -111,15 +111,10 @@ def dashboard():
     bmi = bmi_of(latest_weight["weight_kg"], profile["height_cm"]) if latest_weight and profile["height_cm"] else None
 
     habit_status = []
+    status_by_id = scheduler.get_habit_status_batch(habits)
     for h in habits:
-        pkey = scheduler.period_key_for(h["frequency"], scheduler.today_local())
-        with db.get_conn() as conn:
-            done = conn.execute(
-                "SELECT 1 FROM habit_checkins WHERE habit_id = ? AND period_key = ?",
-                (h["id"], pkey),
-            ).fetchone()
-        streak = scheduler.compute_streak(h["id"], h["frequency"])
-        habit_status.append({"habit": h, "done": bool(done), "streak": streak})
+        s = status_by_id[h["id"]]
+        habit_status.append({"habit": h, "done": s["done"], "streak": s["streak"]})
 
     totals = {"calories": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0, "fiber_g": 0.0}
     for f in today_food:
@@ -419,15 +414,11 @@ def habits():
 
     today = scheduler.today_local()
     status = []
+    status_by_id = scheduler.get_habit_status_batch(items)
     for h in items:
         pkey = scheduler.period_key_for(h["frequency"], today)
-        with db.get_conn() as conn:
-            done = conn.execute(
-                "SELECT 1 FROM habit_checkins WHERE habit_id = ? AND period_key = ?",
-                (h["id"], pkey),
-            ).fetchone()
-        streak = scheduler.compute_streak(h["id"], h["frequency"])
-        status.append({"habit": h, "done": bool(done), "period_key": pkey, "streak": streak})
+        s = status_by_id[h["id"]]
+        status.append({"habit": h, "done": s["done"], "period_key": pkey, "streak": s["streak"]})
 
     return render_template("habits.html", status=status)
 
