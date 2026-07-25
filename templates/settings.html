@@ -5,7 +5,7 @@
 
 <div class="card wide">
   <h3>Notifications (Telegram)</h3>
-  <p class="muted">Point this at any bot you own. Message <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> to find your own chat ID.</p>
+  <p class="muted">Point this at any bot you own. Message <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> to find your own chat ID. Note: Telegram won't let a bot message you until you've sent <em>it</em> a message first (open your bot and hit Start) — the most common cause of "chat not found" even with a correct token/ID.</p>
   <form method="post" action="{{ url_for('save_settings') }}" class="inline-form">
     <label>Bot token <input type="text" name="tg_bot_token" value="{{ values.tg_bot_token }}" placeholder="123456:ABC-..."></label>
     <label>Your chat ID <input type="text" name="tg_chat_id" value="{{ values.tg_chat_id }}" placeholder="e.g. 123456789"></label>
