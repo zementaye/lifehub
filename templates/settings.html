@@ -33,6 +33,7 @@
 
 <div class="card wide">
   <h3>Scheduling</h3>
+  <p class="muted">These are shared defaults, not per-item settings. Individual habits can have their own reminder time set on the Habits page (which overrides the shared one below); vault documents get automatic expiry reminders regardless of what's set here.</p>
   <form method="post" action="{{ url_for('save_settings') }}" class="inline-form">
     <label>Timezone <input type="text" name="timezone" value="{{ values.timezone }}" placeholder="Africa/Addis_Ababa"></label>
     <label>Currency <input type="text" name="currency" value="{{ values.currency }}" placeholder="ETB"></label>
@@ -55,6 +56,10 @@
     </label>
     <button type="submit">Save</button>
   </form>
-  <p class="muted">Weekly habits are checked for completion on the day the week "ends." Monthly habits are checked on the last day of the month.</p>
+  <p class="muted">
+    <strong>Reminder send hour</strong> — when your standalone Reminders (the Reminders page), recurring transactions, and vault expiry checks all get processed each day.<br>
+    <strong>Habit nudge hour</strong> — when you get one combined message listing any habits still undone today, <em>excluding</em> habits that have their own custom reminder time set.<br>
+    Weekly habits are checked for completion on the day the week "ends." Monthly habits are checked on the last day of the month.
+  </p>
 </div>
 {% endblock %}
