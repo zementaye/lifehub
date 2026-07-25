@@ -295,7 +295,22 @@ ALLOWED_EXT = {"png", "jpg", "jpeg", "webp", "heic", "pdf"}
 @app.route("/vault")
 def vault():
     with db.get_conn() as conn:
-        docs = conn.execute("SELECT * FROM documents ORDER BY label").fetchall()
+        rows = conn.execute("SELECT * FROM documents ORDER BY label").fetchall()
+
+    today = scheduler.today_local()
+    docs = []
+    for d in rows:
+        entry = dict(d)
+        if d["expiry_date"]:
+            try:
+                entry["days_left"] = (date.fromisoformat(d["expiry_date"]) - today).days
+            except ValueError:
+                entry["days_left"] = None
+        else:
+            entry["days_left"] = None
+        entry["acknowledged"] = d["expiry_ack_date"] == d["expiry_date"] and d["expiry_date"] is not None
+        docs.append(entry)
+
     return render_template("vault.html", docs=docs)
 
 
@@ -304,7 +319,6 @@ def vault_upload():
     label = request.form.get("label", "").strip()
     notes = request.form.get("notes", "").strip()
     expiry_date = request.form.get("expiry_date", "").strip() or None
-    make_reminder = request.form.get("make_reminder") == "on"
     file = request.files.get("file")
 
     if not label or not file or file.filename == "":
@@ -324,13 +338,35 @@ def vault_upload():
             "INSERT INTO documents (label, filename, notes, expiry_date, created_at) VALUES (?,?,?,?,?)",
             (label, filename, notes, expiry_date, db.now()),
         )
-        if expiry_date and make_reminder:
-            conn.execute(
-                "INSERT INTO reminders (title, next_due, recurrence, active, created_at) VALUES (?,?,?,1,?)",
-                (f"{label} expires", expiry_date, "once", db.now()),
-            )
 
-    flash(f"Saved {label}." + (" Reminder created too." if expiry_date and make_reminder else ""))
+    flash(f"Saved {label}." + (" You'll get expiry reminders automatically as the date approaches." if expiry_date else ""))
+    return redirect(url_for("vault"))
+
+
+@app.route("/vault/<int:doc_id>/renew", methods=["POST"])
+def vault_renew(doc_id):
+    new_expiry = request.form.get("expiry_date", "").strip() or None
+    with db.get_conn() as conn:
+        # Renewing to a new date naturally resets the reminder cycle, since
+        # expiry_ack_date is cleared and no longer matches the old expiry.
+        conn.execute(
+            "UPDATE documents SET expiry_date = ?, expiry_ack_date = NULL WHERE id = ?",
+            (new_expiry, doc_id),
+        )
+    flash("Expiry date updated.")
+    return redirect(url_for("vault"))
+
+
+@app.route("/vault/<int:doc_id>/acknowledge", methods=["POST"])
+def vault_acknowledge(doc_id):
+    with db.get_conn() as conn:
+        doc = conn.execute("SELECT * FROM documents WHERE id = ?", (doc_id,)).fetchone()
+        if doc:
+            conn.execute(
+                "UPDATE documents SET expiry_ack_date = ? WHERE id = ?",
+                (doc["expiry_date"], doc_id),
+            )
+    flash("Got it — reminders paused for this expiry until you renew it.")
     return redirect(url_for("vault"))
 
 
@@ -427,13 +463,26 @@ def habits():
 def add_habit():
     title = request.form.get("title", "").strip()
     frequency = request.form.get("frequency", "daily")
+    reminder_hour = request.form.get("reminder_hour", type=int)
+    if reminder_hour is not None:
+        reminder_hour = max(0, min(reminder_hour, 23))
     if title:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO habits (title, frequency, active, created_at) VALUES (?,?,1,?)",
-                (title, frequency, db.now()),
+                "INSERT INTO habits (title, frequency, reminder_hour, active, created_at) VALUES (?,?,?,1,?)",
+                (title, frequency, reminder_hour, db.now()),
             )
         flash(f"Habit added: {title}")
+    return redirect(url_for("habits"))
+
+
+@app.route("/habits/<int:habit_id>/reminder", methods=["POST"])
+def set_habit_reminder(habit_id):
+    reminder_hour = request.form.get("reminder_hour", type=int)
+    if reminder_hour is not None:
+        reminder_hour = max(0, min(reminder_hour, 23))
+    with db.get_conn() as conn:
+        conn.execute("UPDATE habits SET reminder_hour = ? WHERE id = ?", (reminder_hour, habit_id))
     return redirect(url_for("habits"))
 
 
