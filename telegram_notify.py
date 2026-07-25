@@ -13,16 +13,24 @@ logger = logging.getLogger(__name__)
 
 
 def get_credentials() -> tuple[str, str]:
-    token = db.get_setting("tg_bot_token", config.TG_BOT_TOKEN)
-    chat_id = db.get_setting("tg_chat_id", config.TG_CHAT_ID)
+    token = db.get_setting("tg_bot_token", config.TG_BOT_TOKEN).strip()
+    chat_id = db.get_setting("tg_chat_id", config.TG_CHAT_ID).strip()
     return token, chat_id
 
 
 def send(text: str) -> bool:
+    ok, _err = send_detailed(text)
+    return ok
+
+
+def send_detailed(text: str) -> tuple[bool, str]:
+    """Same as send(), but also returns Telegram's actual error message
+    (e.g. 'Unauthorized' for a bad token, 'chat not found' for a bad chat
+    ID or a bot you haven't started a conversation with) instead of just
+    True/False, so failures are actually diagnosable."""
     token, chat_id = get_credentials()
     if not token or not chat_id:
-        logger.warning("Telegram bot not configured — skipping notification: %s", text)
-        return False
+        return False, "Bot token or chat ID isn't set."
     try:
         resp = requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
@@ -30,9 +38,13 @@ def send(text: str) -> bool:
             timeout=10,
         )
         if not resp.ok:
-            logger.error("Telegram notify failed: %s", resp.text)
-            return False
-        return True
-    except requests.RequestException:
+            try:
+                err = resp.json().get("description", resp.text)
+            except ValueError:
+                err = resp.text
+            logger.error("Telegram notify failed: %s", err)
+            return False, err
+        return True, ""
+    except requests.RequestException as e:
         logger.exception("Telegram notify request failed")
-        return False
+        return False, str(e)
