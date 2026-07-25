@@ -586,31 +586,46 @@ def delete_budget_category(cat_id):
 @app.route("/budget/recurring", methods=["POST"])
 def add_recurring_transaction():
     import calendar
+    from datetime import timedelta
 
     title = request.form.get("title", "").strip()
     ttype = request.form.get("type", "expense")
     amount = request.form.get("amount", type=float)
     category_id = request.form.get("category_id", type=int) or None
+    frequency = request.form.get("frequency", "monthly")
+    if frequency not in ("monthly", "weekly"):
+        frequency = "monthly"
     day_of_month = request.form.get("day_of_month", type=int) or 1
     day_of_month = max(1, min(day_of_month, 28))
+    day_of_week = request.form.get("day_of_week", type=int)
+    day_of_week = 0 if day_of_week is None else max(0, min(day_of_week, 6))
     start_raw = request.form.get("start_date") or scheduler.today_local().isoformat()
 
     if title and amount:
-        if len(start_raw) == 7:  # "YYYY-MM" from the month picker
+        if len(start_raw) == 7:  # "YYYY-MM" from the month picker (monthly only)
             start_raw += "-01"
         start = date.fromisoformat(start_raw)
-        clamped_day = min(day_of_month, calendar.monthrange(start.year, start.month)[1])
-        next_run = start.replace(day=clamped_day)
-        if next_run < scheduler.today_local():
-            next_run = scheduler.add_months(next_run, 1)
+
+        if frequency == "weekly":
+            next_run = start
+            while next_run.weekday() != day_of_week:
+                next_run += timedelta(days=1)
+            while next_run < scheduler.today_local():
+                next_run += timedelta(days=7)
+        else:
+            clamped_day = min(day_of_month, calendar.monthrange(start.year, start.month)[1])
+            next_run = start.replace(day=clamped_day)
+            if next_run < scheduler.today_local():
+                next_run = scheduler.add_months(next_run, 1)
 
         with db.get_conn() as conn:
             conn.execute(
                 "INSERT INTO recurring_transactions "
-                "(title, type, amount, category_id, day_of_month, next_run, active, created_at) "
-                "VALUES (?,?,?,?,?,?,1,?)",
+                "(title, type, amount, category_id, frequency, day_of_month, day_of_week, next_run, active, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,1,?)",
                 (title, ttype, amount, category_id if ttype == "expense" else None,
-                 day_of_month, next_run.isoformat(), db.now()),
+                 frequency, day_of_month, day_of_week if frequency == "weekly" else None,
+                 next_run.isoformat(), db.now()),
             )
         flash(f"Recurring {ttype} set up: {title} — first run {next_run.isoformat()}")
     return redirect(url_for("budget"))
