@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS habits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     frequency TEXT NOT NULL DEFAULT 'daily',
+    reminder_hour INTEGER,        -- optional per-habit reminder time (0-23); NULL = covered by the shared evening digest instead
     active INTEGER NOT NULL DEFAULT 1,
     created_at REAL NOT NULL
 );
@@ -160,8 +161,10 @@ CREATE TABLE IF NOT EXISTS savings_contributions (
 # to existing databases that predate the column.
 _MIGRATIONS = [
     ("documents", "expiry_date", "TEXT"),
+    ("documents", "expiry_ack_date", "TEXT"),
     ("recurring_transactions", "frequency", "TEXT NOT NULL DEFAULT 'monthly'"),
     ("recurring_transactions", "day_of_week", "INTEGER"),
+    ("habits", "reminder_hour", "INTEGER"),
 ]
 
 
