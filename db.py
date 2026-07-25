@@ -129,6 +129,25 @@ CREATE TABLE IF NOT EXISTS recurring_transactions (
     created_at REAL NOT NULL,
     FOREIGN KEY (category_id) REFERENCES budget_categories(id) ON DELETE SET NULL
 );
+
+CREATE TABLE IF NOT EXISTS savings_goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,       -- e.g. "Emergency fund", "New laptop"
+    target_amount REAL,              -- optional; NULL = open-ended jar, no target
+    current_amount REAL NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS savings_contributions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    goal_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    amount REAL NOT NULL,            -- positive = deposit, negative = withdrawal
+    transaction_id INTEGER,          -- the matching row this created in `transactions`
+    created_at REAL NOT NULL,
+    FOREIGN KEY (goal_id) REFERENCES savings_goals(id) ON DELETE CASCADE,
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
+);
 """
 
 # (table, column, sqlite type) — added after initial release, applied via ALTER TABLE
