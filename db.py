@@ -9,6 +9,12 @@ import config
 
 USE_TURSO = bool(config.TURSO_DATABASE_URL and config.TURSO_AUTH_TOKEN)
 
+# Reused across every Turso HTTP call for the life of the process, so the
+# underlying TCP/TLS connection stays alive (keep-alive) instead of doing a
+# fresh handshake on every single query — each query is a real network round
+# trip once the DB is remote, so this matters a lot for perceived speed.
+_http_session = requests.Session()
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -251,7 +257,7 @@ class _TursoHttpConn:
                 {"type": "close"},
             ]
         }
-        resp = requests.post(self._url, json=payload, headers=self._headers, timeout=15)
+        resp = _http_session.post(self._url, json=payload, headers=self._headers, timeout=15)
         resp.raise_for_status()
         data = resp.json()
 
