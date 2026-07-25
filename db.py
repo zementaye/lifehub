@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS recurring_transactions (
 CREATE TABLE IF NOT EXISTS savings_goals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,       -- e.g. "Emergency fund", "New laptop"
-    target_amount REAL,              -- optional; NULL = open-ended jar, no target
+    target_amount REAL,              -- optional, NULL = open-ended jar with no target
     current_amount REAL NOT NULL DEFAULT 0,
     created_at REAL NOT NULL
 );
@@ -270,9 +270,17 @@ class _TursoHttpConn:
         return _TursoCursor(cols, rows, int(lastrowid) if lastrowid else None)
 
     def executescript(self, script):
-        # Run statements one at a time over HTTP; fine here since SCHEMA has
-        # no ';' inside string literals.
-        for stmt in filter(None, (s.strip() for s in script.split(";"))):
+        # Run statements one at a time over HTTP. Strip '-- comment' text
+        # from each line first — a naive split on ';' would otherwise break
+        # a statement in half if any comment happens to contain a
+        # semicolon (this bit us once already).
+        cleaned_lines = []
+        for line in script.split("\n"):
+            if "--" in line:
+                line = line[: line.index("--")]
+            cleaned_lines.append(line)
+        cleaned = "\n".join(cleaned_lines)
+        for stmt in filter(None, (s.strip() for s in cleaned.split(";"))):
             self.execute(stmt)
 
     def commit(self):
