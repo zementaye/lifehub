@@ -751,6 +751,7 @@ def save_settings():
         val = request.form.get(key)
         if val is None:
             continue  # field wasn't part of the form that was submitted — leave untouched
+        val = val.strip()  # copy-pasted tokens/IDs often carry a stray space or newline
         if val == "":
             db.delete_setting(key)  # explicit blank = revert to default
             continue
@@ -767,8 +768,11 @@ def save_settings():
 
 @app.route("/settings/test-notify", methods=["POST"])
 def test_notify():
-    ok = telegram_notify.send("✅ Test notification from your Life Hub!")
-    flash("Test message sent!" if ok else "Failed to send — check your bot token/chat ID.")
+    ok, err = telegram_notify.send_detailed("✅ Test notification from your Life Hub!")
+    if ok:
+        flash("Test message sent!")
+    else:
+        flash(f"Telegram said: {err}")
     return redirect(url_for("settings"))
 
 
