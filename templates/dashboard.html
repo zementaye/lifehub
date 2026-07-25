@@ -33,7 +33,7 @@
     {% if habit_status %}
       <ul class="checklist">
         {% for hs in habit_status %}
-          <li class="{{ 'done' if hs.done }}">{{ '✅' if hs.done else '⬜' }} {{ hs.habit.title }}{% if hs.streak > 0 %} <span class="streak-badge">🔥 {{ hs.streak }}</span>{% endif %}</li>
+          <li class="{{ 'done' if hs.done }}"><span class="status-dot {{ 'done' if hs.done }}"></span> {{ hs.habit.title }}{% if hs.streak > 0 %} <span class="streak-badge">🔥 {{ hs.streak }}</span>{% endif %}</li>
         {% endfor %}
       </ul>
     {% else %}
