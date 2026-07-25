@@ -28,7 +28,7 @@
           {% for hs in items %}
             <li class="{{ 'done' if hs.done }}">
               <form method="post" action="{{ url_for('uncheck_habit' if hs.done else 'checkin_habit', habit_id=hs.habit.id) }}" class="checkbox-form">
-                <button type="submit" class="checkbox-btn">{{ '✅' if hs.done else '⬜' }}</button>
+                <button type="submit" class="checkbox-btn {{ 'checked' if hs.done }}" aria-label="{{ 'Mark not done' if hs.done else 'Mark done' }}"></button>
               </form>
               <span>{{ hs.habit.title }}</span>
               {% if hs.streak > 0 %}<span class="streak-badge">🔥 {{ hs.streak }}</span>{% endif %}
