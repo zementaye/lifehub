@@ -310,7 +310,18 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 }
 .checklist.interactive li:last-child { border-bottom: none; }
 .checklist.interactive li span { flex: 1; text-decoration: inherit; }
-.checkbox-form, .delete-form { display: inline; }
+.checkbox-form, .delete-form, .habit-reminder-form { display: inline-flex; align-items: center; gap: 4px; }
+.habit-reminder-form input {
+  width: 42px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  text-align: center;
+}
 .checkbox-btn {
   width: 22px; height: 22px;
   border: 2px solid var(--border);
@@ -400,6 +411,34 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
 /* Vault */
 .doc-card { text-align: center; }
+.expiry-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
+.expiry-badge.soon { background: rgba(201,131,47,0.16); color: var(--primary); }
+.expiry-badge.urgent { background: rgba(193,80,58,0.18); color: var(--danger); }
+.expiry-badge.expired { background: var(--danger); color: #fff; }
+.expiry-badge.muted-badge { background: rgba(137,150,163,0.16); color: var(--muted); }
+.doc-expiry-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 6px;
+}
+.doc-expiry-actions input {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 0.78rem;
+}
 
 .dropzone {
   position: relative;
