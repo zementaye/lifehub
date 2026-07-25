@@ -82,7 +82,7 @@
 
 <div class="card wide">
   <h3>Recurring — Jobs, Salary &amp; Bills</h3>
-  <p class="muted">Auto-logs itself as a transaction each month on the day you set (e.g. payday, rent due date).</p>
+  <p class="muted">Auto-logs itself as a transaction on a schedule you set — monthly (e.g. payday, rent due date) or weekly (e.g. a job that pays every Tuesday).</p>
   <form method="post" action="{{ url_for('add_recurring_transaction') }}" class="inline-form">
     <label>Title <input type="text" name="title" placeholder="e.g. Design job salary, Rent" required></label>
     <label>Type
@@ -98,21 +98,50 @@
         {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
       </select>
     </label>
-    <label>Day of month <input type="number" name="day_of_month" min="1" max="28" value="1"></label>
-    <label>Starting month <input type="month" name="start_date" value="{{ month }}"></label>
+    <label>Frequency
+      <select name="frequency" id="rec-freq" onchange="
+        var isWeekly = this.value === 'weekly';
+        document.getElementById('rec-dom-field').style.display = isWeekly ? 'none' : 'flex';
+        document.getElementById('rec-dow-field').style.display = isWeekly ? 'flex' : 'none';
+        document.getElementById('rec-start').type = isWeekly ? 'date' : 'month';
+        document.getElementById('rec-start-label').textContent = isWeekly ? 'Starting date' : 'Starting month';
+      ">
+        <option value="monthly">Monthly</option>
+        <option value="weekly">Weekly</option>
+      </select>
+    </label>
+    <label id="rec-dom-field">Day of month <input type="number" name="day_of_month" min="1" max="28" value="1"></label>
+    <label id="rec-dow-field" style="display:none;">Day of week
+      <select name="day_of_week">
+        <option value="0">Monday</option>
+        <option value="1">Tuesday</option>
+        <option value="2">Wednesday</option>
+        <option value="3">Thursday</option>
+        <option value="4">Friday</option>
+        <option value="5">Saturday</option>
+        <option value="6">Sunday</option>
+      </select>
+    </label>
+    <label><span id="rec-start-label">Starting month</span> <input type="month" name="start_date" id="rec-start" value="{{ month }}"></label>
     <button type="submit">Add</button>
   </form>
 
   {% if recurring %}
     <table class="table" style="margin-top:14px;">
-      <thead><tr><th>Title</th><th>Type</th><th>Amount</th><th>Day</th><th>Next run</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Title</th><th>Type</th><th>Amount</th><th>Frequency</th><th>Next run</th><th>Status</th><th></th></tr></thead>
       <tbody>
       {% for r in recurring %}
         <tr class="{{ '' if r.active else 'muted' }}">
           <td>{{ r.title }}</td>
           <td>{{ '💰 Income' if r.type == 'income' else '💸 Expense' }}{% if r.category_name %} · {{ r.category_name }}{% endif %}</td>
           <td>{{ r.amount | round | int }} {{ currency }}</td>
-          <td>{{ r.day_of_month }}</td>
+          <td>
+            {% if r.frequency == 'weekly' %}
+              Weekly · {{ ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][r.day_of_week] }}
+            {% else %}
+              Monthly · day {{ r.day_of_month }}
+            {% endif %}
+          </td>
           <td>{{ r.next_run }}</td>
           <td>{{ 'Active' if r.active else 'Paused' }}</td>
           <td class="row-actions">
