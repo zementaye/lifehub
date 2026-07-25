@@ -499,6 +499,9 @@ def budget():
             "LEFT JOIN budget_categories c ON c.id = r.category_id "
             "ORDER BY r.active DESC, r.next_run"
         ).fetchall()
+        savings_goals = conn.execute(
+            "SELECT * FROM savings_goals ORDER BY created_at"
+        ).fetchall()
 
         income_total = conn.execute(
             "SELECT COALESCE(SUM(amount),0) AS t FROM transactions WHERE type='income' AND strftime('%Y-%m', date)=?",
@@ -527,7 +530,7 @@ def budget():
         "budget.html", month=month, categories=categories, txns=txns,
         income_total=income_total, expense_total=expense_total,
         net=income_total - expense_total, category_spend=category_spend,
-        currency=currency, recurring=recurring,
+        currency=currency, recurring=recurring, savings_goals=savings_goals,
     )
 
 
@@ -648,6 +651,88 @@ def delete_recurring_transaction(rid):
     return redirect(url_for("budget"))
 
 
+# ── Savings goals ────────────────────────────────────────────────────────
+
+@app.route("/budget/savings", methods=["POST"])
+def add_savings_goal():
+    name = request.form.get("name", "").strip()
+    target_amount = request.form.get("target_amount", type=float)
+    if name:
+        with db.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO savings_goals (name, target_amount, current_amount, created_at) "
+                "VALUES (?,?,0,?)",
+                (name, target_amount, db.now()),
+            )
+        flash(f"Savings goal created: {name}")
+    return redirect(url_for("budget"))
+
+
+@app.route("/budget/savings/<int:goal_id>/contribute", methods=["POST"])
+def contribute_savings_goal(goal_id):
+    amount = request.form.get("amount", type=float)
+    today = scheduler.today_local().isoformat()
+    if amount and amount > 0:
+        with db.get_conn() as conn:
+            goal = conn.execute("SELECT * FROM savings_goals WHERE id = ?", (goal_id,)).fetchone()
+            if goal:
+                # Money moving into savings reduces what's available to spend,
+                # so it's logged as a normal expense transaction — the goal's
+                # progress bar and your budget totals both stay accurate.
+                cur = conn.execute(
+                    "INSERT INTO transactions (date, type, category_id, description, amount, created_at) "
+                    "VALUES (?,?,?,?,?,?)",
+                    (today, "expense", None, f"Savings: {goal['name']}", amount, db.now()),
+                )
+                conn.execute(
+                    "INSERT INTO savings_contributions (goal_id, date, amount, transaction_id, created_at) "
+                    "VALUES (?,?,?,?,?)",
+                    (goal_id, today, amount, cur.lastrowid, db.now()),
+                )
+                conn.execute(
+                    "UPDATE savings_goals SET current_amount = current_amount + ? WHERE id = ?",
+                    (amount, goal_id),
+                )
+        flash(f"Added {amount:.0f} to savings")
+    return redirect(url_for("budget"))
+
+
+@app.route("/budget/savings/<int:goal_id>/withdraw", methods=["POST"])
+def withdraw_savings_goal(goal_id):
+    amount = request.form.get("amount", type=float)
+    today = scheduler.today_local().isoformat()
+    if amount and amount > 0:
+        with db.get_conn() as conn:
+            goal = conn.execute("SELECT * FROM savings_goals WHERE id = ?", (goal_id,)).fetchone()
+            if goal:
+                amount = min(amount, goal["current_amount"])  # can't withdraw more than saved
+                # Money coming back out of savings adds back to what's
+                # available to spend, so it's logged as income.
+                cur = conn.execute(
+                    "INSERT INTO transactions (date, type, category_id, description, amount, created_at) "
+                    "VALUES (?,?,?,?,?,?)",
+                    (today, "income", None, f"Savings withdrawal: {goal['name']}", amount, db.now()),
+                )
+                conn.execute(
+                    "INSERT INTO savings_contributions (goal_id, date, amount, transaction_id, created_at) "
+                    "VALUES (?,?,?,?,?)",
+                    (goal_id, today, -amount, cur.lastrowid, db.now()),
+                )
+                conn.execute(
+                    "UPDATE savings_goals SET current_amount = current_amount - ? WHERE id = ?",
+                    (amount, goal_id),
+                )
+        flash(f"Withdrew {amount:.0f} from savings")
+    return redirect(url_for("budget"))
+
+
+@app.route("/budget/savings/<int:goal_id>/delete", methods=["POST"])
+def delete_savings_goal(goal_id):
+    with db.get_conn() as conn:
+        conn.execute("DELETE FROM savings_goals WHERE id = ?", (goal_id,))
+    return redirect(url_for("budget"))
+
+
 # ── Settings ─────────────────────────────────────────────────────────────
 
 @app.route("/settings")
@@ -702,7 +787,7 @@ def export_data():
     tables = [
         "profile", "weight_entries", "sessions", "custom_foods", "food_log",
         "documents", "reminders", "habits", "habit_checkins", "budget_categories",
-        "transactions", "recurring_transactions", "settings",
+        "transactions", "recurring_transactions", "savings_goals", "savings_contributions", "settings",
     ]
     data = {}
     with db.get_conn() as conn:
