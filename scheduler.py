@@ -141,7 +141,54 @@ def compute_streak(habit_id: int, frequency: str) -> int:
         streak += 1
         cursor = step_back(cursor, frequency)
     return streak
+
+
+def get_habit_status_batch(habits: list) -> dict:
+    """Same result as calling compute_streak() + a 'done today' check for
+    each habit individually, but with ONE database query total instead of
+    two per habit. That N+1 pattern (9 round-trips for just 4 habits) is
+    fine on local sqlite, but each round-trip is a real network request
+    once the DB is remote (Turso), which is what was making the Habits
+    page and dashboard noticeably slow to load/update.
+
+    Returns {habit_id: {"done": bool, "streak": int}}.
+    """
+    if not habits:
+        return {}
+
     today = today_local()
+    habit_ids = [h["id"] for h in habits]
+    placeholders = ",".join("?" for _ in habit_ids)
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            f"SELECT habit_id, period_key FROM habit_checkins WHERE habit_id IN ({placeholders})",
+            tuple(habit_ids),
+        ).fetchall()
+
+    checkins_by_habit = {}
+    for row in rows:
+        checkins_by_habit.setdefault(row["habit_id"], set()).add(row["period_key"])
+
+    result = {}
+    for h in habits:
+        freq = h["frequency"]
+        checkins = checkins_by_habit.get(h["id"], set())
+        current_pkey = period_key_for(freq, today)
+        done = current_pkey in checkins
+
+        if not checkins:
+            streak = 0
+        else:
+            cursor = today
+            if current_pkey not in checkins:
+                cursor = step_back(cursor, freq)
+            streak = 0
+            while period_key_for(freq, cursor) in checkins:
+                streak += 1
+                cursor = step_back(cursor, freq)
+
+        result[h["id"]] = {"done": done, "streak": streak}
+    return result
     weekly_day = today.weekday() == get_week_end_day()
     monthly_day = is_last_day_of_month(today)
 
