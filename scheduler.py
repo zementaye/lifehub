@@ -1,6 +1,6 @@
 import calendar
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -208,9 +208,15 @@ def check_recurring_transactions() -> None:
             icon = "💰" if r["type"] == "income" else "💸"
             telegram_notify.send(f"{icon} Recurring {r['type']} logged: <b>{r['title']}</b> — {r['amount']:.0f} {currency}")
 
-            new_next = add_months(date.fromisoformat(r["next_run"]), 1)
-            while new_next <= today:
+            new_next = date.fromisoformat(r["next_run"])
+            if r["frequency"] == "weekly":
+                new_next += timedelta(days=7)
+                while new_next <= today:
+                    new_next += timedelta(days=7)
+            else:
                 new_next = add_months(new_next, 1)
+                while new_next <= today:
+                    new_next = add_months(new_next, 1)
             conn.execute(
                 "UPDATE recurring_transactions SET next_run = ? WHERE id = ?",
                 (new_next.isoformat(), r["id"]),
