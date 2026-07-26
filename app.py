@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 import uuid
 from datetime import date, timedelta
 
@@ -16,6 +17,12 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
+
+# Changes every time the app process starts (i.e. every deploy/restart).
+# Appended as a ?v= query string on static assets in base.html so browsers
+# fetch a fresh copy after each deploy instead of serving a stale cached
+# style.css/app.js for up to 12 hours (Flask's default static cache time).
+app.jinja_env.globals["asset_version"] = str(int(time.time()))
 
 db.init_db()
 
