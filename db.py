@@ -141,6 +141,7 @@ CREATE TABLE IF NOT EXISTS savings_goals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,       -- e.g. "Emergency fund", "New laptop"
     target_amount REAL,              -- optional, NULL = open-ended jar with no target
+    target_date TEXT,                -- optional date to hit the target by
     current_amount REAL NOT NULL DEFAULT 0,
     created_at REAL NOT NULL
 );
@@ -165,6 +166,7 @@ _MIGRATIONS = [
     ("recurring_transactions", "frequency", "TEXT NOT NULL DEFAULT 'monthly'"),
     ("recurring_transactions", "day_of_week", "INTEGER"),
     ("habits", "reminder_hour", "INTEGER"),
+    ("savings_goals", "target_date", "TEXT"),
 ]
 
 
