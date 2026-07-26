@@ -67,3 +67,45 @@
     return div.innerHTML;
   }
 })();
+
+// Count-up animation for any [data-countup] stat number, and animated
+// fill-in for any .animated-fill progress bar. Runs on every page.
+(function () {
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function animateCountUp(el) {
+    const target = parseFloat(el.dataset.countup);
+    if (isNaN(target)) return;
+    const duration = 800;
+    const start = performance.now();
+    const isNegative = target < 0;
+    const absTarget = Math.abs(target);
+
+    function frame(now) {
+      const t = Math.min((now - start) / duration, 1);
+      const value = Math.round(absTarget * easeOutCubic(t));
+      el.textContent = (isNegative ? '-' : '') + value.toLocaleString();
+      if (t < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function animateFills() {
+    document.querySelectorAll('.animated-fill').forEach((el) => {
+      const pct = parseFloat(el.dataset.targetPct);
+      if (isNaN(pct)) return;
+      // Force layout so the browser registers width:0 first, otherwise it
+      // may jump straight to the target instead of animating.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          el.style.width = Math.max(0, Math.min(pct, 100)) + '%';
+        });
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-countup]').forEach(animateCountUp);
+    animateFills();
+  });
+})();
