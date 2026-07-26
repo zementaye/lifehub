@@ -20,10 +20,10 @@
   <div class="card">
     <h3>Today's Nutrition</h3>
     <div class="stat-row">
-      <div class="stat"><span class="stat-value">{{ totals.calories | round | int }}</span><span class="stat-label">calories</span></div>
-      <div class="stat"><span class="stat-value">{{ totals.protein_g | round | int }}g</span><span class="stat-label">protein</span></div>
-      <div class="stat"><span class="stat-value">{{ totals.carbs_g | round | int }}g</span><span class="stat-label">carbs</span></div>
-      <div class="stat"><span class="stat-value">{{ totals.fat_g | round | int }}g</span><span class="stat-label">fat</span></div>
+      <div class="stat"><span class="stat-value" data-countup="{{ totals.calories | round | int }}">0</span><span class="stat-label">calories</span></div>
+      <div class="stat"><span class="stat-value"><span data-countup="{{ totals.protein_g | round | int }}">0</span><small>g</small></span><span class="stat-label">protein</span></div>
+      <div class="stat"><span class="stat-value"><span data-countup="{{ totals.carbs_g | round | int }}">0</span><small>g</small></span><span class="stat-label">carbs</span></div>
+      <div class="stat"><span class="stat-value"><span data-countup="{{ totals.fat_g | round | int }}">0</span><small>g</small></span><span class="stat-label">fat</span></div>
     </div>
     <a class="link" href="{{ url_for('nutrition') }}">Log food →</a>
   </div>
