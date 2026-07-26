@@ -6,7 +6,7 @@
 <title>{% block title %}Life Hub{% endblock %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version }}">
 </head>
 <body class="page-{{ request.endpoint }}">
 <header class="topbar">
@@ -45,7 +45,7 @@
   <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}"><span>✅</span>Habits</a>
 </nav>
 
-<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='app.js') }}?v={{ asset_version }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
