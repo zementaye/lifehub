@@ -8,9 +8,9 @@
     <label>Month <input type="month" name="month" value="{{ month }}" onchange="this.form.submit()"></label>
   </form>
   <div class="stat-row">
-    <div class="stat"><span class="stat-value">{{ income_total | round | int }}</span><span class="stat-label">Income ({{ currency }})</span></div>
-    <div class="stat"><span class="stat-value">{{ expense_total | round | int }}</span><span class="stat-label">Expenses ({{ currency }})</span></div>
-    <div class="stat"><span class="stat-value" style="color: {{ 'var(--danger)' if net < 0 else 'var(--primary)' }};">{{ net | round | int }}</span><span class="stat-label">Net</span></div>
+    <div class="stat"><span class="stat-value" data-countup="{{ income_total | round | int }}">0</span><span class="stat-label">Income ({{ currency }})</span></div>
+    <div class="stat"><span class="stat-value" data-countup="{{ expense_total | round | int }}">0</span><span class="stat-label">Expenses ({{ currency }})</span></div>
+    <div class="stat"><span class="stat-value {{ 'net-negative' if net < 0 else 'net-positive' }}" data-countup="{{ net | round | int }}">0</span><span class="stat-label">Net</span></div>
   </div>
 </div>
 
@@ -72,7 +72,7 @@
           <span class="{{ 'over' if cs.over }}">{{ cs.spent | round | int }} / {{ cs.limit | round | int }} {{ currency }}</span>
         </div>
         <div class="budget-bar-track">
-          <div class="budget-bar-fill {{ 'over' if cs.over }}" style="width: {{ cs.pct }}%;"></div>
+          <div class="budget-bar-fill animated-fill {{ 'over' if cs.over }}" data-target-pct="{{ cs.pct }}"></div>
         </div>
       </div>
     {% endif %}
@@ -161,19 +161,19 @@
   {% endif %}
 </div>
 
-<div class="card wide">
+<div class="card wide savings-card">
   <h3>Savings Goals</h3>
   <p class="muted">Set up separate jars to save toward — adding money logs it as an expense (moved out of what's available to spend); withdrawing logs it back as income.</p>
   <form method="post" action="{{ url_for('add_savings_goal') }}" class="inline-form">
     <label>Name <input type="text" name="name" placeholder="e.g. Emergency fund, New laptop" required></label>
     <label>Goal amount ({{ currency }}) <input type="number" step="0.01" name="target_amount" placeholder="optional"></label>
+    <label>Target date <input type="date" name="target_date"></label>
     <button type="submit">Add goal</button>
   </form>
 
   {% if savings_goals %}
     <div class="savings-grid">
       {% for g in savings_goals %}
-        {% set pct = (g.current_amount / g.target_amount * 100) if g.target_amount else None %}
         <div class="card savings-goal-card">
           <div class="budget-bar-label">
             <span><strong>{{ g.name }}</strong></span>
@@ -182,14 +182,30 @@
             </form>
           </div>
           <div class="budget-bar-label">
-            <span>{{ g.current_amount | round | int }}{% if g.target_amount %} / {{ g.target_amount | round | int }}{% endif %} {{ currency }}</span>
-            {% if pct is not none %}<span>{{ pct | round | int }}%</span>{% endif %}
+            <span class="money-readout">{{ g.current_amount | round | int }}{% if g.target_amount %} / {{ g.target_amount | round | int }}{% endif %} {{ currency }}</span>
+            {% if g.pct is not none %}<span>{{ g.pct | round | int }}%</span>{% endif %}
           </div>
-          {% if pct is not none %}
+          {% if g.pct is not none %}
             <div class="budget-bar-track">
-              <div class="budget-bar-fill" style="width: {{ [pct, 100] | min }}%;"></div>
+              <div class="budget-bar-fill animated-fill" data-target-pct="{{ [g.pct, 100] | min }}"></div>
             </div>
           {% endif %}
+
+          {% if g.status == 'reached' %}
+            <p class="savings-plan reached">🎉 Goal reached!</p>
+          {% elif g.status == 'overdue' %}
+            <p class="savings-plan overdue">⚠️ Target date passed — still {{ g.remaining | round | int }} {{ currency }} to go.</p>
+          {% elif g.status == 'on_track' %}
+            <p class="savings-plan on-track">Save ~<strong>{{ g.weekly_needed | round | int }} {{ currency }}/week</strong> to hit it by {{ g.target_date }} ({{ g.days_left }}d left).</p>
+          {% elif g.target_date %}
+            <p class="muted">Target date: {{ g.target_date }} ({{ g.days_left }}d left) — set a goal amount to see the weekly plan.</p>
+          {% endif %}
+
+          <form method="post" action="{{ url_for('set_savings_target', goal_id=g.id) }}" class="doc-expiry-actions">
+            <input type="date" name="target_date" value="{{ g.target_date or '' }}">
+            <button type="submit" class="btn-icon" title="Set/update target date">🎯</button>
+          </form>
+
           <div class="savings-actions">
             <form method="post" action="{{ url_for('contribute_savings_goal', goal_id=g.id) }}">
               <input type="number" step="0.01" name="amount" placeholder="Add {{ currency }}" required>
