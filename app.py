@@ -521,6 +521,40 @@ def delete_habit(habit_id):
 
 # ── Budget ───────────────────────────────────────────────────────────────
 
+def _augment_savings_goal(g):
+    """Adds computed fields to a savings_goals row: how much is left to
+    save, and — if a target date is set — how much per week that works out
+    to given what's already saved and how much time is left."""
+    entry = dict(g)
+    target = g["target_amount"]
+    current = g["current_amount"]
+    target_date = g["target_date"]
+
+    entry["remaining"] = max(0, target - current) if target else None
+    entry["pct"] = (current / target * 100) if target else None
+    entry["days_left"] = None
+    entry["weekly_needed"] = None
+    entry["status"] = None  # 'reached' | 'overdue' | 'on_track' | None
+
+    if target and current >= target:
+        entry["status"] = "reached"
+    elif target_date:
+        try:
+            td = date.fromisoformat(target_date)
+        except ValueError:
+            td = None
+        if td:
+            days_left = (td - scheduler.today_local()).days
+            entry["days_left"] = days_left
+            if days_left <= 0:
+                entry["status"] = "overdue"
+            elif target:
+                weeks_left = max(days_left / 7, 1 / 7)  # never divide by zero
+                entry["weekly_needed"] = entry["remaining"] / weeks_left
+                entry["status"] = "on_track"
+
+    return entry
+
 @app.route("/budget")
 def budget():
     month = request.args.get("month") or scheduler.today_local().strftime("%Y-%m")
@@ -539,9 +573,10 @@ def budget():
             "LEFT JOIN budget_categories c ON c.id = r.category_id "
             "ORDER BY r.active DESC, r.next_run"
         ).fetchall()
-        savings_goals = conn.execute(
+        savings_goals_raw = conn.execute(
             "SELECT * FROM savings_goals ORDER BY created_at"
         ).fetchall()
+        savings_goals = [_augment_savings_goal(g) for g in savings_goals_raw]
 
         income_total = conn.execute(
             "SELECT COALESCE(SUM(amount),0) AS t FROM transactions WHERE type='income' AND strftime('%Y-%m', date)=?",
@@ -697,14 +732,23 @@ def delete_recurring_transaction(rid):
 def add_savings_goal():
     name = request.form.get("name", "").strip()
     target_amount = request.form.get("target_amount", type=float)
+    target_date = request.form.get("target_date", "").strip() or None
     if name:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO savings_goals (name, target_amount, current_amount, created_at) "
-                "VALUES (?,?,0,?)",
-                (name, target_amount, db.now()),
+                "INSERT INTO savings_goals (name, target_amount, target_date, current_amount, created_at) "
+                "VALUES (?,?,?,0,?)",
+                (name, target_amount, target_date, db.now()),
             )
         flash(f"Savings goal created: {name}")
+    return redirect(url_for("budget"))
+
+
+@app.route("/budget/savings/<int:goal_id>/target", methods=["POST"])
+def set_savings_target(goal_id):
+    target_date = request.form.get("target_date", "").strip() or None
+    with db.get_conn() as conn:
+        conn.execute("UPDATE savings_goals SET target_date = ? WHERE id = ?", (target_date, goal_id))
     return redirect(url_for("budget"))
 
 
