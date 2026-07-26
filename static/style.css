@@ -23,8 +23,25 @@ body {
   margin: 0;
   font-family: var(--font-body);
   background: var(--bg);
+  background-attachment: fixed;
   color: var(--ink);
   padding-bottom: 76px;
+}
+
+/* Habits page — a "planner/checklist" character: faint dot grid, like
+   graph/journal paper you'd tick boxes on. */
+body.page-habits {
+  background-image: radial-gradient(rgba(201,131,47,0.16) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Budget page — a "ledger" character: faint crossed rule lines, like
+   financial ledger paper. */
+body.page-budget {
+  background-image:
+    linear-gradient(rgba(79,157,110,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79,157,110,0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
 h1, h2, h3, h4 {
@@ -77,6 +94,11 @@ a:hover { text-decoration: underline; }
   background: var(--primary);
   border-radius: 1px;
   display: inline-block;
+  animation: brand-breathe 3s ease-in-out infinite;
+}
+@keyframes brand-breathe {
+  0%, 100% { box-shadow: 0 0 0 rgba(201,131,47,0); }
+  50% { box-shadow: 0 0 8px rgba(201,131,47,0.6); }
 }
 .topnav { display: none; gap: 22px; }
 .topnav a {
@@ -162,6 +184,12 @@ a:hover { text-decoration: underline; }
   padding: 20px 16px 40px;
 }
 
+.content {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 28px 40px;
+}
+
 .flash { margin-bottom: 16px; }
 .flash-msg {
   background: var(--surface-raised);
@@ -191,7 +219,23 @@ a:hover { text-decoration: underline; }
   border-radius: var(--radius);
   padding: 18px;
   box-shadow: var(--shadow);
+  animation: card-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.content > h1 { animation: card-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.grid > .card:nth-of-type(1), .content > .card:nth-of-type(1) { animation-delay: 0.04s; }
+.grid > .card:nth-of-type(2), .content > .card:nth-of-type(2) { animation-delay: 0.09s; }
+.grid > .card:nth-of-type(3), .content > .card:nth-of-type(3) { animation-delay: 0.14s; }
+.grid > .card:nth-of-type(4), .content > .card:nth-of-type(4) { animation-delay: 0.19s; }
+.grid > .card:nth-of-type(n+5), .content > .card:nth-of-type(n+5) { animation-delay: 0.24s; }
+.savings-goal-card { animation: card-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.savings-grid > .savings-goal-card:nth-of-type(1) { animation-delay: 0.06s; }
+.savings-grid > .savings-goal-card:nth-of-type(2) { animation-delay: 0.11s; }
+.savings-grid > .savings-goal-card:nth-of-type(3) { animation-delay: 0.16s; }
+.savings-grid > .savings-goal-card:nth-of-type(n+4) { animation-delay: 0.21s; }
 
 .stat-row { display: flex; flex-wrap: wrap; gap: 24px; margin: 10px 0; }
 .stat { display: flex; flex-direction: column; border-left: 2px solid var(--primary); padding-left: 10px; }
@@ -339,6 +383,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .checkbox-btn.checked {
   background: var(--success);
   border-color: var(--success);
+  animation: check-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes check-pop {
+  0% { transform: scale(0.7); }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); }
 }
 .checkbox-btn.checked::after {
   content: "✓";
@@ -351,6 +401,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   font-family: var(--font-mono);
   font-size: 0.72rem; font-weight: 600; color: var(--primary);
   background: rgba(201,131,47,0.14); padding: 2px 7px; border-radius: 4px; margin-left: 4px;
+  display: inline-block;
+  animation: flame-pulse 1.8s ease-in-out infinite;
+}
+@keyframes flame-pulse {
+  0%, 100% { text-shadow: 0 0 0 rgba(201,131,47,0); transform: scale(1); }
+  50% { text-shadow: 0 0 8px rgba(201,131,47,0.55); transform: scale(1.05); }
 }
 .status-dot {
   display: inline-block;
@@ -406,8 +462,23 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   height: 7px; background: var(--surface-raised); border-radius: 3px; overflow: hidden;
   border: 1px solid var(--border);
 }
-.budget-bar-fill { height: 100%; background: var(--primary); }
-.budget-bar-fill.over { background: var(--danger); }
+.budget-bar-fill { height: 100%; background: var(--primary); width: 0; transition: width 1s cubic-bezier(0.22, 1, 0.36, 1); }
+.budget-bar-fill.over { background: var(--danger); animation: over-pulse 1.6s ease-in-out infinite; }
+@keyframes over-pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(193,80,58,0); }
+  50% { box-shadow: 0 0 10px rgba(193,80,58,0.7); }
+}
+.stat-value.net-positive { color: var(--success); text-shadow: 0 0 14px rgba(79,157,110,0.35); }
+.stat-value.net-negative { color: var(--danger); animation: net-warn 1.8s ease-in-out infinite; }
+@keyframes net-warn {
+  0%, 100% { text-shadow: 0 0 0 rgba(193,80,58,0); }
+  50% { text-shadow: 0 0 10px rgba(193,80,58,0.55); }
+}
+.money-readout { font-family: var(--font-mono); font-weight: 600; }
+.savings-plan { font-size: 0.82rem; margin: 6px 0 0; }
+.savings-plan.on-track { color: var(--accent); }
+.savings-plan.reached { color: var(--success); font-weight: 700; }
+.savings-plan.overdue { color: var(--danger); }
 
 /* Vault */
 .doc-card { text-align: center; }
