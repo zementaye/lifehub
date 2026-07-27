@@ -10,8 +10,19 @@
       <label>Height (cm)
         <input type="number" step="0.1" name="height_cm" value="{{ profile.height_cm or '' }}" required>
       </label>
+      <label>Birth date
+        <input type="date" name="birth_date" value="{{ profile.birth_date or '' }}">
+      </label>
+      <label>Sex
+        <select name="sex">
+          <option value="">— unset —</option>
+          <option value="male" {{ 'selected' if profile.sex == 'male' }}>Male</option>
+          <option value="female" {{ 'selected' if profile.sex == 'female' }}>Female</option>
+        </select>
+      </label>
       <button type="submit">Save</button>
     </form>
+    <p class="muted">Birth date and sex are only used to calculate your recommended daily intake on the Nutrition page.</p>
     {% if bmi %}
       <p class="stat-value">{{ bmi }} <small>BMI · {{ bmi_category }}</small></p>
     {% endif %}
