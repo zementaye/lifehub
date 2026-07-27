@@ -180,10 +180,6 @@ a:hover { text-decoration: underline; }
   body { padding-bottom: 24px; }
   .bottomnav { display: none; }
 }
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 20px 16px 40px;
-}
 
 .content {
   max-width: 1080px;
