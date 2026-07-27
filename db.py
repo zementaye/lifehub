@@ -18,7 +18,9 @@ _http_session = requests.Session()
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY CHECK (id = 1),
-    height_cm REAL
+    height_cm REAL,
+    birth_date TEXT,      -- used to compute age for recommended intake
+    sex TEXT              -- 'male' or 'female', used for the BMR formula
 );
 
 CREATE TABLE IF NOT EXISTS weight_entries (
@@ -167,6 +169,8 @@ _MIGRATIONS = [
     ("recurring_transactions", "day_of_week", "INTEGER"),
     ("habits", "reminder_hour", "INTEGER"),
     ("savings_goals", "target_date", "TEXT"),
+    ("profile", "birth_date", "TEXT"),
+    ("profile", "sex", "TEXT"),
 ]
 
 
