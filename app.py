@@ -49,6 +49,16 @@ def set_access_cookie(resp):
     return resp
 
 
+@app.after_request
+def no_cache_static(resp):
+    # Belt-and-suspenders on top of the ?v= cache-busting: force browsers to
+    # always revalidate style.css/app.js with the server instead of trusting
+    # a locally cached copy, no matter how that copy got cached in the past.
+    if request.path.startswith("/static/"):
+        resp.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return resp
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 def bmi_of(weight_kg: float, height_cm: float) -> float | None:
