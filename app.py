@@ -9,6 +9,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 import config
 import db
 import nutrition_api
+import nutrition_calc
 import scheduler
 import telegram_notify
 
@@ -169,9 +170,14 @@ def health():
 @app.route("/health/height", methods=["POST"])
 def set_height():
     height = request.form.get("height_cm", type=float)
+    birth_date = request.form.get("birth_date", "").strip() or None
+    sex = request.form.get("sex", "").strip() or None
     with db.get_conn() as conn:
-        conn.execute("UPDATE profile SET height_cm = ? WHERE id = 1", (height,))
-    flash("Height updated.")
+        conn.execute(
+            "UPDATE profile SET height_cm = ?, birth_date = ?, sex = ? WHERE id = 1",
+            (height, birth_date, sex),
+        )
+    flash("Profile updated.")
     return redirect(url_for("health"))
 
 
@@ -228,6 +234,15 @@ def nutrition():
         log = conn.execute("SELECT * FROM food_log WHERE date = ? ORDER BY id", (d,)).fetchall()
         custom_foods = conn.execute("SELECT * FROM custom_foods ORDER BY name").fetchall()
 
+        profile = conn.execute("SELECT * FROM profile WHERE id = 1").fetchone()
+        latest_weight = conn.execute(
+            "SELECT weight_kg FROM weight_entries ORDER BY date DESC, id DESC LIMIT 1"
+        ).fetchone()
+        week_ago = (date.today() - timedelta(days=7)).isoformat()
+        session_count = conn.execute(
+            "SELECT COUNT(*) AS c FROM sessions WHERE date >= ?", (week_ago,)
+        ).fetchone()["c"]
+
     totals = {"calories": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0, "fiber_g": 0.0}
     for f in log:
         for k in totals:
@@ -240,8 +255,29 @@ def nutrition():
         "protein_g": float(goal_protein) if goal_protein else None,
     }
 
+    recommendation = nutrition_calc.compute_recommendation(
+        height_cm=profile["height_cm"],
+        weight_kg=latest_weight["weight_kg"] if latest_weight else None,
+        birth_date_str=profile["birth_date"],
+        sex=profile["sex"],
+        today=date.today(),
+        session_count=session_count,
+    )
+
     return render_template("nutrition.html", log=log, custom_foods=custom_foods, totals=totals,
-                            view_date=d, goals=goals)
+                            view_date=d, goals=goals, recommendation=recommendation)
+
+
+@app.route("/nutrition/use-recommendation", methods=["POST"])
+def use_recommended_nutrition():
+    calories = request.form.get("calories", type=int)
+    protein_g = request.form.get("protein_g", type=int)
+    if calories:
+        db.set_setting("nutrition_goal_calories", str(calories))
+    if protein_g:
+        db.set_setting("nutrition_goal_protein", str(protein_g))
+    flash("Recommended intake applied as your daily goal.")
+    return redirect(url_for("nutrition"))
 
 
 @app.route("/nutrition/search")
