@@ -182,9 +182,9 @@ a:hover { text-decoration: underline; }
 }
 
 .content {
-  max-width: 1080px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 24px 28px 40px;
+  padding: 24px 32px 40px;
 }
 
 .flash { margin-bottom: 16px; }
