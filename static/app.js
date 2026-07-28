@@ -56,7 +56,7 @@
     document.getElementById('log-carbs').value = r.carbs_g;
     document.getElementById('log-fat').value = r.fat_g;
     document.getElementById('log-fiber').value = r.fiber_g;
-    preview.textContent = `Selected: ${r.name} — ${Math.round(r.calories)} cal per 100g. "Servings" below multiplies this per-100g value, so for a ~50g item like 1 egg, enter 0.5.`;
+    preview.textContent = `Selected: ${r.name} — ${Math.round(r.calories)} cal per 100g. Enter how many grams you actually ate below.`;
     logForm.style.display = 'flex';
   }
 
