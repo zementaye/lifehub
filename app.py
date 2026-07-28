@@ -290,7 +290,12 @@ def nutrition_search():
 @app.route("/nutrition/log", methods=["POST"])
 def log_food():
     d = request.form.get("date") or date.today().isoformat()
-    servings = request.form.get("servings", type=float) or 1.0
+    grams = request.form.get("grams", type=float)
+    if grams is not None:
+        servings = grams / 100.0
+    else:
+        # backward compatible fallback if an old cached page still submits "servings"
+        servings = request.form.get("servings", type=float) or 1.0
     name = request.form.get("name", "").strip()
     source = request.form.get("source", "usda")
 
