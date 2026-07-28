@@ -86,7 +86,7 @@
       <input type="hidden" name="fat_g" id="log-fat">
       <input type="hidden" name="fiber_g" id="log-fiber">
       <div id="log-preview" class="muted"></div>
-      <label>Servings <input type="number" step="0.1" name="servings" value="1" id="log-servings" required></label>
+      <label>Amount eaten (g) <input type="number" step="1" name="grams" value="100" id="log-grams" required></label>
       <button type="submit">Add to log</button>
     </form>
   </div>
@@ -113,19 +113,20 @@
       <input type="hidden" name="fat_g" id="cf-fat">
       <input type="hidden" name="fiber_g" id="cf-fiber">
       <input type="hidden" name="custom_food_id" id="cf-id">
-      <label>Servings <input type="number" step="0.1" name="servings" value="1" required></label>
+      <label>Amount eaten (g) <input type="number" step="1" name="grams" value="100" required></label>
       <button type="submit">Add to log</button>
     </form>
 
     <hr>
     <h4>Add a New Custom Food</h4>
+    <p class="muted">Enter the nutrition facts for a 100g portion — like the "per 100g" column on a nutrition label.</p>
     <form method="post" action="{{ url_for('add_custom_food') }}" class="inline-form">
       <label>Name <input type="text" name="name" required></label>
-      <label>Calories <input type="number" step="0.1" name="calories"></label>
-      <label>Protein (g) <input type="number" step="0.1" name="protein_g"></label>
-      <label>Carbs (g) <input type="number" step="0.1" name="carbs_g"></label>
-      <label>Fat (g) <input type="number" step="0.1" name="fat_g"></label>
-      <label>Fiber (g) <input type="number" step="0.1" name="fiber_g"></label>
+      <label>Calories (per 100g) <input type="number" step="0.1" name="calories"></label>
+      <label>Protein (g per 100g) <input type="number" step="0.1" name="protein_g"></label>
+      <label>Carbs (g per 100g) <input type="number" step="0.1" name="carbs_g"></label>
+      <label>Fat (g per 100g) <input type="number" step="0.1" name="fat_g"></label>
+      <label>Fiber (g per 100g) <input type="number" step="0.1" name="fiber_g"></label>
       <button type="submit">Save custom food</button>
     </form>
   </div>
@@ -135,12 +136,12 @@
   <h3>Log for {{ view_date }}</h3>
   {% if log %}
     <table class="table">
-      <thead><tr><th>Food</th><th>Servings</th><th>Cal</th><th>Protein</th><th>Carbs</th><th>Fat</th><th>Fiber</th><th></th></tr></thead>
+      <thead><tr><th>Food</th><th>Amount</th><th>Cal</th><th>Protein</th><th>Carbs</th><th>Fat</th><th>Fiber</th><th></th></tr></thead>
       <tbody>
       {% for f in log %}
         <tr>
           <td>{{ f.name }}</td>
-          <td>{{ f.servings }}</td>
+          <td>{{ (f.servings * 100) | round | int }}g</td>
           <td>{{ (f.calories * f.servings) | round | int }}</td>
           <td>{{ (f.protein_g * f.servings) | round(1) }}</td>
           <td>{{ (f.carbs_g * f.servings) | round(1) }}</td>
