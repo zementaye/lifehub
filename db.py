@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS food_log (
     source TEXT NOT NULL,
     custom_food_id INTEGER,
     name TEXT NOT NULL,
+    meal TEXT NOT NULL DEFAULT 'snack',  -- 'breakfast' | 'lunch' | 'dinner' | 'snack'
     servings REAL NOT NULL DEFAULT 1,
     calories REAL NOT NULL DEFAULT 0,
     protein_g REAL NOT NULL DEFAULT 0,
@@ -171,6 +172,7 @@ _MIGRATIONS = [
     ("savings_goals", "target_date", "TEXT"),
     ("profile", "birth_date", "TEXT"),
     ("profile", "sex", "TEXT"),
+    ("food_log", "meal", "TEXT NOT NULL DEFAULT 'snack'"),
 ]
 
 
