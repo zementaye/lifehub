@@ -86,6 +86,14 @@
       <input type="hidden" name="fat_g" id="log-fat">
       <input type="hidden" name="fiber_g" id="log-fiber">
       <div id="log-preview" class="muted"></div>
+      <label>Meal
+        <select name="meal">
+          <option value="breakfast">Breakfast</option>
+          <option value="lunch">Lunch</option>
+          <option value="dinner">Dinner</option>
+          <option value="snack" selected>Snack</option>
+        </select>
+      </label>
       <label>Amount eaten (g) <input type="number" step="1" name="grams" value="100" id="log-grams" required></label>
       <button type="submit">Add to log</button>
     </form>
@@ -113,6 +121,14 @@
       <input type="hidden" name="fat_g" id="cf-fat">
       <input type="hidden" name="fiber_g" id="cf-fiber">
       <input type="hidden" name="custom_food_id" id="cf-id">
+      <label>Meal
+        <select name="meal">
+          <option value="breakfast">Breakfast</option>
+          <option value="lunch">Lunch</option>
+          <option value="dinner">Dinner</option>
+          <option value="snack" selected>Snack</option>
+        </select>
+      </label>
       <label>Amount eaten (g) <input type="number" step="1" name="grams" value="100" required></label>
       <button type="submit">Add to log</button>
     </form>
@@ -134,29 +150,43 @@
 
 <div class="card wide">
   <h3>Log for {{ view_date }}</h3>
+  {% set meal_labels = {'breakfast': '🍳 Breakfast', 'lunch': '🥗 Lunch', 'dinner': '🍽️ Dinner', 'snack': '🍎 Snack'} %}
   {% if log %}
-    <table class="table">
-      <thead><tr><th>Food</th><th>Amount</th><th>Cal</th><th>Protein</th><th>Carbs</th><th>Fat</th><th>Fiber</th><th></th></tr></thead>
-      <tbody>
-      {% for f in log %}
-        <tr>
-          <td>{{ f.name }}</td>
-          <td>{{ (f.servings * 100) | round | int }}g</td>
-          <td>{{ (f.calories * f.servings) | round | int }}</td>
-          <td>{{ (f.protein_g * f.servings) | round(1) }}</td>
-          <td>{{ (f.carbs_g * f.servings) | round(1) }}</td>
-          <td>{{ (f.fat_g * f.servings) | round(1) }}</td>
-          <td>{{ (f.fiber_g * f.servings) | round(1) }}</td>
-          <td>
-            <form method="post" action="{{ url_for('delete_food_log', log_id=f.id) }}">
-              <input type="hidden" name="date" value="{{ view_date }}">
-              <button class="btn-icon" title="Delete">🗑️</button>
-            </form>
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+    {% for meal_key, label in meal_labels.items() %}
+      {% set entries = log_by_meal[meal_key] %}
+      <div class="meal-section">
+        <div class="budget-bar-label">
+          <span><strong>{{ label }}</strong></span>
+          {% if entries %}<span class="muted">{{ meal_totals[meal_key] | round | int }} cal</span>{% endif %}
+        </div>
+        {% if entries %}
+          <table class="table">
+            <thead><tr><th>Food</th><th>Amount</th><th>Cal</th><th>Protein</th><th>Carbs</th><th>Fat</th><th>Fiber</th><th></th></tr></thead>
+            <tbody>
+            {% for f in entries %}
+              <tr>
+                <td>{{ f.name }}</td>
+                <td>{{ (f.servings * 100) | round | int }}g</td>
+                <td>{{ (f.calories * f.servings) | round | int }}</td>
+                <td>{{ (f.protein_g * f.servings) | round(1) }}</td>
+                <td>{{ (f.carbs_g * f.servings) | round(1) }}</td>
+                <td>{{ (f.fat_g * f.servings) | round(1) }}</td>
+                <td>{{ (f.fiber_g * f.servings) | round(1) }}</td>
+                <td>
+                  <form method="post" action="{{ url_for('delete_food_log', log_id=f.id) }}">
+                    <input type="hidden" name="date" value="{{ view_date }}">
+                    <button class="btn-icon" title="Delete">🗑️</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p class="muted">Nothing logged yet.</p>
+        {% endif %}
+      </div>
+    {% endfor %}
   {% else %}
     <p class="muted">Nothing logged for this day yet.</p>
   {% endif %}
