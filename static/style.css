@@ -316,6 +316,8 @@ button.btn-icon:hover { background: var(--surface-raised); color: var(--ink); }
   margin-top: 14px;
 }
 .savings-goal-card { padding: 14px; }
+.meal-section { margin-top: 18px; }
+.meal-section:first-child { margin-top: 8px; }
 .savings-goal-card .budget-bar-label { margin-bottom: 8px; }
 .savings-actions {
   display: flex;
