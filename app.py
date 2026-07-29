@@ -248,6 +248,14 @@ def nutrition():
         for k in totals:
             totals[k] += f[k] * f["servings"]
 
+    meal_order = ["breakfast", "lunch", "dinner", "snack"]
+    log_by_meal = {m: [] for m in meal_order}
+    for f in log:
+        log_by_meal.get(f["meal"], log_by_meal["snack"]).append(f)
+    meal_totals = {}
+    for m in meal_order:
+        meal_totals[m] = sum(f["calories"] * f["servings"] for f in log_by_meal[m])
+
     goal_cal = db.get_setting("nutrition_goal_calories")
     goal_protein = db.get_setting("nutrition_goal_protein")
     goals = {
@@ -264,7 +272,8 @@ def nutrition():
         session_count=session_count,
     )
 
-    return render_template("nutrition.html", log=log, custom_foods=custom_foods, totals=totals,
+    return render_template("nutrition.html", log=log, log_by_meal=log_by_meal, meal_totals=meal_totals,
+                            custom_foods=custom_foods, totals=totals,
                             view_date=d, goals=goals, recommendation=recommendation)
 
 
@@ -298,6 +307,9 @@ def log_food():
         servings = request.form.get("servings", type=float) or 1.0
     name = request.form.get("name", "").strip()
     source = request.form.get("source", "usda")
+    meal = request.form.get("meal", "snack")
+    if meal not in ("breakfast", "lunch", "dinner", "snack"):
+        meal = "snack"
 
     fields = {}
     for k in ("calories", "protein_g", "carbs_g", "fat_g", "fiber_g"):
@@ -306,10 +318,10 @@ def log_food():
     if name:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO food_log (date, source, custom_food_id, name, servings, "
+                "INSERT INTO food_log (date, source, custom_food_id, name, meal, servings, "
                 "calories, protein_g, carbs_g, fat_g, fiber_g, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                (d, source, request.form.get("custom_food_id", type=int), name, servings,
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (d, source, request.form.get("custom_food_id", type=int), name, meal, servings,
                  fields["calories"], fields["protein_g"], fields["carbs_g"], fields["fat_g"],
                  fields["fiber_g"], db.now()),
             )
