@@ -70,140 +70,24 @@
   {% endif %}
 </div>
 
-<div class="grid">
-  <div class="card">
-    <h3>Search &amp; Log Food</h3>
-    <input type="text" id="food-search" placeholder="Search e.g. banana, chicken breast..." autocomplete="off">
-    <div id="search-results" class="search-results"></div>
-
-    <form method="post" action="{{ url_for('log_food') }}" id="log-form" class="inline-form" style="display:none; margin-top:12px;">
-      <input type="hidden" name="date" value="{{ view_date }}">
-      <input type="hidden" name="source" value="usda">
-      <input type="hidden" name="name" id="log-name">
-      <input type="hidden" name="calories" id="log-calories">
-      <input type="hidden" name="protein_g" id="log-protein">
-      <input type="hidden" name="carbs_g" id="log-carbs">
-      <input type="hidden" name="fat_g" id="log-fat">
-      <input type="hidden" name="fiber_g" id="log-fiber">
-      <div id="log-preview" class="muted"></div>
-      <label>Meal
-        <select name="meal">
-          <option value="breakfast">Breakfast</option>
-          <option value="lunch">Lunch</option>
-          <option value="dinner">Dinner</option>
-          <option value="snack" selected>Snack</option>
-        </select>
-      </label>
-      <label>Amount eaten (g) <input type="number" step="1" name="grams" value="100" id="log-grams" required></label>
-      <button type="submit">Add to log</button>
-    </form>
-  </div>
-
-  <div class="card">
-    <h3>Or Log a Custom Food</h3>
-    <form method="post" action="{{ url_for('log_food') }}" class="inline-form">
-      <input type="hidden" name="date" value="{{ view_date }}">
-      <input type="hidden" name="source" value="custom">
-      <label>Food
-        <select name="custom_food_select" onchange="fillCustomFood(this)">
-          <option value="">— choose —</option>
-          {% for f in custom_foods %}
-            <option value="{{ f.id }}" data-name="{{ f.name }}" data-cal="{{ f.calories }}"
-                    data-protein="{{ f.protein_g }}" data-carbs="{{ f.carbs_g }}"
-                    data-fat="{{ f.fat_g }}" data-fiber="{{ f.fiber_g }}">{{ f.name }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <input type="hidden" name="name" id="cf-name">
-      <input type="hidden" name="calories" id="cf-cal">
-      <input type="hidden" name="protein_g" id="cf-protein">
-      <input type="hidden" name="carbs_g" id="cf-carbs">
-      <input type="hidden" name="fat_g" id="cf-fat">
-      <input type="hidden" name="fiber_g" id="cf-fiber">
-      <input type="hidden" name="custom_food_id" id="cf-id">
-      <label>Meal
-        <select name="meal">
-          <option value="breakfast">Breakfast</option>
-          <option value="lunch">Lunch</option>
-          <option value="dinner">Dinner</option>
-          <option value="snack" selected>Snack</option>
-        </select>
-      </label>
-      <label>Amount eaten (g) <input type="number" step="1" name="grams" value="100" required></label>
-      <button type="submit">Add to log</button>
-    </form>
-
-    <hr>
-    <h4>Add a New Custom Food</h4>
-    <p class="muted">Enter the nutrition facts for a 100g portion — like the "per 100g" column on a nutrition label.</p>
-    <form method="post" action="{{ url_for('add_custom_food') }}" class="inline-form">
-      <label>Name <input type="text" name="name" required></label>
-      <label>Calories (per 100g) <input type="number" step="0.1" name="calories"></label>
-      <label>Protein (g per 100g) <input type="number" step="0.1" name="protein_g"></label>
-      <label>Carbs (g per 100g) <input type="number" step="0.1" name="carbs_g"></label>
-      <label>Fat (g per 100g) <input type="number" step="0.1" name="fat_g"></label>
-      <label>Fiber (g per 100g) <input type="number" step="0.1" name="fiber_g"></label>
-      <button type="submit">Save custom food</button>
-    </form>
-  </div>
-</div>
-
 <div class="card wide">
-  <h3>Log for {{ view_date }}</h3>
-  {% set meal_labels = {'breakfast': '🍳 Breakfast', 'lunch': '🥗 Lunch', 'dinner': '🍽️ Dinner', 'snack': '🍎 Snack'} %}
-  {% if log %}
-    {% for meal_key, label in meal_labels.items() %}
-      {% set entries = log_by_meal[meal_key] %}
-      <div class="meal-section">
-        <div class="budget-bar-label">
-          <span><strong>{{ label }}</strong></span>
-          {% if entries %}<span class="muted">{{ meal_totals[meal_key] | round | int }} cal</span>{% endif %}
-        </div>
-        {% if entries %}
-          <table class="table">
-            <thead><tr><th>Food</th><th>Amount</th><th>Cal</th><th>Protein</th><th>Carbs</th><th>Fat</th><th>Fiber</th><th></th></tr></thead>
-            <tbody>
-            {% for f in entries %}
-              <tr>
-                <td>{{ f.name }}</td>
-                <td>{{ (f.servings * 100) | round | int }}g</td>
-                <td>{{ (f.calories * f.servings) | round | int }}</td>
-                <td>{{ (f.protein_g * f.servings) | round(1) }}</td>
-                <td>{{ (f.carbs_g * f.servings) | round(1) }}</td>
-                <td>{{ (f.fat_g * f.servings) | round(1) }}</td>
-                <td>{{ (f.fiber_g * f.servings) | round(1) }}</td>
-                <td>
-                  <form method="post" action="{{ url_for('delete_food_log', log_id=f.id) }}">
-                    <input type="hidden" name="date" value="{{ view_date }}">
-                    <button class="btn-icon" title="Delete">🗑️</button>
-                  </form>
-                </td>
-              </tr>
-            {% endfor %}
-            </tbody>
-          </table>
+  <h3>Log a Meal</h3>
+  <p class="muted">Tap a meal to search and add the foods you had.</p>
+  <div class="meal-tiles">
+    {% set meal_labels = {'breakfast': ('🍳', 'Breakfast'), 'lunch': ('🥗', 'Lunch'), 'dinner': ('🍽️', 'Dinner'), 'snack': ('🍎', 'Snack')} %}
+    {% for meal_key, meal_info in meal_labels.items() %}
+      {% set icon, label = meal_info %}
+      {% set s = meal_summary[meal_key] %}
+      <a class="meal-tile" href="{{ url_for('nutrition_meal', meal=meal_key, date=view_date) }}">
+        <span class="meal-tile-icon">{{ icon }}</span>
+        <span class="meal-tile-label">{{ label }}</span>
+        {% if s.count > 0 %}
+          <span class="meal-tile-sub">{{ s.calories | round | int }} cal · {{ s.count }} item{{ 's' if s.count != 1 }}</span>
         {% else %}
-          <p class="muted">Nothing logged yet.</p>
+          <span class="meal-tile-sub muted">Nothing logged yet</span>
         {% endif %}
-      </div>
+      </a>
     {% endfor %}
-  {% else %}
-    <p class="muted">Nothing logged for this day yet.</p>
-  {% endif %}
+  </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-function fillCustomFood(sel) {
-  const opt = sel.selectedOptions[0];
-  document.getElementById('cf-id').value = opt.value;
-  document.getElementById('cf-name').value = opt.dataset.name || '';
-  document.getElementById('cf-cal').value = opt.dataset.cal || 0;
-  document.getElementById('cf-protein').value = opt.dataset.protein || 0;
-  document.getElementById('cf-carbs').value = opt.dataset.carbs || 0;
-  document.getElementById('cf-fat').value = opt.dataset.fat || 0;
-  document.getElementById('cf-fiber').value = opt.dataset.fiber || 0;
-}
-</script>
 {% endblock %}
