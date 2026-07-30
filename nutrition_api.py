@@ -56,50 +56,42 @@ def _fetch(query: str, data_types: str, page_size: int) -> list[dict]:
 
 
 def search_foods(query: str, page_size: int = 15) -> list[dict]:
-    """Search for foods, local common-foods database first, then USDA
-    FoodData Central to fill in anything the local list doesn't cover.
+    """Search for foods. The local common-foods database is checked first
+    and, if it has ANY match, that's all that's returned — no USDA results
+    get mixed in. USDA's database often has 5+ wildly different entries for
+    something as simple as "chicken breast" (raw, cooked, breaded tenders,
+    lunchmeat, roll...), and showing all of them next to a curated single
+    correct answer just re-introduces the exact confusion the local
+    database exists to avoid. USDA is only used as a fallback for foods
+    that aren't in the curated local list at all.
+
     All nutrient values are per 100g.
-
-    The local database is checked first and always works, even if USDA's
-    API is down, slow, or rate-limited (their free key allows only 30
-    requests/hour) — so a basic search like "chicken breast" or "rice"
-    never comes back empty just because a third party is having issues.
-
-    Beyond that, generic whole foods (Foundation / SR Legacy — USDA's
-    standardized, unbranded entries) are ranked ahead of branded products,
-    since branded results can bury a plain search under snack bars and
-    prepared dishes with wildly different calorie counts.
     """
     if not query.strip():
         return []
 
     local_results = common_foods.search_common_foods(query)
-    seen_names = {r["name"].lower() for r in local_results}
+    if local_results:
+        return local_results
 
-    remaining = page_size - len(local_results)
+    generic_foods = _fetch(query, "Foundation,SR Legacy", page_size)
+    seen_ids = {f.get("fdcId") for f in generic_foods}
+
+    branded_foods = []
+    if len(generic_foods) < page_size:
+        branded_foods = [
+            f for f in _fetch(query, "Branded", page_size - len(generic_foods))
+            if f.get("fdcId") not in seen_ids
+        ]
+
     usda_results = []
-    if remaining > 0:
-        generic_foods = _fetch(query, "Foundation,SR Legacy", remaining)
-        seen_ids = {f.get("fdcId") for f in generic_foods}
-
-        branded_foods = []
-        if len(generic_foods) < remaining:
-            branded_foods = [
-                f for f in _fetch(query, "Branded", remaining - len(generic_foods))
-                if f.get("fdcId") not in seen_ids
-            ]
-
-        for food in generic_foods + branded_foods:
-            name = food.get("description", "Unknown")
-            if name.lower() in seen_names:
-                continue  # already covered by a local entry
-            nutrients = _extract_nutrients(food)
-            usda_results.append({
-                "fdc_id": food.get("fdcId"),
-                "name": name,
-                "brand": food.get("brandOwner", ""),
-                "generic": food.get("dataType") in ("Foundation", "SR Legacy"),
-                **nutrients,
-            })
-
-    return local_results + usda_results
+    for food in generic_foods + branded_foods:
+        nutrients = _extract_nutrients(food)
+        usda_results.append({
+            "fdc_id": food.get("fdcId"),
+            "name": food.get("description", "Unknown"),
+            "brand": food.get("brandOwner", ""),
+            "generic": food.get("dataType") in ("Foundation", "SR Legacy"),
+            **nutrients,
+        })
+    return usda_results
