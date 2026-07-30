@@ -7,23 +7,33 @@ import config
 
 BASE_URL = "https://api.nal.usda.gov/fdc/v1"
 
-# Map the USDA nutrient names we care about to our internal keys
+# Map the USDA nutrient names we care about to our internal keys, along
+# with the unit each one must be reported in.
 _NUTRIENT_MAP = {
-    "Energy": "calories",
-    "Protein": "protein_g",
-    "Carbohydrate, by difference": "carbs_g",
-    "Total lipid (fat)": "fat_g",
-    "Fiber, total dietary": "fiber_g",
+    "Energy": ("calories", "KCAL"),
+    "Protein": ("protein_g", "G"),
+    "Carbohydrate, by difference": ("carbs_g", "G"),
+    "Total lipid (fat)": ("fat_g", "G"),
+    "Fiber, total dietary": ("fiber_g", "G"),
 }
 
 
 def _extract_nutrients(food: dict) -> dict:
     out = {"calories": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0, "fiber_g": 0.0}
     for n in food.get("foodNutrients", []):
-        name = n.get("nutrientName")
-        key = _NUTRIENT_MAP.get(name)
-        if key:
-            out[key] = n.get("value", 0.0) or 0.0
+        mapping = _NUTRIENT_MAP.get(n.get("nutrientName"))
+        if not mapping:
+            continue
+        key, expected_unit = mapping
+        # USDA records commonly list "Energy" TWICE — once in kcal, once in
+        # kJ (~4.18x larger). Matching by name alone let whichever one came
+        # last in the array silently win, which is what caused wildly
+        # inflated calorie counts (e.g. an egg showing 617 instead of 143).
+        # Only accept the entry that's actually in the expected unit.
+        unit = (n.get("unitName") or "").upper()
+        if unit and unit != expected_unit:
+            continue
+        out[key] = n.get("value", 0.0) or 0.0
     return out
 
 
