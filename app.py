@@ -232,7 +232,6 @@ def nutrition():
     d = request.args.get("date") or date.today().isoformat()
     with db.get_conn() as conn:
         log = conn.execute("SELECT * FROM food_log WHERE date = ? ORDER BY id", (d,)).fetchall()
-        custom_foods = conn.execute("SELECT * FROM custom_foods ORDER BY name").fetchall()
 
         profile = conn.execute("SELECT * FROM profile WHERE id = 1").fetchone()
         latest_weight = conn.execute(
@@ -249,12 +248,11 @@ def nutrition():
             totals[k] += f[k] * f["servings"]
 
     meal_order = ["breakfast", "lunch", "dinner", "snack"]
-    log_by_meal = {m: [] for m in meal_order}
+    meal_summary = {m: {"calories": 0.0, "count": 0} for m in meal_order}
     for f in log:
-        log_by_meal.get(f["meal"], log_by_meal["snack"]).append(f)
-    meal_totals = {}
-    for m in meal_order:
-        meal_totals[m] = sum(f["calories"] * f["servings"] for f in log_by_meal[m])
+        m = f["meal"] if f["meal"] in meal_order else "snack"
+        meal_summary[m]["calories"] += f["calories"] * f["servings"]
+        meal_summary[m]["count"] += 1
 
     goal_cal = db.get_setting("nutrition_goal_calories")
     goal_protein = db.get_setting("nutrition_goal_protein")
@@ -272,9 +270,31 @@ def nutrition():
         session_count=session_count,
     )
 
-    return render_template("nutrition.html", log=log, log_by_meal=log_by_meal, meal_totals=meal_totals,
-                            custom_foods=custom_foods, totals=totals,
+    return render_template("nutrition.html", totals=totals, meal_summary=meal_summary,
                             view_date=d, goals=goals, recommendation=recommendation)
+
+
+MEAL_LABELS = {"breakfast": "🍳 Breakfast", "lunch": "🥗 Lunch", "dinner": "🍽️ Dinner", "snack": "🍎 Snack"}
+
+
+@app.route("/nutrition/meal/<meal>")
+def nutrition_meal(meal):
+    if meal not in MEAL_LABELS:
+        return redirect(url_for("nutrition"))
+    d = request.args.get("date") or date.today().isoformat()
+    with db.get_conn() as conn:
+        entries = conn.execute(
+            "SELECT * FROM food_log WHERE date = ? AND meal = ? ORDER BY id", (d, meal)
+        ).fetchall()
+        custom_foods = conn.execute("SELECT * FROM custom_foods ORDER BY name").fetchall()
+
+    totals = {"calories": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0, "fiber_g": 0.0}
+    for f in entries:
+        for k in totals:
+            totals[k] += f[k] * f["servings"]
+
+    return render_template("nutrition_meal.html", meal=meal, meal_label=MEAL_LABELS[meal],
+                            entries=entries, custom_foods=custom_foods, totals=totals, view_date=d)
 
 
 @app.route("/nutrition/use-recommendation", methods=["POST"])
@@ -326,15 +346,17 @@ def log_food():
                  fields["fiber_g"], db.now()),
             )
         flash(f"Logged {name}.")
-    return redirect(url_for("nutrition", date=d))
+    return redirect(url_for("nutrition_meal", meal=meal, date=d))
 
 
 @app.route("/nutrition/log/<int:log_id>/delete", methods=["POST"])
 def delete_food_log(log_id):
     d = request.form.get("date") or date.today().isoformat()
     with db.get_conn() as conn:
+        entry = conn.execute("SELECT meal FROM food_log WHERE id = ?", (log_id,)).fetchone()
         conn.execute("DELETE FROM food_log WHERE id = ?", (log_id,))
-    return redirect(url_for("nutrition", date=d))
+    meal = entry["meal"] if entry else "snack"
+    return redirect(url_for("nutrition_meal", meal=meal, date=d))
 
 
 @app.route("/nutrition/custom", methods=["POST"])
