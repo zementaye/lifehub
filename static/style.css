@@ -318,6 +318,41 @@ button.btn-icon:hover { background: var(--surface-raised); color: var(--ink); }
 .savings-goal-card { padding: 14px; }
 .meal-section { margin-top: 18px; }
 .meal-section:first-child { margin-top: 8px; }
+
+.meal-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.meal-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 14px;
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.meal-tile:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+.meal-tile-icon { font-size: 1.8rem; }
+.meal-tile-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.95rem;
+}
+.meal-tile-sub { font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); }
 .savings-goal-card .budget-bar-label { margin-bottom: 8px; }
 .savings-actions {
   display: flex;
