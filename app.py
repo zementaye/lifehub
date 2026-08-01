@@ -485,6 +485,18 @@ def vault_file(filename):
     return send_from_directory(config.UPLOAD_DIR, filename)
 
 
+@app.route("/vault/<int:doc_id>/download")
+def vault_download(doc_id):
+    with db.get_conn() as conn:
+        doc = conn.execute("SELECT * FROM documents WHERE id = ?", (doc_id,)).fetchone()
+    if not doc:
+        return redirect(url_for("vault"))
+    ext = doc["filename"].rsplit(".", 1)[-1] if "." in doc["filename"] else ""
+    safe_label = "".join(c for c in doc["label"] if c.isalnum() or c in " -_").strip() or "document"
+    download_name = f"{safe_label}.{ext}" if ext else safe_label
+    return send_from_directory(config.UPLOAD_DIR, doc["filename"], as_attachment=True, download_name=download_name)
+
+
 @app.route("/vault/<int:doc_id>/delete", methods=["POST"])
 def vault_delete(doc_id):
     with db.get_conn() as conn:
@@ -557,6 +569,7 @@ def delete_reminder(reminder_id):
 def habits():
     with db.get_conn() as conn:
         items = conn.execute("SELECT * FROM habits WHERE active = 1 ORDER BY frequency, title").fetchall()
+        todos = conn.execute("SELECT * FROM todos ORDER BY done, created_at DESC").fetchall()
 
     today = scheduler.today_local()
     status = []
@@ -566,7 +579,7 @@ def habits():
         s = status_by_id[h["id"]]
         status.append({"habit": h, "done": s["done"], "period_key": pkey, "streak": s["streak"]})
 
-    return render_template("habits.html", status=status)
+    return render_template("habits.html", status=status, todos=todos)
 
 
 @app.route("/habits", methods=["POST"])
@@ -626,6 +639,44 @@ def uncheck_habit(habit_id):
 def delete_habit(habit_id):
     with db.get_conn() as conn:
         conn.execute("UPDATE habits SET active = 0 WHERE id = ?", (habit_id,))
+    return redirect(url_for("habits"))
+
+
+# ── To-Dos (one-time, non-recurring) ────────────────────────────────────
+
+@app.route("/todos", methods=["POST"])
+def add_todo():
+    title = request.form.get("title", "").strip()
+    if title:
+        with db.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO todos (title, done, created_at) VALUES (?,0,?)",
+                (title, db.now()),
+            )
+    return redirect(url_for("habits"))
+
+
+@app.route("/todos/<int:todo_id>/check", methods=["POST"])
+def check_todo(todo_id):
+    with db.get_conn() as conn:
+        conn.execute(
+            "UPDATE todos SET done = 1, completed_at = ? WHERE id = ?",
+            (db.now(), todo_id),
+        )
+    return redirect(url_for("habits"))
+
+
+@app.route("/todos/<int:todo_id>/uncheck", methods=["POST"])
+def uncheck_todo(todo_id):
+    with db.get_conn() as conn:
+        conn.execute("UPDATE todos SET done = 0, completed_at = NULL WHERE id = ?", (todo_id,))
+    return redirect(url_for("habits"))
+
+
+@app.route("/todos/<int:todo_id>/delete", methods=["POST"])
+def delete_todo(todo_id):
+    with db.get_conn() as conn:
+        conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
     return redirect(url_for("habits"))
 
 
