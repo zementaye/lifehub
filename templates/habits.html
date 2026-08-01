@@ -20,6 +20,38 @@
   <p class="muted" style="margin-top:8px;">Hour is 0–23 (e.g. 8 = 8am, 20 = 8pm). Leave blank to just get lumped into the general evening check-in instead, set in Settings.</p>
 </div>
 
+<div class="card">
+  <h3>New To-Do</h3>
+  <p class="muted">A one-time task — not recurring like a habit. Check it off once and you're done with it.</p>
+  <form method="post" action="{{ url_for('add_todo') }}" class="inline-form">
+    <label>Title <input type="text" name="title" placeholder="e.g. Renew car insurance" required></label>
+    <button type="submit">Add</button>
+  </form>
+</div>
+
+<div class="grid">
+  <div class="card wide">
+    <h3>To-Dos</h3>
+    {% if todos %}
+      <ul class="checklist interactive">
+        {% for t in todos %}
+          <li class="{{ 'done' if t.done }}">
+            <form method="post" action="{{ url_for('uncheck_todo' if t.done else 'check_todo', todo_id=t.id) }}" class="checkbox-form">
+              <button type="submit" class="checkbox-btn {{ 'checked' if t.done }}" aria-label="{{ 'Mark not done' if t.done else 'Mark done' }}"></button>
+            </form>
+            <span>{{ t.title }}</span>
+            <form method="post" action="{{ url_for('delete_todo', todo_id=t.id) }}" class="delete-form">
+              <button class="btn-icon" title="Remove to-do">🗑️</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">No to-dos yet — add one above.</p>
+    {% endif %}
+  </div>
+</div>
+
 <div class="grid">
   {% for group_name, group_freq in [('Daily', 'daily'), ('Weekly', 'weekly'), ('Monthly', 'monthly')] %}
     {% set items = status | selectattr('habit.frequency', 'equalto', group_freq) | list %}
