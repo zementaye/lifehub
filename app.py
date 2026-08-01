@@ -362,6 +362,8 @@ def delete_food_log(log_id):
 @app.route("/nutrition/custom", methods=["POST"])
 def add_custom_food():
     name = request.form.get("name", "").strip()
+    meal = request.form.get("meal", "")
+    d = request.form.get("date") or date.today().isoformat()
     if name:
         with db.get_conn() as conn:
             conn.execute(
@@ -376,6 +378,22 @@ def add_custom_food():
                  db.now()),
             )
         flash(f"Added custom food: {name}")
+    if meal in MEAL_LABELS:
+        return redirect(url_for("nutrition_meal", meal=meal, date=d))
+    return redirect(url_for("nutrition"))
+
+
+@app.route("/nutrition/custom/<int:food_id>/delete", methods=["POST"])
+def delete_custom_food(food_id):
+    meal = request.form.get("meal", "")
+    d = request.form.get("date") or date.today().isoformat()
+    with db.get_conn() as conn:
+        food = conn.execute("SELECT name FROM custom_foods WHERE id = ?", (food_id,)).fetchone()
+        conn.execute("DELETE FROM custom_foods WHERE id = ?", (food_id,))
+    if food:
+        flash(f"Deleted custom food: {food['name']}")
+    if meal in MEAL_LABELS:
+        return redirect(url_for("nutrition_meal", meal=meal, date=d))
     return redirect(url_for("nutrition"))
 
 
