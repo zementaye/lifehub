@@ -40,6 +40,7 @@
           <img src="{{ url_for('vault_file', filename=d.filename) }}" class="doc-thumb" alt="{{ d.label }}">
         </a>
       {% endif %}
+      <p><a href="{{ url_for('vault_download', doc_id=d.id) }}" class="link">⬇️ Download</a></p>
       {% if d.notes %}<p class="muted">{{ d.notes }}</p>{% endif %}
       {% if d.expiry_date %}
         <p class="muted">
