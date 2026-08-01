@@ -102,6 +102,14 @@ CREATE TABLE IF NOT EXISTS habit_checkins (
     UNIQUE(habit_id, period_key)
 );
 
+CREATE TABLE IF NOT EXISTS todos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    done INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    completed_at REAL
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT
