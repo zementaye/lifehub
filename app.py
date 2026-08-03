@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, make_response
 
 import config
+import crypto
 import db
 import nutrition_api
 import nutrition_calc
@@ -976,6 +977,110 @@ def delete_savings_goal(goal_id):
     with db.get_conn() as conn:
         conn.execute("DELETE FROM savings_goals WHERE id = ?", (goal_id,))
     return redirect(url_for("budget"))
+
+
+# ── Passwords ────────────────────────────────────────────────────────────
+
+@app.route("/passwords")
+def passwords():
+    with db.get_conn() as conn:
+        rows = conn.execute("SELECT * FROM passwords ORDER BY label").fetchall()
+    items = []
+    for r in rows:
+        entry = dict(r)
+        entry["password"] = crypto.decrypt(r["password_enc"])
+        items.append(entry)
+    return render_template("passwords.html", items=items)
+
+
+@app.route("/passwords", methods=["POST"])
+def add_password():
+    label = request.form.get("label", "").strip()
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+    url = request.form.get("url", "").strip()
+    notes = request.form.get("notes", "").strip()
+    if label and password:
+        with db.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO passwords (label, username, password_enc, url, notes, created_at) "
+                "VALUES (?,?,?,?,?,?)",
+                (label, username, crypto.encrypt(password), url, notes, db.now()),
+            )
+        flash(f"Saved password: {label}")
+    return redirect(url_for("passwords"))
+
+
+@app.route("/passwords/<int:pw_id>/edit", methods=["POST"])
+def edit_password(pw_id):
+    label = request.form.get("label", "").strip()
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")  # blank = keep existing password
+    url = request.form.get("url", "").strip()
+    notes = request.form.get("notes", "").strip()
+    with db.get_conn() as conn:
+        if password:
+            conn.execute(
+                "UPDATE passwords SET label=?, username=?, password_enc=?, url=?, notes=? WHERE id=?",
+                (label, username, crypto.encrypt(password), url, notes, pw_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE passwords SET label=?, username=?, url=?, notes=? WHERE id=?",
+                (label, username, url, notes, pw_id),
+            )
+    flash(f"Updated: {label}")
+    return redirect(url_for("passwords"))
+
+
+@app.route("/passwords/<int:pw_id>/delete", methods=["POST"])
+def delete_password(pw_id):
+    with db.get_conn() as conn:
+        conn.execute("DELETE FROM passwords WHERE id = ?", (pw_id,))
+    return redirect(url_for("passwords"))
+
+
+# ── Notes ────────────────────────────────────────────────────────────────
+
+@app.route("/notes")
+def notes():
+    with db.get_conn() as conn:
+        items = conn.execute("SELECT * FROM notes ORDER BY updated_at DESC").fetchall()
+    return render_template("notes.html", items=items)
+
+
+@app.route("/notes", methods=["POST"])
+def add_note():
+    title = request.form.get("title", "").strip()
+    body = request.form.get("body", "").strip()
+    if title:
+        with db.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO notes (title, body, created_at, updated_at) VALUES (?,?,?,?)",
+                (title, body, db.now(), db.now()),
+            )
+        flash(f"Note added: {title}")
+    return redirect(url_for("notes"))
+
+
+@app.route("/notes/<int:note_id>/edit", methods=["POST"])
+def edit_note(note_id):
+    title = request.form.get("title", "").strip()
+    body = request.form.get("body", "").strip()
+    with db.get_conn() as conn:
+        conn.execute(
+            "UPDATE notes SET title=?, body=?, updated_at=? WHERE id=?",
+            (title, body, db.now(), note_id),
+        )
+    flash("Note updated.")
+    return redirect(url_for("notes"))
+
+
+@app.route("/notes/<int:note_id>/delete", methods=["POST"])
+def delete_note(note_id):
+    with db.get_conn() as conn:
+        conn.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+    return redirect(url_for("notes"))
 
 
 # ── Settings ─────────────────────────────────────────────────────────────
