@@ -19,6 +19,8 @@
     <a href="{{ url_for('budget') }}" class="{{ 'active' if request.endpoint=='budget' }}">Budget</a>
     <a href="{{ url_for('reminders') }}" class="{{ 'active' if request.endpoint=='reminders' }}">Reminders</a>
     <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}">Habits</a>
+    <a href="{{ url_for('passwords') }}" class="{{ 'active' if request.endpoint=='passwords' }}">Passwords</a>
+    <a href="{{ url_for('notes') }}" class="{{ 'active' if request.endpoint=='notes' }}">Notes</a>
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">Settings</a>
   </nav>
   <a href="{{ url_for('settings') }}" class="settings-gear {{ 'active' if request.endpoint=='settings' }}" aria-label="Settings" title="Settings">⚙</a>
