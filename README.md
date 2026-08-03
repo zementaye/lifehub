@@ -16,6 +16,8 @@ that needs to reach you (reminders, unfinished habits).
   themselves every month and notify you when they post
 - **Reminders** — one-off, monthly, or yearly, sent via Telegram, with quick snooze (3d/7d)
 - **Habits** — daily/weekly/monthly recurring checklist with streak tracking (🔥) and Telegram nudges
+- **Passwords** — a small password vault, encrypted at rest (see "About the Passwords section" below)
+- **Notes** — quick free-text notes, editable in place
 - **Settings** — Telegram bot connection, timezone, currency, nutrition goals, and notification
   timing, all editable from the app itself — plus a one-click JSON backup of everything
 
@@ -112,6 +114,20 @@ just as simple to use day-to-day.
 - Set your currency label (e.g. ETB, USD) on the Settings page — it's just a display label,
   no conversion happens.
 - Both respect whatever timezone you set in Settings.
+
+## About the Passwords section
+
+Passwords are encrypted at rest (`crypto.py`, using `cryptography`'s Fernet) — the raw
+SQLite/Turso rows never contain plaintext. The encryption key is derived from
+`FLASK_SECRET_KEY`, so there's nothing extra to configure, but two things follow from that:
+
+- **`FLASK_SECRET_KEY` must stay stable once you start storing real passwords.** If it
+  changes (e.g. you regenerate it, or move to a new Railway/Render project without copying
+  it over), every stored password becomes undecryptable — back that value up somewhere safe.
+- This is reversible encryption (by design — you need to get the password back), not a
+  one-way hash. It's meant to protect the data at rest in the database, not to replace
+  `APP_ACCESS_TOKEN` as your access control. Set `APP_ACCESS_TOKEN` (see "Locking it down"
+  above) before putting real credentials in here, same as with the ID vault.
 
 ## Customizing
 
