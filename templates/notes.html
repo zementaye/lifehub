@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Notes — Life Hub{% endblock %}
+{% block content %}
+<h1>Notes</h1>
+
+<div class="card">
+  <h3>New Note</h3>
+  <form method="post" action="{{ url_for('add_note') }}" class="inline-form">
+    <label>Title <input type="text" name="title" placeholder="e.g. Wifi password, packing list" required></label>
+    <label style="flex:1 1 100%;">Note
+      <textarea name="body" rows="3" style="width:100%; resize:vertical;"></textarea>
+    </label>
+    <button type="submit">Save</button>
+  </form>
+</div>
+
+<div class="grid">
+  {% for n in items %}
+    <div class="card note-card">
+      <div class="pw-header">
+        <h4>{{ n.title }}</h4>
+        <form method="post" action="{{ url_for('delete_note', note_id=n.id) }}" onsubmit="return confirm('Delete {{ n.title }}?');">
+          <button class="btn-icon" title="Delete">🗑️</button>
+        </form>
+      </div>
+      {% if n.body %}<p class="note-body">{{ n.body }}</p>{% endif %}
+      <button type="button" class="secondary note-edit-toggle">Edit</button>
+      <form method="post" action="{{ url_for('edit_note', note_id=n.id) }}" class="inline-form note-edit-form" style="display:none; margin-top:10px;">
+        <label style="flex:1 1 100%;">Title <input type="text" name="title" value="{{ n.title }}" required></label>
+        <label style="flex:1 1 100%;">Note
+          <textarea name="body" rows="4" style="width:100%; resize:vertical;">{{ n.body or '' }}</textarea>
+        </label>
+        <button type="submit">Save</button>
+      </form>
+    </div>
+  {% else %}
+    <p class="muted">No notes yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.note-card').forEach(card => {
+  const editToggle = card.querySelector('.note-edit-toggle');
+  const editForm = card.querySelector('.note-edit-form');
+  editToggle.addEventListener('click', () => {
+    editForm.style.display = editForm.style.display === 'none' ? 'flex' : 'none';
+  });
+});
+</script>
+{% endblock %}
