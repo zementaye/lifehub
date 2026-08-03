@@ -602,3 +602,30 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   width: 100%; max-height: 220px; object-fit: cover;
   border-radius: 4px; margin: 8px 0;
 }
+
+/* Passwords & Notes */
+.pw-header, .note-card .pw-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.pw-header h4 { margin: 0; }
+.pw-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+}
+.pw-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+.note-body { white-space: pre-wrap; font-size: 0.9rem; margin: 6px 0; }
