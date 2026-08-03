@@ -167,6 +167,24 @@ CREATE TABLE IF NOT EXISTS savings_contributions (
     FOREIGN KEY (goal_id) REFERENCES savings_goals(id) ON DELETE CASCADE,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
 );
+
+CREATE TABLE IF NOT EXISTS passwords (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label TEXT NOT NULL,          -- e.g. "Gmail", "Netflix"
+    username TEXT,
+    password_enc TEXT NOT NULL,   -- encrypted via crypto.py, never stored plain
+    url TEXT,
+    notes TEXT,
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    body TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
 """
 
 # (table, column, sqlite type) — added after initial release, applied via ALTER TABLE
