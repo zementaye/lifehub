@@ -44,6 +44,13 @@ def create_user(email: str, password: str) -> int:
             (email, hash_password(password), db.now()),
         )
         user_id = cur.lastrowid
+    # Deliberately a separate connection/transaction from the insert above:
+    # claim_orphaned_data() opens its own get_conn(), and nesting an open
+    # write transaction inside another would deadlock the local-sqlite
+    # backend (Turso's stateless HTTP calls don't have this problem, but
+    # local sqlite does). If anything below this point fails, the user
+    # account still exists with no profile row — init_db()'s backfill step
+    # heals that automatically on the next deploy/restart.
 
     if is_first_user:
         # The very first account claims all pre-existing single-user data,
