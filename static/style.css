@@ -192,17 +192,6 @@ a:hover { text-decoration: underline; }
   background: rgba(201, 131, 47, 0.16);
 }
 .bottomnav a.active span { transform: translateY(-2px) scale(1.18); }
-.bottomnav a.active::before {
-  content: "";
-  position: absolute;
-  top: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 4px; height: 4px;
-  border-radius: 50%;
-  background: var(--primary);
-  box-shadow: 0 0 6px rgba(201,131,47,0.8);
-}
 
 @media (min-width: 860px) {
   .topnav { display: flex; }
@@ -459,8 +448,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .checklist.interactive li:last-child { border-bottom: none; }
 .checklist.interactive li span { flex: 1; text-decoration: inherit; }
 .checkbox-form, .delete-form, .habit-reminder-form { display: inline-flex; align-items: center; gap: 4px; }
-.habit-reminder-form input {
-  width: 42px;
+.habit-reminder-form input[type="time"] {
+  width: 82px;
   padding: 4px 6px;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -469,6 +458,14 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   font-family: var(--font-mono);
   font-size: 0.78rem;
   text-align: center;
+  color-scheme: dark;
+}
+.habit-reminder-form input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+}
+.inline-form input[type="time"] {
+  color-scheme: dark;
 }
 .checkbox-btn {
   width: 22px; height: 22px;
