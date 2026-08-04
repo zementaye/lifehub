@@ -2,18 +2,30 @@
 S3-compatible object storage helper for the ID Vault (Backblaze B2).
 
 Uploads go through a presigned PUT URL sent with a plain `requests.put()`
-rather than boto3's own put_object/upload_fileobj. Multiple newer-botocore
-request-framing behaviors (default checksum trailers, chunked/unsigned
-streaming payloads) trigger "IncompleteBody" errors against Backblaze B2's
-S3-compatible endpoint no matter how those options are configured. A
-presigned URL still uses boto3/botocore (just to compute the signature),
-but the actual byte transfer happens over a completely plain HTTP PUT with
-no special encoding, which sidesteps the problem entirely.
+rather than boto3's own put_object/upload_fileobj, since botocore's request
+framing (chunked/unsigned streaming payloads, checksum trailers) triggers
+"IncompleteBody" errors against Backblaze B2's S3-compatible endpoint no
+matter how those options are configured. boto3/botocore is only used here
+to compute the presigned URL's signature — the actual byte transfer is a
+plain HTTP PUT with no special encoding.
 """
+
+import re
 
 import boto3
 import requests
+from botocore.config import Config
+
 import config
+
+
+def _region_from_endpoint(endpoint_url):
+    """B2 endpoints look like https://s3.<region>.backblazeb2.com — SigV4
+    presigning needs the matching region or B2 rejects the signature."""
+    if not endpoint_url:
+        return "us-east-1"
+    match = re.search(r"s3\.([a-z0-9-]+)\.backblazeb2\.com", endpoint_url)
+    return match.group(1) if match else "us-east-1"
 
 
 def _client():
@@ -22,6 +34,11 @@ def _client():
         endpoint_url=config.R2_ENDPOINT_URL,
         aws_access_key_id=config.R2_ACCESS_KEY_ID,
         aws_secret_access_key=config.R2_SECRET_ACCESS_KEY,
+        region_name=_region_from_endpoint(config.R2_ENDPOINT_URL),
+        # B2 requires SigV4 — boto3 sometimes falls back to the older SigV2
+        # query-auth scheme for presigned URLs, which B2 rejects with a
+        # plain 403. Force SigV4 explicitly.
+        config=Config(signature_version="s3v4"),
     )
 
 
