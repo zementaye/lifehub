@@ -56,3 +56,11 @@ SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "")  # e.g. https://lifehub-g8z9.onrender.com — used to build reset links
 
 SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
+
+# ── Vault file storage (Backblaze B2, S3-compatible) ────────────────────
+# ID vault uploads (photos/PDFs) are stored here instead of local disk, so
+# they survive Render free-tier restarts and redeploys.
+R2_ACCESS_KEY_ID = os.environ.get("B2_KEY_ID")
+R2_SECRET_ACCESS_KEY = os.environ.get("B2_APPLICATION_KEY")
+R2_BUCKET_NAME = os.environ.get("B2_BUCKET_NAME", "lifehub-vault")
+R2_ENDPOINT_URL = os.environ.get("B2_ENDPOINT_URL")
