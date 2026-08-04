@@ -44,6 +44,15 @@ def _client():
 
 def upload_fileobj(file_obj, key, content_type=None):
     """Upload a file-like object (e.g. Flask's request.files['file']) under `key`."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(
+        "B2 debug: key_id=%r (len %d) secret_len=%d bucket=%r endpoint=%r",
+        config.R2_ACCESS_KEY_ID, len(config.R2_ACCESS_KEY_ID or ""),
+        len(config.R2_SECRET_ACCESS_KEY or ""),
+        config.R2_BUCKET_NAME, config.R2_ENDPOINT_URL,
+    )
+
     data = file_obj.read()
     put_url = _client().generate_presigned_url(
         "put_object",
