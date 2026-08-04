@@ -44,4 +44,15 @@ WEEK_END_DAY = int(os.environ.get("WEEK_END_DAY", "6"))  # 0=Mon ... 6=Sun (ISO 
 # them. Leave blank for zero-friction access (fine for local/private use only).
 APP_ACCESS_TOKEN = os.environ.get("APP_ACCESS_TOKEN", "")
 
+# ── Email (password reset) ──────────────────────────────────────────────
+# Standard SMTP — works with a Gmail "App Password" (myaccount.google.com/
+# apppasswords) or any other SMTP provider. If unset, password reset emails
+# just can't be sent (registration/login still work fine without this).
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "")  # e.g. https://lifehub-g8z9.onrender.com — used to build reset links
+
 SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
