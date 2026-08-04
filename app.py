@@ -12,6 +12,7 @@ import db
 import nutrition_api
 import nutrition_calc
 import scheduler
+import storage
 import telegram_notify
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -541,7 +542,7 @@ def vault_upload():
         return redirect(url_for("vault"))
 
     filename = f"{uuid.uuid4().hex}.{ext}"
-    file.save(config.UPLOAD_DIR / filename)
+    storage.upload_fileobj(file, filename, content_type=file.mimetype)
 
     with db.get_conn() as conn:
         conn.execute(
@@ -591,7 +592,7 @@ def vault_file(filename):
         ).fetchone()
     if not doc:
         return "Not found.", 404
-    return send_from_directory(config.UPLOAD_DIR, filename)
+    return redirect(storage.presigned_url(filename))
 
 
 @app.route("/vault/<int:doc_id>/download")
@@ -604,7 +605,7 @@ def vault_download(doc_id):
     ext = doc["filename"].rsplit(".", 1)[-1] if "." in doc["filename"] else ""
     safe_label = "".join(c for c in doc["label"] if c.isalnum() or c in " -_").strip() or "document"
     download_name = f"{safe_label}.{ext}" if ext else safe_label
-    return send_from_directory(config.UPLOAD_DIR, doc["filename"], as_attachment=True, download_name=download_name)
+    return redirect(storage.presigned_url(doc["filename"], download_name=download_name))
 
 
 @app.route("/vault/<int:doc_id>/delete", methods=["POST"])
@@ -613,9 +614,7 @@ def vault_delete(doc_id):
     with db.get_conn() as conn:
         doc = conn.execute("SELECT * FROM documents WHERE id = ? AND user_id = ?", (doc_id, user_id)).fetchone()
         if doc:
-            path = config.UPLOAD_DIR / doc["filename"]
-            if path.exists():
-                path.unlink()
+            storage.delete_file(doc["filename"])
             conn.execute("DELETE FROM documents WHERE id = ? AND user_id = ?", (doc_id, user_id))
     return redirect(url_for("vault"))
 
