@@ -522,7 +522,13 @@ def vault():
         docs.append(entry)
 
     upload_token = uuid.uuid4().hex
-    session["vault_upload_token"] = upload_token
+    # A list, not a single value: opening /vault in a second tab (or a
+    # reload) used to overwrite the one stored token and silently invalidate
+    # whatever the first tab was about to submit. Keeping the last few keeps
+    # multiple tabs/reloads independently valid.
+    tokens = session.get("vault_upload_tokens", [])
+    tokens.append(upload_token)
+    session["vault_upload_tokens"] = tokens[-5:]
     return render_template("vault.html", docs=docs, upload_token=upload_token)
 
 
@@ -540,10 +546,12 @@ def vault_upload():
     # double click that slips past the JS guard, a retried request, a
     # back-button resubmit) carries a stale token and gets silently dropped
     # instead of creating a second document.
-    if not submitted_token or submitted_token != session.get("vault_upload_token"):
+    tokens = session.get("vault_upload_tokens", [])
+    if not submitted_token or submitted_token not in tokens:
         flash("That upload was already saved (or the form expired) — refresh and try again if not.")
         return redirect(url_for("vault"))
-    session.pop("vault_upload_token", None)
+    tokens.remove(submitted_token)
+    session["vault_upload_tokens"] = tokens
 
     if not label or not file or file.filename == "":
         flash("Label and file are required.")
