@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log in — Life Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version }}">
+</head>
+<body class="auth-page">
+<div class="auth-wrap">
+  <div class="auth-brand"><span class="brand-mark"></span>LIFEHUB</div>
+  <div class="card auth-card">
+    <h1 style="font-size:1.2rem;">Log In</h1>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="flash">{% for m in messages %}<div class="flash-msg">{{ m }}</div>{% endfor %}</div>
+      {% endif %}
+    {% endwith %}
+    <form method="post" class="inline-form" style="flex-direction:column; align-items:stretch;">
+      <label>Email <input type="email" name="email" required autofocus></label>
+      <label>Password <input type="password" name="password" required></label>
+      <button type="submit">Log In</button>
+    </form>
+    <p class="muted" style="margin-top:14px;">
+      <a href="{{ url_for('forgot_password') }}">Forgot your password?</a>
+    </p>
+    <p class="muted">
+      Don't have an account? <a href="{{ url_for('register') }}">Sign up</a>
+    </p>
+  </div>
+</div>
+</body>
+</html>
