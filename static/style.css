@@ -316,6 +316,33 @@ button.btn-icon:hover { background: var(--surface-raised); color: var(--ink); }
   margin-top: 14px;
 }
 .savings-goal-card { padding: 14px; }
+
+/* Auth pages (login/register/forgot/reset password) */
+body.auth-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+.auth-wrap { width: 100%; max-width: 380px; }
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  margin-bottom: 20px;
+}
+.auth-card { padding: 28px; }
+.auth-card label { width: 100%; }
+.auth-card input { width: 100%; }
+.auth-card button { margin-top: 6px; }
+.logout-form { display: inline; }
 .meal-section { margin-top: 18px; }
 .meal-section:first-child { margin-top: 8px; }
 
@@ -602,30 +629,3 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   width: 100%; max-height: 220px; object-fit: cover;
   border-radius: 4px; margin: 8px 0;
 }
-
-/* Passwords & Notes */
-.pw-header, .note-card .pw-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-.pw-header h4 { margin: 0; }
-.pw-field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 8px 0;
-}
-.pw-input {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--surface-raised);
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-}
-.note-body { white-space: pre-wrap; font-size: 0.9rem; margin: 6px 0; }
