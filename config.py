@@ -1,79 +1,73 @@
-"""
-S3-compatible object storage helper for the ID Vault (Backblaze B2).
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 
-Uploads go through a presigned PUT URL sent with a plain `requests.put()`
-rather than boto3's own put_object/upload_fileobj, since botocore's request
-framing (chunked/unsigned streaming payloads, checksum trailers) triggers
-"IncompleteBody" errors against Backblaze B2's S3-compatible endpoint no
-matter how those options are configured. boto3/botocore is only used here
-to compute the presigned URL's signature — the actual byte transfer is a
-plain HTTP PUT with no special encoding.
-"""
+load_dotenv()
 
-import re
+BASE_DIR = Path(__file__).parent
 
-import boto3
-import requests
-from botocore.config import Config
+# Where the sqlite DB and uploaded files live. Point this at a Railway/Render
+# volume (e.g. /data) in production so it survives redeploys.
+DATA_DIR = Path(os.environ.get("DATA_DIR", BASE_DIR))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-import config
+DB_PATH = DATA_DIR / "lifehub.db"
+UPLOAD_DIR = DATA_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# ── Turso (remote SQLite-compatible DB) ─────────────────────────────────
+# If both of these are set, db.py talks to Turso over the network instead of
+# a local sqlite file, so your data survives Render's free-tier restarts.
+# Uploaded files (ID vault photos) still live on local disk and are NOT
+# covered by this — they still reset unless you add a paid disk.
+TURSO_DATABASE_URL = os.environ.get("TURSO_DATABASE_URL", "")
+TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "")
 
-def _region_from_endpoint(endpoint_url):
-    """B2 endpoints look like https://s3.<region>.backblazeb2.com — SigV4
-    presigning needs the matching region or B2 rejects the signature."""
-    if not endpoint_url:
-        return "us-east-1"
-    match = re.search(r"s3\.([a-z0-9-]+)\.backblazeb2\.com", endpoint_url)
-    return match.group(1) if match else "us-east-1"
+# ── Telegram notifications ──────────────────────────────────────────────
+# Point this at any bot you own (new or existing) — reminders/habit nudges
+# get sent as DMs from that bot to TG_CHAT_ID.
+TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN", "")
+TG_CHAT_ID = os.environ.get("TG_CHAT_ID", "")
 
+# ── Nutrition lookup (USDA FoodData Central) ────────────────────────────
+# Free key: https://api.data.gov/signup/  (DEMO_KEY works but is rate-limited)
+USDA_API_KEY = os.environ.get("USDA_API_KEY", "DEMO_KEY")
 
-def _client():
-    return boto3.client(
-        "s3",
-        endpoint_url=config.R2_ENDPOINT_URL,
-        aws_access_key_id=config.R2_ACCESS_KEY_ID,
-        aws_secret_access_key=config.R2_SECRET_ACCESS_KEY,
-        region_name=_region_from_endpoint(config.R2_ENDPOINT_URL),
-        # B2 requires SigV4 — boto3 sometimes falls back to the older SigV2
-        # query-auth scheme for presigned URLs, which B2 rejects with a
-        # plain 403. Force SigV4 explicitly.
-        config=Config(signature_version="s3v4"),
-    )
+# ── Habit nudge / reminder scheduling ───────────────────────────────────
+TIMEZONE = os.environ.get("TIMEZONE", "Africa/Addis_Ababa")
+NUDGE_HOUR = int(os.environ.get("NUDGE_HOUR", "20"))   # 24h, local TZ — daily check time
+REMINDER_HOUR = int(os.environ.get("REMINDER_HOUR", "9"))  # when due reminders get sent
+WEEK_END_DAY = int(os.environ.get("WEEK_END_DAY", "6"))  # 0=Mon ... 6=Sun (ISO weekday-1)
 
+# ── Optional lightweight access gate ────────────────────────────────────
+# If set, visitors need ?key=<this value> once; after that a cookie remembers
+# them. Leave blank for zero-friction access (fine for local/private use only).
+APP_ACCESS_TOKEN = os.environ.get("APP_ACCESS_TOKEN", "")
 
-def upload_fileobj(file_obj, key, content_type=None):
-    """Upload a file-like object (e.g. Flask's request.files['file']) under `key`."""
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(
-        "B2 debug: key_id=%r (len %d) secret_len=%d bucket=%r endpoint=%r",
-        config.R2_ACCESS_KEY_ID, len(config.R2_ACCESS_KEY_ID or ""),
-        len(config.R2_SECRET_ACCESS_KEY or ""),
-        config.R2_BUCKET_NAME, config.R2_ENDPOINT_URL,
-    )
+# ── Email (password reset) ──────────────────────────────────────────────
+# Standard SMTP — works with a Gmail "App Password" (myaccount.google.com/
+# apppasswords) or any other SMTP provider. If unset, password reset emails
+# just can't be sent (registration/login still work fine without this).
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "")  # e.g. https://lifehub-g8z9.onrender.com — used to build reset links
 
-    data = file_obj.read()
-    put_url = _client().generate_presigned_url(
-        "put_object",
-        Params={"Bucket": config.R2_BUCKET_NAME, "Key": key},
-        ExpiresIn=300,
-    )
-    headers = {"Content-Type": content_type} if content_type else {}
-    resp = requests.put(put_url, data=data, headers=headers, timeout=60)
-    if not resp.ok:
-        # B2's error XML body has the real reason (bad key, wrong bucket,
-        # expired credentials, etc.) — raise_for_status() alone hides it.
-        raise RuntimeError(f"B2 upload failed ({resp.status_code}): {resp.text}")
+SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
 
+# ── Vault file storage (Backblaze B2, S3-compatible) ────────────────────
+# ID vault uploads (photos/PDFs) are stored here instead of local disk, so
+# they survive Render free-tier restarts and redeploys.
+# .strip() guards against a trailing space/newline sneaking in when the
+# key/endpoint is copy-pasted into Render's env var box — that alone is
+# enough to break SigV4 signing with a SignatureDoesNotMatch error.
+def _clean_env(name, default=None):
+    val = os.environ.get(name, default)
+    return val.strip() if val else val
 
-def presigned_url(key, download_name=None, expires_in=300):
-    """Return a temporary signed URL the browser can hit directly to view/download."""
-    params = {"Bucket": config.R2_BUCKET_NAME, "Key": key}
-    if download_name:
-        params["ResponseContentDisposition"] = f'attachment; filename="{download_name}"'
-    return _client().generate_presigned_url("get_object", Params=params, ExpiresIn=expires_in)
-
-
-def delete_file(key):
-    _client().delete_object(Bucket=config.R2_BUCKET_NAME, Key=key)
+R2_ACCESS_KEY_ID = _clean_env("B2_KEY_ID")
+R2_SECRET_ACCESS_KEY = _clean_env("B2_APPLICATION_KEY")
+R2_BUCKET_NAME = _clean_env("B2_BUCKET_NAME", "lifehub-vault")
+R2_ENDPOINT_URL = _clean_env("B2_ENDPOINT_URL")
