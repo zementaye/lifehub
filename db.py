@@ -473,6 +473,15 @@ def init_db() -> None:
             existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
             if column not in existing:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}")
+        # Self-heal: every user should have exactly one profile row. This
+        # backfills anyone left without one — e.g. an account created during
+        # the brief window where registration crashed on the profile insert
+        # after the user row had already committed.
+        conn.execute(
+            "INSERT INTO profile (user_id, height_cm) "
+            "SELECT id, NULL FROM users "
+            "WHERE id NOT IN (SELECT user_id FROM profile WHERE user_id IS NOT NULL)"
+        )
 
 
 def claim_orphaned_data(user_id: int) -> None:
