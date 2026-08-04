@@ -52,7 +52,10 @@ def upload_fileobj(file_obj, key, content_type=None):
     )
     headers = {"Content-Type": content_type} if content_type else {}
     resp = requests.put(put_url, data=data, headers=headers, timeout=60)
-    resp.raise_for_status()
+    if not resp.ok:
+        # B2's error XML body has the real reason (bad key, wrong bucket,
+        # expired credentials, etc.) — raise_for_status() alone hides it.
+        raise RuntimeError(f"B2 upload failed ({resp.status_code}): {resp.text}")
 
 
 def presigned_url(key, download_name=None, expires_in=300):
