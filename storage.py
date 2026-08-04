@@ -20,6 +20,11 @@ def _client():
         config=Config(
             request_checksum_calculation="when_required",
             response_checksum_validation="when_required",
+            # Without this, botocore streams PutObject as an unsigned
+            # "chunked" payload by default, which Backblaze B2 doesn't
+            # reconstruct correctly (raises IncompleteBody). Forcing signed,
+            # non-chunked payloads fixes it.
+            s3={"payload_signing_enabled": True},
         ),
     )
 
