@@ -1,6 +1,6 @@
 """Sends notifications via any Telegram bot you own — set it up on the Settings
-page (or via TG_BOT_TOKEN/TG_CHAT_ID env vars as the initial default). No
-dependency on python-telegram-bot needed, this just hits the HTTP Bot API."""
+page. Each user configures their own bot token/chat ID. No dependency on
+python-telegram-bot needed, this just hits the HTTP Bot API."""
 
 import logging
 
@@ -12,23 +12,23 @@ import db
 logger = logging.getLogger(__name__)
 
 
-def get_credentials() -> tuple[str, str]:
-    token = db.get_setting("tg_bot_token", config.TG_BOT_TOKEN).strip()
-    chat_id = db.get_setting("tg_chat_id", config.TG_CHAT_ID).strip()
+def get_credentials(user_id: int) -> tuple[str, str]:
+    token = db.get_setting(user_id, "tg_bot_token", config.TG_BOT_TOKEN).strip()
+    chat_id = db.get_setting(user_id, "tg_chat_id", config.TG_CHAT_ID).strip()
     return token, chat_id
 
 
-def send(text: str) -> bool:
-    ok, _err = send_detailed(text)
+def send(user_id: int, text: str) -> bool:
+    ok, _err = send_detailed(user_id, text)
     return ok
 
 
-def send_detailed(text: str) -> tuple[bool, str]:
+def send_detailed(user_id: int, text: str) -> tuple[bool, str]:
     """Same as send(), but also returns Telegram's actual error message
     (e.g. 'Unauthorized' for a bad token, 'chat not found' for a bad chat
     ID or a bot you haven't started a conversation with) instead of just
     True/False, so failures are actually diagnosable."""
-    token, chat_id = get_credentials()
+    token, chat_id = get_credentials(user_id)
     if not token or not chat_id:
         return False, "Bot token or chat ID isn't set."
     try:
