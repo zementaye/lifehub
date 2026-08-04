@@ -7,6 +7,7 @@
 <div class="card">
   <h3>Add a Document</h3>
   <form method="post" action="{{ url_for('vault_upload') }}" enctype="multipart/form-data" class="inline-form" id="vault-upload-form">
+    <input type="hidden" name="upload_token" value="{{ upload_token }}">
     <label>Label <input type="text" name="label" placeholder="e.g. Driver's License" required></label>
     <label>Notes <input type="text" name="notes" placeholder="optional"></label>
     <label>Expiry date <input type="date" name="expiry_date" id="expiry-input"></label>
