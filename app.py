@@ -4,7 +4,7 @@ import time
 import uuid
 from datetime import date, timedelta
 
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, make_response, session
 
 import auth
 import config
@@ -521,7 +521,9 @@ def vault():
         entry["acknowledged"] = d["expiry_ack_date"] == d["expiry_date"] and d["expiry_date"] is not None
         docs.append(entry)
 
-    return render_template("vault.html", docs=docs)
+    upload_token = uuid.uuid4().hex
+    session["vault_upload_token"] = upload_token
+    return render_template("vault.html", docs=docs, upload_token=upload_token)
 
 
 @app.route("/vault/upload", methods=["POST"])
@@ -531,6 +533,17 @@ def vault_upload():
     notes = request.form.get("notes", "").strip()
     expiry_date = request.form.get("expiry_date", "").strip() or None
     file = request.files.get("file")
+    submitted_token = request.form.get("upload_token", "")
+
+    # Idempotency guard: the token is minted fresh every time /vault renders
+    # and is cleared the instant it's used, so a duplicate submission (a
+    # double click that slips past the JS guard, a retried request, a
+    # back-button resubmit) carries a stale token and gets silently dropped
+    # instead of creating a second document.
+    if not submitted_token or submitted_token != session.get("vault_upload_token"):
+        flash("That upload was already saved (or the form expired) — refresh and try again if not.")
+        return redirect(url_for("vault"))
+    session.pop("vault_upload_token", None)
 
     if not label or not file or file.filename == "":
         flash("Label and file are required.")
