@@ -68,8 +68,8 @@
           </form>
         {% endif %}
       {% endif %}
-      <form method="post" action="{{ url_for('vault_delete', doc_id=d.id) }}" onsubmit="return confirm('Delete {{ d.label }}?');">
-        <button class="btn-icon" title="Delete">🗑️ Delete</button>
+      <form method="post" action="{{ url_for('vault_delete', doc_id=d.id) }}" class="vault-delete-form" data-label="{{ d.label }}">
+        <button type="submit" class="btn-icon vault-delete-btn" title="Delete">🗑️ Delete</button>
       </form>
     </div>
   {% else %}
@@ -199,6 +199,71 @@ dropzone.addEventListener('drop', (e) => {
     xhr.addEventListener('error', () => resetButton('Upload failed — try again'));
 
     xhr.send(new FormData(uploadForm));
+  });
+})();
+
+// Delete progress + page lock: confirm, then disable every interactive
+// element and show a "Deleting…" overlay until the redirect lands, so a
+// second click — on this delete or anything else on the page — can't
+// fire while the request is in flight.
+(function () {
+  const deleteForms = document.querySelectorAll('.vault-delete-form');
+  if (!deleteForms.length) return;
+
+  function lockPage(message) {
+    document.querySelectorAll('button, a, input, select, textarea').forEach((el) => {
+      el.dataset.vaultLockWasDisabled = el.disabled ? '1' : '0';
+      el.disabled = true;
+      if (el.tagName === 'A') {
+        el.dataset.vaultLockHref = el.getAttribute('href') || '';
+        el.removeAttribute('href');
+        el.style.pointerEvents = 'none';
+      }
+    });
+
+    const overlay = document.createElement('div');
+    overlay.id = 'vault-delete-overlay';
+    overlay.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;' +
+      'align-items:center;justify-content:center;z-index:9999;';
+    overlay.innerHTML =
+      '<div style="background:#fff;padding:24px 32px;border-radius:10px;' +
+      'display:flex;flex-direction:column;align-items:center;gap:12px;' +
+      'font-size:15px;color:#222;">' +
+      '<div style="width:28px;height:28px;border:3px solid #ddd;' +
+      'border-top-color:#2f6f5e;border-radius:50%;' +
+      'animation:vault-delete-spin .8s linear infinite;"></div>' +
+      '<p style="margin:0;">' + message + '</p></div>';
+    document.body.appendChild(overlay);
+  }
+
+  const spinStyle = document.createElement('style');
+  spinStyle.textContent = '@keyframes vault-delete-spin{to{transform:rotate(360deg);}}';
+  document.head.appendChild(spinStyle);
+
+  deleteForms.forEach((form) => {
+    form.addEventListener('submit', (e) => {
+      const label = form.dataset.label || 'this document';
+      if (!confirm(`Delete ${label}?`)) {
+        e.preventDefault();
+        return;
+      }
+      lockPage(`Deleting "${label}"…`);
+    });
+  });
+
+  // Safety net if the page is ever restored from bfcache (e.g. the
+  // request failed and the user hit back) — don't leave it locked.
+  window.addEventListener('pageshow', () => {
+    const overlay = document.getElementById('vault-delete-overlay');
+    if (overlay) overlay.remove();
+    document.querySelectorAll('[data-vault-lock-was-disabled]').forEach((el) => {
+      el.disabled = el.dataset.vaultLockWasDisabled === '1';
+      if (el.tagName === 'A' && el.dataset.vaultLockHref) {
+        el.setAttribute('href', el.dataset.vaultLockHref);
+        el.style.pointerEvents = '';
+      }
+    });
   });
 })();
 </script>
