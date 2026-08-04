@@ -16,8 +16,23 @@ USE_TURSO = bool(config.TURSO_DATABASE_URL and config.TURSO_AUTH_TOKEN)
 _http_session = requests.Session()
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS password_resets (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    expires_at REAL NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS profile (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
     height_cm REAL,
     birth_date TEXT,      -- used to compute age for recommended intake
     sex TEXT              -- 'male' or 'female', used for the BMR formula
@@ -25,6 +40,7 @@ CREATE TABLE IF NOT EXISTS profile (
 
 CREATE TABLE IF NOT EXISTS weight_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
     date TEXT NOT NULL,
     weight_kg REAL NOT NULL,
     created_at REAL NOT NULL
@@ -32,6 +48,7 @@ CREATE TABLE IF NOT EXISTS weight_entries (
 
 CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
     date TEXT NOT NULL,
     type TEXT NOT NULL,
     duration_minutes INTEGER,
@@ -41,6 +58,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE TABLE IF NOT EXISTS custom_foods (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
     name TEXT NOT NULL,
     calories REAL NOT NULL DEFAULT 0,
     protein_g REAL NOT NULL DEFAULT 0,
@@ -52,6 +70,7 @@ CREATE TABLE IF NOT EXISTS custom_foods (
 
 CREATE TABLE IF NOT EXISTS food_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
     date TEXT NOT NULL,
     source TEXT NOT NULL,
     custom_food_id INTEGER,
@@ -68,15 +87,18 @@ CREATE TABLE IF NOT EXISTS food_log (
 
 CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
     label TEXT NOT NULL,
     filename TEXT NOT NULL,
     notes TEXT,
     expiry_date TEXT,
+    expiry_ack_date TEXT,
     created_at REAL NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS reminders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
     title TEXT NOT NULL,
     next_due TEXT NOT NULL,
     recurrence TEXT NOT NULL DEFAULT 'once',
@@ -87,6 +109,7 @@ CREATE TABLE IF NOT EXISTS reminders (
 
 CREATE TABLE IF NOT EXISTS habits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
     title TEXT NOT NULL,
     frequency TEXT NOT NULL DEFAULT 'daily',
     reminder_hour INTEGER,        -- optional per-habit reminder time (0-23); NULL = covered by the shared evening digest instead
@@ -104,6 +127,7 @@ CREATE TABLE IF NOT EXISTS habit_checkins (
 
 CREATE TABLE IF NOT EXISTS todos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
     title TEXT NOT NULL,
     done INTEGER NOT NULL DEFAULT 0,
     created_at REAL NOT NULL,
@@ -111,19 +135,23 @@ CREATE TABLE IF NOT EXISTS todos (
 );
 
 CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
+    user_id INTEGER NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT,
+    PRIMARY KEY (user_id, key)
 );
 
 CREATE TABLE IF NOT EXISTS budget_categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
+    user_id INTEGER,
+    name TEXT NOT NULL,
     monthly_limit REAL,
     created_at REAL NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
     date TEXT NOT NULL,
     type TEXT NOT NULL,           -- 'income' or 'expense'
     category_id INTEGER,          -- NULL allowed, especially for income
@@ -135,6 +163,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 
 CREATE TABLE IF NOT EXISTS recurring_transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
     title TEXT NOT NULL,          -- e.g. a job name ("Design job salary") or a bill ("Rent")
     type TEXT NOT NULL,           -- 'income' or 'expense'
     amount REAL NOT NULL,
@@ -150,7 +179,8 @@ CREATE TABLE IF NOT EXISTS recurring_transactions (
 
 CREATE TABLE IF NOT EXISTS savings_goals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,       -- e.g. "Emergency fund", "New laptop"
+    user_id INTEGER,
+    name TEXT NOT NULL,       -- e.g. "Emergency fund", "New laptop"
     target_amount REAL,              -- optional, NULL = open-ended jar with no target
     target_date TEXT,                -- optional date to hit the target by
     current_amount REAL NOT NULL DEFAULT 0,
@@ -167,28 +197,12 @@ CREATE TABLE IF NOT EXISTS savings_contributions (
     FOREIGN KEY (goal_id) REFERENCES savings_goals(id) ON DELETE CASCADE,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
 );
-
-CREATE TABLE IF NOT EXISTS passwords (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    label TEXT NOT NULL,          -- e.g. "Gmail", "Netflix"
-    username TEXT,
-    password_enc TEXT NOT NULL,   -- encrypted via crypto.py, never stored plain
-    url TEXT,
-    notes TEXT,
-    created_at REAL NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    body TEXT,
-    created_at REAL NOT NULL,
-    updated_at REAL NOT NULL
-);
 """
 
 # (table, column, sqlite type) — added after initial release, applied via ALTER TABLE
-# to existing databases that predate the column.
+# to existing databases that predate the column. user_id columns are added
+# nullable (existing rows get user_id=NULL) — the first person to register
+# claims all of them, see claim_orphaned_data() below.
 _MIGRATIONS = [
     ("documents", "expiry_date", "TEXT"),
     ("documents", "expiry_ack_date", "TEXT"),
@@ -199,6 +213,26 @@ _MIGRATIONS = [
     ("profile", "birth_date", "TEXT"),
     ("profile", "sex", "TEXT"),
     ("food_log", "meal", "TEXT NOT NULL DEFAULT 'snack'"),
+    ("profile", "user_id", "INTEGER"),
+    ("weight_entries", "user_id", "INTEGER"),
+    ("sessions", "user_id", "INTEGER"),
+    ("custom_foods", "user_id", "INTEGER"),
+    ("food_log", "user_id", "INTEGER"),
+    ("documents", "user_id", "INTEGER"),
+    ("reminders", "user_id", "INTEGER"),
+    ("habits", "user_id", "INTEGER"),
+    ("todos", "user_id", "INTEGER"),
+    ("budget_categories", "user_id", "INTEGER"),
+    ("transactions", "user_id", "INTEGER"),
+    ("recurring_transactions", "user_id", "INTEGER"),
+    ("savings_goals", "user_id", "INTEGER"),
+]
+
+# Every user-owned table, used by claim_orphaned_data() below.
+_USER_OWNED_TABLES = [
+    "profile", "weight_entries", "sessions", "custom_foods", "food_log",
+    "documents", "reminders", "habits", "todos", "budget_categories",
+    "transactions", "recurring_transactions", "savings_goals",
 ]
 
 
@@ -352,33 +386,70 @@ def get_conn():
 
 def init_db() -> None:
     with get_conn() as conn:
+        # The `settings` table's primary key changed from just `key` to
+        # `(user_id, key)` when multi-user support was added. A simple
+        # ALTER TABLE ADD COLUMN can't change a primary key on an existing
+        # table, and this one matters: without a real rebuild, two
+        # different users' settings with the same key (timezone, currency,
+        # etc.) would silently overwrite each other. So if this is an
+        # old-shape settings table, rename it aside and create the new one
+        # fresh — claim_orphaned_data() copies the old rows over once we
+        # know which user should own them.
+        existing_settings_cols = {row["name"] for row in conn.execute("PRAGMA table_info(settings)")}
+        if existing_settings_cols and "user_id" not in existing_settings_cols:
+            conn.execute("ALTER TABLE settings RENAME TO settings_old")
+
         conn.executescript(SCHEMA)
-        conn.execute("INSERT OR IGNORE INTO profile (id, height_cm) VALUES (1, NULL)")
+
         for table, column, coltype in _MIGRATIONS:
             existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
             if column not in existing:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}")
 
 
+def claim_orphaned_data(user_id: int) -> None:
+    """Called once, right after the very first account registers. Assigns
+    all pre-existing data (from before multi-user support existed) to that
+    account, so the original owner doesn't lose anything."""
+    with get_conn() as conn:
+        for table in _USER_OWNED_TABLES:
+            conn.execute(f"UPDATE {table} SET user_id = ? WHERE user_id IS NULL", (user_id,))
+
+        # Migrate the old single-key settings table (see init_db) into the
+        # new per-user one, then clean it up.
+        old_cols = {row["name"] for row in conn.execute("PRAGMA table_info(settings_old)")}
+        if old_cols:
+            old_rows = conn.execute("SELECT key, value FROM settings_old").fetchall()
+            for row in old_rows:
+                conn.execute(
+                    "INSERT INTO settings (user_id, key, value) VALUES (?,?,?) "
+                    "ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
+                    (user_id, row["key"], row["value"]),
+                )
+            conn.execute("DROP TABLE settings_old")
+
+
 def now() -> float:
     return time.time()
 
 
-def get_setting(key: str, default=None):
+def get_setting(user_id: int, key: str, default=None):
     with get_conn() as conn:
-        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        row = conn.execute(
+            "SELECT value FROM settings WHERE user_id = ? AND key = ?", (user_id, key)
+        ).fetchone()
         return row["value"] if row else default
 
 
-def set_setting(key: str, value) -> None:
+def set_setting(user_id: int, key: str, value) -> None:
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO settings (key, value) VALUES (?, ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            (key, str(value)),
+            "INSERT INTO settings (user_id, key, value) VALUES (?, ?, ?) "
+            "ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
+            (user_id, key, str(value)),
         )
 
 
-def delete_setting(key: str) -> None:
+def delete_setting(user_id: int, key: str) -> None:
     with get_conn() as conn:
-        conn.execute("DELETE FROM settings WHERE key = ?", (key,))
+        conn.execute("DELETE FROM settings WHERE user_id = ? AND key = ?", (user_id, key))
