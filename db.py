@@ -27,15 +27,17 @@ CREATE TABLE IF NOT EXISTS password_resets (
     token TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL,
     expires_at REAL NOT NULL,
-    used INTEGER NOT NULL DEFAULT 0
+    used INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
+    user_id INTEGER UNIQUE, -- nullable so legacy pre-login rows can sit "orphaned" until claimed
     height_cm REAL,
-    birth_date TEXT,      -- used to compute age for recommended intake
-    sex TEXT              -- 'male' or 'female', used for the BMR formula
+    birth_date TEXT, -- used to compute age for recommended intake
+    sex TEXT, -- 'male' or 'female', used for the BMR formula
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS weight_entries (
@@ -75,7 +77,7 @@ CREATE TABLE IF NOT EXISTS food_log (
     source TEXT NOT NULL,
     custom_food_id INTEGER,
     name TEXT NOT NULL,
-    meal TEXT NOT NULL DEFAULT 'snack',  -- 'breakfast' | 'lunch' | 'dinner' | 'snack'
+    meal TEXT NOT NULL DEFAULT 'snack', -- 'breakfast' | 'lunch' | 'dinner' | 'snack'
     servings REAL NOT NULL DEFAULT 1,
     calories REAL NOT NULL DEFAULT 0,
     protein_g REAL NOT NULL DEFAULT 0,
@@ -112,7 +114,7 @@ CREATE TABLE IF NOT EXISTS habits (
     user_id INTEGER,
     title TEXT NOT NULL,
     frequency TEXT NOT NULL DEFAULT 'daily',
-    reminder_hour INTEGER,        -- optional per-habit reminder time (0-23); NULL = covered by the shared evening digest instead
+    reminder_hour INTEGER, -- optional per-habit reminder time (0-23); NULL = covered by the shared evening digest instead
     active INTEGER NOT NULL DEFAULT 1,
     created_at REAL NOT NULL
 );
@@ -135,7 +137,7 @@ CREATE TABLE IF NOT EXISTS todos (
 );
 
 CREATE TABLE IF NOT EXISTS settings (
-    user_id INTEGER NOT NULL,
+    user_id INTEGER, -- nullable so legacy pre-login rows can sit "orphaned" until claimed
     key TEXT NOT NULL,
     value TEXT,
     PRIMARY KEY (user_id, key)
@@ -146,17 +148,18 @@ CREATE TABLE IF NOT EXISTS budget_categories (
     user_id INTEGER,
     name TEXT NOT NULL,
     monthly_limit REAL,
-    created_at REAL NOT NULL
+    created_at REAL NOT NULL,
+    UNIQUE(user_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
     date TEXT NOT NULL,
-    type TEXT NOT NULL,           -- 'income' or 'expense'
-    category_id INTEGER,          -- NULL allowed, especially for income
+    type TEXT NOT NULL, -- 'income' or 'expense'
+    category_id INTEGER, -- NULL allowed, especially for income
     description TEXT,
-    amount REAL NOT NULL,         -- always stored positive
+    amount REAL NOT NULL, -- always stored positive
     created_at REAL NOT NULL,
     FOREIGN KEY (category_id) REFERENCES budget_categories(id) ON DELETE SET NULL
 );
@@ -164,14 +167,14 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE TABLE IF NOT EXISTS recurring_transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
-    title TEXT NOT NULL,          -- e.g. a job name ("Design job salary") or a bill ("Rent")
-    type TEXT NOT NULL,           -- 'income' or 'expense'
+    title TEXT NOT NULL, -- e.g. a job name ("Design job salary") or a bill ("Rent")
+    type TEXT NOT NULL, -- 'income' or 'expense'
     amount REAL NOT NULL,
-    category_id INTEGER,          -- expenses only
-    frequency TEXT NOT NULL DEFAULT 'monthly',  -- 'monthly' or 'weekly'
-    day_of_month INTEGER NOT NULL DEFAULT 1,  -- 1-28, used when frequency = 'monthly'
-    day_of_week INTEGER,          -- 0=Mon .. 6=Sun, used when frequency = 'weekly'
-    next_run TEXT NOT NULL,       -- ISO date of the next auto-log
+    category_id INTEGER, -- expenses only
+    frequency TEXT NOT NULL DEFAULT 'monthly', -- 'monthly' or 'weekly'
+    day_of_month INTEGER NOT NULL DEFAULT 1, -- 1-28, used when frequency = 'monthly'
+    day_of_week INTEGER, -- 0=Mon .. 6=Sun, used when frequency = 'weekly'
+    next_run TEXT NOT NULL, -- ISO date of the next auto-log
     active INTEGER NOT NULL DEFAULT 1,
     created_at REAL NOT NULL,
     FOREIGN KEY (category_id) REFERENCES budget_categories(id) ON DELETE SET NULL
@@ -180,29 +183,48 @@ CREATE TABLE IF NOT EXISTS recurring_transactions (
 CREATE TABLE IF NOT EXISTS savings_goals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
-    name TEXT NOT NULL,       -- e.g. "Emergency fund", "New laptop"
-    target_amount REAL,              -- optional, NULL = open-ended jar with no target
-    target_date TEXT,                -- optional date to hit the target by
+    name TEXT NOT NULL, -- e.g. "Emergency fund", "New laptop"
+    target_amount REAL, -- optional, NULL = open-ended jar with no target
+    target_date TEXT, -- optional date to hit the target by
     current_amount REAL NOT NULL DEFAULT 0,
-    created_at REAL NOT NULL
+    created_at REAL NOT NULL,
+    UNIQUE(user_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS savings_contributions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     goal_id INTEGER NOT NULL,
     date TEXT NOT NULL,
-    amount REAL NOT NULL,            -- positive = deposit, negative = withdrawal
-    transaction_id INTEGER,          -- the matching row this created in `transactions`
+    amount REAL NOT NULL, -- positive = deposit, negative = withdrawal
+    transaction_id INTEGER, -- the matching row this created in `transactions`
     created_at REAL NOT NULL,
     FOREIGN KEY (goal_id) REFERENCES savings_goals(id) ON DELETE CASCADE,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
 );
+
+CREATE TABLE IF NOT EXISTS passwords (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    label TEXT NOT NULL, -- e.g. "Gmail", "Netflix"
+    username TEXT,
+    password_enc TEXT NOT NULL, -- encrypted via crypto.py, never stored plain
+    url TEXT,
+    notes TEXT,
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    title TEXT NOT NULL,
+    body TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
 """
 
 # (table, column, sqlite type) — added after initial release, applied via ALTER TABLE
-# to existing databases that predate the column. user_id columns are added
-# nullable (existing rows get user_id=NULL) — the first person to register
-# claims all of them, see claim_orphaned_data() below.
+# to existing databases that predate the column.
 _MIGRATIONS = [
     ("documents", "expiry_date", "TEXT"),
     ("documents", "expiry_ack_date", "TEXT"),
@@ -213,7 +235,11 @@ _MIGRATIONS = [
     ("profile", "birth_date", "TEXT"),
     ("profile", "sex", "TEXT"),
     ("food_log", "meal", "TEXT NOT NULL DEFAULT 'snack'"),
-    ("profile", "user_id", "INTEGER"),
+    # Multi-user migration — adds a nullable user_id to every table that
+    # predates login/registration. Existing rows land with user_id = NULL
+    # ("orphaned"); claim_orphaned_data() assigns them to the first person
+    # who registers, so whoever was using the single-user deployment keeps
+    # their data instead of losing it.
     ("weight_entries", "user_id", "INTEGER"),
     ("sessions", "user_id", "INTEGER"),
     ("custom_foods", "user_id", "INTEGER"),
@@ -226,13 +252,16 @@ _MIGRATIONS = [
     ("transactions", "user_id", "INTEGER"),
     ("recurring_transactions", "user_id", "INTEGER"),
     ("savings_goals", "user_id", "INTEGER"),
+    ("passwords", "user_id", "INTEGER"),
+    ("notes", "user_id", "INTEGER"),
 ]
 
-# Every user-owned table, used by claim_orphaned_data() below.
+# Tables that own a direct user_id column and should be swept for orphaned
+# (user_id IS NULL) rows once the first account is created.
 _USER_OWNED_TABLES = [
-    "profile", "weight_entries", "sessions", "custom_foods", "food_log",
-    "documents", "reminders", "habits", "todos", "budget_categories",
-    "transactions", "recurring_transactions", "savings_goals",
+    "weight_entries", "sessions", "custom_foods", "food_log", "documents",
+    "reminders", "habits", "todos", "budget_categories", "transactions",
+    "recurring_transactions", "savings_goals", "passwords", "notes",
 ]
 
 
@@ -283,10 +312,11 @@ class _TursoCursor:
     HTTP-API result, so callers can keep using fetchone()/fetchall()/
     iteration exactly as they would with sqlite3."""
 
-    def __init__(self, cols, rows, lastrowid=None):
+    def __init__(self, cols, rows, lastrowid=None, rowcount=0):
         self._cols = cols
         self._rows = rows
         self.lastrowid = lastrowid
+        self.rowcount = rowcount
 
     def _wrap(self, raw_row):
         return _Row(zip(self._cols, raw_row))
@@ -331,12 +361,10 @@ class _TursoHttpConn:
         resp = _http_session.post(self._url, json=payload, headers=self._headers, timeout=15)
         resp.raise_for_status()
         data = resp.json()
-
         exec_result = data["results"][0]
         if exec_result.get("type") == "error":
             err = exec_result.get("error", {})
             raise RuntimeError(f"Turso error: {err.get('message', err)}")
-
         result = exec_result["response"]["result"]
         cols = [c["name"] for c in result.get("cols", [])]
         rows = [
@@ -344,7 +372,8 @@ class _TursoHttpConn:
             for row in result.get("rows", [])
         ]
         lastrowid = result.get("last_insert_rowid")
-        return _TursoCursor(cols, rows, int(lastrowid) if lastrowid else None)
+        affected = result.get("affected_row_count", 0)
+        return _TursoCursor(cols, rows, int(lastrowid) if lastrowid else None, int(affected or 0))
 
     def executescript(self, script):
         # Run statements one at a time over HTTP. Strip '-- comment' text
@@ -384,23 +413,62 @@ def get_conn():
             raw_conn.close()
 
 
+def _migrate_legacy_singleton_tables(conn) -> None:
+    """The pre-login schema had `profile` as a one-row-only table
+    (`id INTEGER PRIMARY KEY CHECK (id = 1)`, no user_id) and `settings`
+    keyed only on `key`. Neither shape can be fixed with ALTER TABLE ADD
+    COLUMN — the primary key itself has to change. On a fresh database
+    neither table exists yet, so this is a no-op; on an existing deployment
+    it rebuilds the table and carries the old data over as "orphaned"
+    (user_id = NULL) so claim_orphaned_data() can hand it to the first
+    account that registers."""
+    existing_tables = {
+        row["name"] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        )
+    }
+
+    if "profile" in existing_tables:
+        cols = {row["name"] for row in conn.execute("PRAGMA table_info(profile)")}
+        if "user_id" not in cols:
+            old_rows = [dict(r) for r in conn.execute("SELECT * FROM profile").fetchall()]
+            conn.execute("ALTER TABLE profile RENAME TO profile_legacy")
+            conn.execute(
+                "CREATE TABLE profile ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "user_id INTEGER UNIQUE, "
+                "height_cm REAL, birth_date TEXT, sex TEXT)"
+            )
+            for row in old_rows:
+                conn.execute(
+                    "INSERT INTO profile (user_id, height_cm, birth_date, sex) "
+                    "VALUES (NULL, ?, ?, ?)",
+                    (row.get("height_cm"), row.get("birth_date"), row.get("sex")),
+                )
+            conn.execute("DROP TABLE profile_legacy")
+
+    if "settings" in existing_tables:
+        cols = {row["name"] for row in conn.execute("PRAGMA table_info(settings)")}
+        if "user_id" not in cols:
+            old_rows = [dict(r) for r in conn.execute("SELECT * FROM settings").fetchall()]
+            conn.execute("ALTER TABLE settings RENAME TO settings_legacy")
+            conn.execute(
+                "CREATE TABLE settings ("
+                "user_id INTEGER, key TEXT NOT NULL, value TEXT, "
+                "PRIMARY KEY (user_id, key))"
+            )
+            for row in old_rows:
+                conn.execute(
+                    "INSERT INTO settings (user_id, key, value) VALUES (NULL, ?, ?)",
+                    (row["key"], row["value"]),
+                )
+            conn.execute("DROP TABLE settings_legacy")
+
+
 def init_db() -> None:
     with get_conn() as conn:
-        # The `settings` table's primary key changed from just `key` to
-        # `(user_id, key)` when multi-user support was added. A simple
-        # ALTER TABLE ADD COLUMN can't change a primary key on an existing
-        # table, and this one matters: without a real rebuild, two
-        # different users' settings with the same key (timezone, currency,
-        # etc.) would silently overwrite each other. So if this is an
-        # old-shape settings table, rename it aside and create the new one
-        # fresh — claim_orphaned_data() copies the old rows over once we
-        # know which user should own them.
-        existing_settings_cols = {row["name"] for row in conn.execute("PRAGMA table_info(settings)")}
-        if existing_settings_cols and "user_id" not in existing_settings_cols:
-            conn.execute("ALTER TABLE settings RENAME TO settings_old")
-
+        _migrate_legacy_singleton_tables(conn)
         conn.executescript(SCHEMA)
-
         for table, column, coltype in _MIGRATIONS:
             existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
             if column not in existing:
@@ -408,25 +476,15 @@ def init_db() -> None:
 
 
 def claim_orphaned_data(user_id: int) -> None:
-    """Called once, right after the very first account registers. Assigns
-    all pre-existing data (from before multi-user support existed) to that
-    account, so the original owner doesn't lose anything."""
+    """Assigns every pre-existing row with no owner (user_id IS NULL — data
+    left over from before registration existed) to the given user. Called
+    once, when the very first account is created, so whoever was already
+    using a single-user deployment doesn't lose their history."""
     with get_conn() as conn:
         for table in _USER_OWNED_TABLES:
             conn.execute(f"UPDATE {table} SET user_id = ? WHERE user_id IS NULL", (user_id,))
-
-        # Migrate the old single-key settings table (see init_db) into the
-        # new per-user one, then clean it up.
-        old_cols = {row["name"] for row in conn.execute("PRAGMA table_info(settings_old)")}
-        if old_cols:
-            old_rows = conn.execute("SELECT key, value FROM settings_old").fetchall()
-            for row in old_rows:
-                conn.execute(
-                    "INSERT INTO settings (user_id, key, value) VALUES (?,?,?) "
-                    "ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
-                    (user_id, row["key"], row["value"]),
-                )
-            conn.execute("DROP TABLE settings_old")
+        conn.execute("UPDATE settings SET user_id = ? WHERE user_id IS NULL", (user_id,))
+        conn.execute("UPDATE profile SET user_id = ? WHERE user_id IS NULL", (user_id,))
 
 
 def now() -> float:
