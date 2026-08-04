@@ -25,9 +25,17 @@ def _client():
 
 
 def upload_fileobj(file_obj, key, content_type=None):
-    """Upload a file-like object (e.g. Flask's request.files['file']) under `key`."""
+    """Upload a file-like object (e.g. Flask's request.files['file']) under `key`.
+
+    Uses a plain put_object with the bytes read into memory rather than
+    boto3's managed upload_fileobj/TransferManager — that path uses a
+    chunked-encoding upload style that Backblaze B2 handles unreliably for
+    small files (raises IncompleteBody). Vault files are small (photos/PDFs),
+    so reading fully into memory first is simple and safe.
+    """
+    data = file_obj.read()
     extra = {"ContentType": content_type} if content_type else {}
-    _client().upload_fileobj(file_obj, config.R2_BUCKET_NAME, key, ExtraArgs=extra)
+    _client().put_object(Bucket=config.R2_BUCKET_NAME, Key=key, Body=data, **extra)
 
 
 def presigned_url(key, download_name=None, expires_in=300):
