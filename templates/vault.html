@@ -26,7 +26,8 @@
     </div>
   </div>
 
-  <button type="submit" form="vault-upload-form" style="margin-top:12px;">Save</button>
+  <button type="submit" form="vault-upload-form" id="vault-save-btn" style="margin-top:12px;">Save</button>
+  <progress id="vault-upload-progress" max="100" value="0" style="display:none;width:100%;margin-top:8px;"></progress>
 </div>
 
 <div class="grid">
@@ -140,5 +141,64 @@ dropzone.addEventListener('drop', (e) => {
     showFile(files[0]);
   }
 });
+
+// Prevent double-submit (the actual bug being fixed here) and show real
+// upload progress instead of the form just sitting there with no feedback.
+// We take over the submit with XHR so we can read upload.progress events,
+// which a plain <form method=post> can never give us.
+(function () {
+  const uploadForm = document.getElementById('vault-upload-form');
+  const saveBtn = document.getElementById('vault-save-btn');
+  const progressBar = document.getElementById('vault-upload-progress');
+  if (!uploadForm || !saveBtn) return;
+
+  let submitting = false;
+
+  function resetButton(label) {
+    submitting = false;
+    saveBtn.disabled = false;
+    saveBtn.textContent = label;
+    if (progressBar) progressBar.style.display = 'none';
+  }
+
+  uploadForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (submitting) return; // a second click/Enter while one is in flight is a no-op
+    submitting = true;
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Uploading…';
+    if (progressBar) {
+      progressBar.style.display = 'block';
+      progressBar.value = 0;
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', uploadForm.action);
+
+    xhr.upload.addEventListener('progress', (ev) => {
+      if (ev.lengthComputable && progressBar) {
+        const pct = Math.round((ev.loaded / ev.total) * 100);
+        progressBar.value = pct;
+        saveBtn.textContent = `Uploading… ${pct}%`;
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 400) {
+        // The Flask route flashes a message then redirects back to /vault;
+        // XHR already followed that redirect, so just land on the final
+        // URL to render the fresh page (flash message included).
+        window.location.href = xhr.responseURL || uploadForm.action;
+      } else {
+        resetButton('Upload failed — try again');
+      }
+    });
+
+    xhr.addEventListener('error', () => resetButton('Upload failed — try again'));
+
+    xhr.send(new FormData(uploadForm));
+  });
+})();
 </script>
 {% endblock %}
