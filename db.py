@@ -428,41 +428,68 @@ def _migrate_legacy_singleton_tables(conn) -> None:
         )
     }
 
-    if "profile" in existing_tables:
+    # --- profile ------------------------------------------------------
+    # Each conn.execute() below is its own auto-committed HTTP round trip
+    # on Turso (no shared transaction), so a redeploy/restart can interrupt
+    # this halfway through. We detect a half-finished attempt by checking
+    # for a leftover `profile_legacy` table and resume from there instead
+    # of assuming a clean start (re-running RENAME TO profile_legacy on a
+    # name that already exists would itself raise).
+    needs_profile_finish = "profile_legacy" in existing_tables
+    if not needs_profile_finish and "profile" in existing_tables:
         cols = {row["name"] for row in conn.execute("PRAGMA table_info(profile)")}
         if "user_id" not in cols:
-            old_rows = [dict(r) for r in conn.execute("SELECT * FROM profile").fetchall()]
             conn.execute("ALTER TABLE profile RENAME TO profile_legacy")
-            conn.execute(
-                "CREATE TABLE profile ("
-                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                "user_id INTEGER UNIQUE, "
-                "height_cm REAL, birth_date TEXT, sex TEXT)"
-            )
+            needs_profile_finish = True
+
+    if needs_profile_finish:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS profile ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "user_id INTEGER UNIQUE, "
+            "height_cm REAL, birth_date TEXT, sex TEXT)"
+        )
+        # The legacy table could only ever hold a single row (its old PK
+        # was CHECK(id = 1)), so "has it been copied yet" is just "does an
+        # orphaned (user_id IS NULL) row already exist" — safe to check
+        # even on a retry.
+        already_copied = conn.execute(
+            "SELECT id FROM profile WHERE user_id IS NULL"
+        ).fetchone()
+        if not already_copied:
+            old_rows = [dict(r) for r in conn.execute("SELECT * FROM profile_legacy").fetchall()]
             for row in old_rows:
                 conn.execute(
                     "INSERT INTO profile (user_id, height_cm, birth_date, sex) "
                     "VALUES (NULL, ?, ?, ?)",
                     (row.get("height_cm"), row.get("birth_date"), row.get("sex")),
                 )
-            conn.execute("DROP TABLE profile_legacy")
+        conn.execute("DROP TABLE profile_legacy")
 
-    if "settings" in existing_tables:
+    # --- settings -------------------------------------------------------
+    needs_settings_finish = "settings_legacy" in existing_tables
+    if not needs_settings_finish and "settings" in existing_tables:
         cols = {row["name"] for row in conn.execute("PRAGMA table_info(settings)")}
         if "user_id" not in cols:
-            old_rows = [dict(r) for r in conn.execute("SELECT * FROM settings").fetchall()]
             conn.execute("ALTER TABLE settings RENAME TO settings_legacy")
+            needs_settings_finish = True
+
+    if needs_settings_finish:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS settings ("
+            "user_id INTEGER, key TEXT NOT NULL, value TEXT, "
+            "PRIMARY KEY (user_id, key))"
+        )
+        old_rows = [dict(r) for r in conn.execute("SELECT * FROM settings_legacy").fetchall()]
+        for row in old_rows:
+            # OR IGNORE: safe to retry — if a key was already copied by an
+            # earlier interrupted attempt, this just skips it instead of
+            # raising a duplicate-PK error.
             conn.execute(
-                "CREATE TABLE settings ("
-                "user_id INTEGER, key TEXT NOT NULL, value TEXT, "
-                "PRIMARY KEY (user_id, key))"
+                "INSERT OR IGNORE INTO settings (user_id, key, value) VALUES (NULL, ?, ?)",
+                (row["key"], row["value"]),
             )
-            for row in old_rows:
-                conn.execute(
-                    "INSERT INTO settings (user_id, key, value) VALUES (NULL, ?, ?)",
-                    (row["key"], row["value"]),
-                )
-            conn.execute("DROP TABLE settings_legacy")
+        conn.execute("DROP TABLE settings_legacy")
 
 
 def init_db() -> None:
