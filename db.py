@@ -413,6 +413,19 @@ def get_conn():
             raw_conn.close()
 
 
+def _table_has_check_constraint(conn, table: str) -> bool:
+    """True if `table`'s CREATE TABLE SQL (as SQLite actually stored it)
+    contains a CHECK constraint. Column presence (e.g. "does profile have
+    user_id") is NOT a reliable signal that the old CHECK(id = 1) is gone —
+    an earlier ALTER TABLE ADD COLUMN migration can bolt a new column onto
+    the table while leaving its original CHECK fully intact, since ADD
+    COLUMN can't remove or rewrite existing constraints."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
+    ).fetchone()
+    return bool(row and row["sql"] and "CHECK" in row["sql"].upper())
+
+
 def _migrate_legacy_singleton_tables(conn) -> None:
     """The pre-login schema had `profile` as a one-row-only table
     (`id INTEGER PRIMARY KEY CHECK (id = 1)`, no user_id) and `settings`
@@ -435,12 +448,19 @@ def _migrate_legacy_singleton_tables(conn) -> None:
     # for a leftover `profile_legacy` table and resume from there instead
     # of assuming a clean start (re-running RENAME TO profile_legacy on a
     # name that already exists would itself raise).
+    #
+    # Rebuild is driven by the presence of the stale CHECK constraint, NOT
+    # by whether `user_id` already exists on the table — a prior ALTER
+    # TABLE ADD COLUMN migration can add `user_id` without touching the
+    # original `CHECK (id = 1)`, which ADD COLUMN has no power to remove.
     needs_profile_finish = "profile_legacy" in existing_tables
-    if not needs_profile_finish and "profile" in existing_tables:
-        cols = {row["name"] for row in conn.execute("PRAGMA table_info(profile)")}
-        if "user_id" not in cols:
-            conn.execute("ALTER TABLE profile RENAME TO profile_legacy")
-            needs_profile_finish = True
+    if (
+        not needs_profile_finish
+        and "profile" in existing_tables
+        and _table_has_check_constraint(conn, "profile")
+    ):
+        conn.execute("ALTER TABLE profile RENAME TO profile_legacy")
+        needs_profile_finish = True
 
     if needs_profile_finish:
         conn.execute(
@@ -450,19 +470,23 @@ def _migrate_legacy_singleton_tables(conn) -> None:
             "height_cm REAL, birth_date TEXT, sex TEXT)"
         )
         # The legacy table could only ever hold a single row (its old PK
-        # was CHECK(id = 1)), so "has it been copied yet" is just "does an
-        # orphaned (user_id IS NULL) row already exist" — safe to check
-        # even on a retry.
-        already_copied = conn.execute(
-            "SELECT id FROM profile WHERE user_id IS NULL"
-        ).fetchone()
+        # forced id = 1), so "has it been copied yet" is just "does any
+        # row exist in the new table at all" — safe to check on a retry.
+        already_copied = conn.execute("SELECT id FROM profile LIMIT 1").fetchone()
         if not already_copied:
+            legacy_cols = {row["name"] for row in conn.execute("PRAGMA table_info(profile_legacy)")}
             old_rows = [dict(r) for r in conn.execute("SELECT * FROM profile_legacy").fetchall()]
             for row in old_rows:
                 conn.execute(
                     "INSERT INTO profile (user_id, height_cm, birth_date, sex) "
-                    "VALUES (NULL, ?, ?, ?)",
-                    (row.get("height_cm"), row.get("birth_date"), row.get("sex")),
+                    "VALUES (?, ?, ?, ?)",
+                    (
+                        # An earlier bad migration may have already set
+                        # user_id on the legacy row via ADD COLUMN — carry
+                        # it across instead of clobbering it back to NULL.
+                        row.get("user_id") if "user_id" in legacy_cols else None,
+                        row.get("height_cm"), row.get("birth_date"), row.get("sex"),
+                    ),
                 )
         conn.execute("DROP TABLE profile_legacy")
 
