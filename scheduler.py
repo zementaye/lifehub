@@ -12,8 +12,13 @@ import telegram_notify
 logger = logging.getLogger(__name__)
 
 
-def get_tz() -> ZoneInfo:
-    tz_name = db.get_setting("timezone", config.TIMEZONE)
+def get_all_user_ids() -> list[int]:
+    with db.get_conn() as conn:
+        return [row["id"] for row in conn.execute("SELECT id FROM users")]
+
+
+def get_tz(user_id: int) -> ZoneInfo:
+    tz_name = db.get_setting(user_id, "timezone", config.TIMEZONE)
     try:
         return ZoneInfo(tz_name)
     except Exception:
@@ -21,20 +26,25 @@ def get_tz() -> ZoneInfo:
         return ZoneInfo("UTC")
 
 
-def get_reminder_hour() -> int:
-    return int(db.get_setting("reminder_hour", config.REMINDER_HOUR))
+def get_reminder_hour(user_id: int) -> int:
+    return int(db.get_setting(user_id, "reminder_hour", config.REMINDER_HOUR))
 
 
-def get_nudge_hour() -> int:
-    return int(db.get_setting("nudge_hour", config.NUDGE_HOUR))
+def get_nudge_hour(user_id: int) -> int:
+    return int(db.get_setting(user_id, "nudge_hour", config.NUDGE_HOUR))
 
 
-def get_week_end_day() -> int:
-    return int(db.get_setting("week_end_day", config.WEEK_END_DAY))
+def get_week_end_day(user_id: int) -> int:
+    return int(db.get_setting(user_id, "week_end_day", config.WEEK_END_DAY))
 
 
-def today_local() -> date:
-    return datetime.now(get_tz()).date()
+def today_local(user_id: int = None) -> date:
+    """Note: with multiple users potentially in different timezones,
+    'today' is inherently per-user. Callers that don't pass a user_id
+    (e.g. app.py routes needing a sensible default before a user's own
+    timezone is known) get the configured server-default timezone."""
+    tz = get_tz(user_id) if user_id else ZoneInfo(config.TIMEZONE)
+    return datetime.now(tz).date()
 
 
 def iso_week_key(d: date) -> str:
@@ -76,18 +86,18 @@ def period_key_for(freq: str, d: date) -> str:
     return d.isoformat()
 
 
-# ── Jobs ─────────────────────────────────────────────────────────────────
+# ── Jobs (all scoped to a single user_id) ───────────────────────────────
 
-def check_reminders() -> None:
-    today = today_local()
+def check_reminders(user_id: int) -> None:
+    today = today_local(user_id)
     with db.get_conn() as conn:
         due = conn.execute(
-            "SELECT * FROM reminders WHERE active = 1 AND date(next_due) <= date(?)",
-            (today.isoformat(),),
+            "SELECT * FROM reminders WHERE user_id = ? AND active = 1 AND date(next_due) <= date(?)",
+            (user_id, today.isoformat()),
         ).fetchall()
 
         for r in due:
-            ok = telegram_notify.send(f"🔔 Reminder: <b>{r['title']}</b>")
+            ok = telegram_notify.send(user_id, f"🔔 Reminder: <b>{r['title']}</b>")
             if not ok:
                 continue
             if r["recurrence"] == "once":
@@ -116,11 +126,11 @@ def step_back(d: date, freq: str) -> date:
     return d.fromordinal(d.toordinal() - 1)
 
 
-def compute_streak(habit_id: int, frequency: str) -> int:
+def compute_streak(habit_id: int, frequency: str, user_id: int) -> int:
     """Consecutive completed periods leading up to now. Doesn't require today's
     period to already be checked off — an in-progress day/week/month doesn't
     break the streak, matching how most habit trackers count it."""
-    today = today_local()
+    today = today_local(user_id)
     with db.get_conn() as conn:
         checkins = {
             row["period_key"]
@@ -146,17 +156,15 @@ def compute_streak(habit_id: int, frequency: str) -> int:
 def get_habit_status_batch(habits: list) -> dict:
     """Same result as calling compute_streak() + a 'done today' check for
     each habit individually, but with ONE database query total instead of
-    two per habit. That N+1 pattern (9 round-trips for just 4 habits) is
-    fine on local sqlite, but each round-trip is a real network request
-    once the DB is remote (Turso), which is what was making the Habits
-    page and dashboard noticeably slow to load/update.
-
-    Returns {habit_id: {"done": bool, "streak": int}}.
-    """
+    two per habit. Returns {habit_id: {"done": bool, "streak": int}}.
+    Assumes all habits passed in belong to the same user (true for every
+    caller — they're always fetched via a single user-scoped query)."""
     if not habits:
         return {}
 
-    today = today_local()
+    # All habits passed in share one owner, so today's date only needs
+    # computing once, in that owner's timezone.
+    today = today_local(habits[0]["user_id"])
     habit_ids = [h["id"] for h in habits]
     placeholders = ",".join("?" for _ in habit_ids)
     with db.get_conn() as conn:
@@ -191,15 +199,15 @@ def get_habit_status_batch(habits: list) -> dict:
     return result
 
 
-def get_incomplete_habits() -> list[str]:
-    today = today_local()
-    weekly_day = today.weekday() == get_week_end_day()
+def get_incomplete_habits(user_id: int) -> list[str]:
+    today = today_local(user_id)
+    weekly_day = today.weekday() == get_week_end_day(user_id)
     monthly_day = is_last_day_of_month(today)
 
     incomplete = []
     with db.get_conn() as conn:
         habits = conn.execute(
-            "SELECT * FROM habits WHERE active = 1 AND reminder_hour IS NULL"
+            "SELECT * FROM habits WHERE user_id = ? AND active = 1 AND reminder_hour IS NULL", (user_id,)
         ).fetchall()
         for h in habits:
             freq = h["frequency"]
@@ -218,20 +226,20 @@ def get_incomplete_habits() -> list[str]:
     return incomplete
 
 
-def check_individual_habit_reminders() -> None:
+def check_individual_habit_reminders(user_id: int) -> None:
     """Habits with their own reminder_hour set (e.g. 'Morning Prayer' at 7,
     'Bible Study' at 20) get pinged individually at that exact hour instead
     of being lumped into the one shared evening digest. Self-contained
     dedupe (like check_recurring_transactions) so it's safe to call every
     15-minute tick rather than needing its own top-level hour gate."""
-    today = today_local()
-    now_hour = datetime.now(get_tz()).hour
-    weekly_day = today.weekday() == get_week_end_day()
+    today = today_local(user_id)
+    now_hour = datetime.now(get_tz(user_id)).hour
+    weekly_day = today.weekday() == get_week_end_day(user_id)
     monthly_day = is_last_day_of_month(today)
 
     with db.get_conn() as conn:
         habits = conn.execute(
-            "SELECT * FROM habits WHERE active = 1 AND reminder_hour = ?", (now_hour,)
+            "SELECT * FROM habits WHERE user_id = ? AND active = 1 AND reminder_hour = ?", (user_id, now_hour)
         ).fetchall()
 
         for h in habits:
@@ -242,7 +250,7 @@ def check_individual_habit_reminders() -> None:
                 continue
 
             dedupe_key = f"habit_reminder_sent:{h['id']}:{today.isoformat()}"
-            if db.get_setting(dedupe_key):
+            if db.get_setting(user_id, dedupe_key):
                 continue
 
             pkey = period_key_for(freq, today)
@@ -253,21 +261,21 @@ def check_individual_habit_reminders() -> None:
             if done:
                 continue
 
-            if telegram_notify.send(f"⏰ Reminder: <b>{h['title']}</b>"):
-                db.set_setting(dedupe_key, "1")
+            if telegram_notify.send(user_id, f"⏰ Reminder: <b>{h['title']}</b>"):
+                db.set_setting(user_id, dedupe_key, "1")
 
 
-def check_document_expiries() -> None:
+def check_document_expiries(user_id: int) -> None:
     """Vault documents with an expiry date get a reminder at 1 month out,
     2 weeks out, and then daily for the final 7 days — matching how you'd
     actually want to be nagged about a license renewal. Stops early if
     you've acknowledged that expiry date (see /vault/<id>/acknowledge), and
     naturally resets whenever you renew (update the expiry date to a new
     one) since that no longer matches the acknowledged date."""
-    today = today_local()
+    today = today_local(user_id)
     with db.get_conn() as conn:
         docs = conn.execute(
-            "SELECT * FROM documents WHERE expiry_date IS NOT NULL"
+            "SELECT * FROM documents WHERE user_id = ? AND expiry_date IS NOT NULL", (user_id,)
         ).fetchall()
 
     for d in docs:
@@ -286,7 +294,7 @@ def check_document_expiries() -> None:
             continue
 
         dedupe_key = f"doc_expiry_sent:{d['id']}:{today.isoformat()}"
-        if db.get_setting(dedupe_key):
+        if db.get_setting(user_id, dedupe_key):
             continue
 
         if days_left == 0:
@@ -298,52 +306,52 @@ def check_document_expiries() -> None:
         else:  # 30
             msg = f"📅 <b>{d['label']}</b> expires in 1 month."
 
-        if telegram_notify.send(msg):
-            db.set_setting(dedupe_key, "1")
+        if telegram_notify.send(user_id, msg):
+            db.set_setting(user_id, dedupe_key, "1")
 
 
-def get_overbudget_categories() -> list[str]:
-    today = today_local()
+def get_overbudget_categories(user_id: int) -> list[str]:
+    today = today_local(user_id)
     month_key = iso_month_key(today)
-    currency = db.get_setting("currency", "ETB")
+    currency = db.get_setting(user_id, "currency", "ETB")
 
     over = []
     with db.get_conn() as conn:
         cats = conn.execute(
-            "SELECT * FROM budget_categories WHERE monthly_limit IS NOT NULL"
+            "SELECT * FROM budget_categories WHERE user_id = ? AND monthly_limit IS NOT NULL", (user_id,)
         ).fetchall()
         for c in cats:
             spent = conn.execute(
                 "SELECT COALESCE(SUM(amount), 0) AS total FROM transactions "
-                "WHERE type = 'expense' AND category_id = ? AND strftime('%Y-%m', date) = ?",
-                (c["id"], month_key),
+                "WHERE user_id = ? AND type = 'expense' AND category_id = ? AND strftime('%Y-%m', date) = ?",
+                (user_id, c["id"], month_key),
             ).fetchone()["total"]
             if spent > c["monthly_limit"]:
                 over.append(f"{c['name']}: {spent:.0f} / {c['monthly_limit']:.0f} {currency}")
     return over
 
 
-def check_recurring_transactions() -> None:
+def check_recurring_transactions(user_id: int) -> None:
     """Auto-logs due recurring income (jobs/salary) and expenses (rent, bills,
     etc.) as real transactions, then advances each to its next month."""
-    today = today_local()
-    currency = db.get_setting("currency", "ETB")
+    today = today_local(user_id)
+    currency = db.get_setting(user_id, "currency", "ETB")
 
     with db.get_conn() as conn:
         due = conn.execute(
-            "SELECT * FROM recurring_transactions WHERE active = 1 AND date(next_run) <= date(?)",
-            (today.isoformat(),),
+            "SELECT * FROM recurring_transactions WHERE user_id = ? AND active = 1 AND date(next_run) <= date(?)",
+            (user_id, today.isoformat()),
         ).fetchall()
 
         for r in due:
             conn.execute(
-                "INSERT INTO transactions (date, type, category_id, description, amount, created_at) "
-                "VALUES (?,?,?,?,?,?)",
-                (r["next_run"], r["type"], r["category_id"], f"{r['title']} (recurring)",
+                "INSERT INTO transactions (user_id, date, type, category_id, description, amount, created_at) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (user_id, r["next_run"], r["type"], r["category_id"], f"{r['title']} (recurring)",
                  r["amount"], db.now()),
             )
             icon = "💰" if r["type"] == "income" else "💸"
-            telegram_notify.send(f"{icon} Recurring {r['type']} logged: <b>{r['title']}</b> — {r['amount']:.0f} {currency}")
+            telegram_notify.send(user_id, f"{icon} Recurring {r['type']} logged: <b>{r['title']}</b> — {r['amount']:.0f} {currency}")
 
             new_next = date.fromisoformat(r["next_run"])
             if r["frequency"] == "weekly":
@@ -360,11 +368,11 @@ def check_recurring_transactions() -> None:
             )
 
 
-def send_evening_digest() -> None:
+def send_evening_digest(user_id: int) -> None:
     """One combined Telegram message covering unfinished habits and any
     over-budget categories this month, instead of separate pings."""
-    incomplete = get_incomplete_habits()
-    overbudget = get_overbudget_categories()
+    incomplete = get_incomplete_habits(user_id)
+    overbudget = get_overbudget_categories(user_id)
 
     if not incomplete and not overbudget:
         return
@@ -375,33 +383,44 @@ def send_evening_digest() -> None:
     if overbudget:
         parts.append("💸 Over budget this month:\n" + "\n".join(f"• {t}" for t in overbudget))
 
-    telegram_notify.send("\n\n".join(parts))
+    telegram_notify.send(user_id, "\n\n".join(parts))
 
 
-def tick() -> None:
-    """Runs every 15 minutes. Fires reminder-check / evening-digest jobs exactly
-    once on the day they're due, at whatever hour is currently configured —
-    so changing the hour in Settings takes effect without a restart."""
-    today = today_local()
-    now_hour = datetime.now(get_tz()).hour
+def tick_for_user(user_id: int) -> None:
+    """Runs every 15 minutes for each registered user. Fires reminder-check /
+    evening-digest jobs exactly once on the day they're due, at whatever
+    hour is currently configured for THAT user — so changing the hour in
+    Settings takes effect without a restart, and different users in
+    different timezones each get notified at their own local time."""
+    today = today_local(user_id)
+    now_hour = datetime.now(get_tz(user_id)).hour
 
-    if now_hour == get_reminder_hour() and db.get_setting("last_reminder_run") != today.isoformat():
+    if now_hour == get_reminder_hour(user_id) and db.get_setting(user_id, "last_reminder_run") != today.isoformat():
         try:
-            check_reminders()
-            check_recurring_transactions()
-            check_document_expiries()
+            check_reminders(user_id)
+            check_recurring_transactions(user_id)
+            check_document_expiries(user_id)
         finally:
-            db.set_setting("last_reminder_run", today.isoformat())
+            db.set_setting(user_id, "last_reminder_run", today.isoformat())
 
-    if now_hour == get_nudge_hour() and db.get_setting("last_habit_run") != today.isoformat():
+    if now_hour == get_nudge_hour(user_id) and db.get_setting(user_id, "last_habit_run") != today.isoformat():
         try:
-            send_evening_digest()
+            send_evening_digest(user_id)
         finally:
-            db.set_setting("last_habit_run", today.isoformat())
+            db.set_setting(user_id, "last_habit_run", today.isoformat())
 
     # Self-contained dedupe, safe to call every tick regardless of hour —
     # it only actually sends when now_hour matches a habit's own reminder_hour.
-    check_individual_habit_reminders()
+    check_individual_habit_reminders(user_id)
+
+
+def tick() -> None:
+    """Runs every 15 minutes, once per registered user."""
+    for user_id in get_all_user_ids():
+        try:
+            tick_for_user(user_id)
+        except Exception:
+            logger.exception("tick_for_user failed for user_id=%s", user_id)
 
 
 def start_scheduler() -> BackgroundScheduler:
