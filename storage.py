@@ -3,6 +3,7 @@ S3-compatible object storage helper for the ID Vault (Backblaze B2).
 """
 
 import boto3
+from botocore.config import Config
 import config
 
 
@@ -12,6 +13,14 @@ def _client():
         endpoint_url=config.R2_ENDPOINT_URL,
         aws_access_key_id=config.R2_ACCESS_KEY_ID,
         aws_secret_access_key=config.R2_SECRET_ACCESS_KEY,
+        # Newer boto3/botocore versions send data-integrity checksum headers
+        # by default that Backblaze B2 doesn't support, which causes the
+        # connection to be dropped mid-request. Dial checksums back to
+        # "only when the API requires them" so uploads/downloads work.
+        config=Config(
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        ),
     )
 
 
