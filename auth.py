@@ -46,11 +46,18 @@ def create_user(email: str, password: str) -> int:
         user_id = cur.lastrowid
 
     if is_first_user:
-        # The very first account claims all pre-existing single-user data.
+        # The very first account claims all pre-existing single-user data,
+        # including any legacy profile row.
         db.claim_orphaned_data(user_id)
-    # Every user gets their own blank profile row to start.
+
+    # Every user gets their own blank profile row to start — but the first
+    # user may already have one via claim_orphaned_data() above, so this
+    # must not clobber/duplicate it (profile.user_id is UNIQUE).
     with db.get_conn() as conn:
-        conn.execute("INSERT INTO profile (user_id, height_cm) VALUES (?, NULL)", (user_id,))
+        conn.execute(
+            "INSERT OR IGNORE INTO profile (user_id, height_cm) VALUES (?, NULL)",
+            (user_id,),
+        )
     return user_id
 
 
