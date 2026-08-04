@@ -60,7 +60,14 @@ SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
 # ── Vault file storage (Backblaze B2, S3-compatible) ────────────────────
 # ID vault uploads (photos/PDFs) are stored here instead of local disk, so
 # they survive Render free-tier restarts and redeploys.
-R2_ACCESS_KEY_ID = os.environ.get("B2_KEY_ID")
-R2_SECRET_ACCESS_KEY = os.environ.get("B2_APPLICATION_KEY")
-R2_BUCKET_NAME = os.environ.get("B2_BUCKET_NAME", "lifehub-vault")
-R2_ENDPOINT_URL = os.environ.get("B2_ENDPOINT_URL")
+# .strip() guards against a trailing space/newline sneaking in when the
+# key/endpoint is copy-pasted into Render's env var box — that alone is
+# enough to break SigV4 signing with a SignatureDoesNotMatch error.
+def _clean_env(name, default=None):
+    val = os.environ.get(name, default)
+    return val.strip() if val else val
+
+R2_ACCESS_KEY_ID = _clean_env("B2_KEY_ID")
+R2_SECRET_ACCESS_KEY = _clean_env("B2_APPLICATION_KEY")
+R2_BUCKET_NAME = _clean_env("B2_BUCKET_NAME", "lifehub-vault")
+R2_ENDPOINT_URL = _clean_env("B2_ENDPOINT_URL")
