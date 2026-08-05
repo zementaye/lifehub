@@ -1,7 +1,3 @@
-"""Sends notifications via any Telegram bot you own — set it up on the Settings
-page. Each user configures their own bot token/chat ID. No dependency on
-python-telegram-bot needed, this just hits the HTTP Bot API."""
-
 import logging
 
 import requests
@@ -11,40 +7,46 @@ import db
 
 logger = logging.getLogger(__name__)
 
+TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
 
-def get_credentials(user_id: int) -> tuple[str, str]:
-    token = db.get_setting(user_id, "tg_bot_token", config.TG_BOT_TOKEN).strip()
-    chat_id = db.get_setting(user_id, "tg_chat_id", config.TG_CHAT_ID).strip()
+
+def _credentials(user_id: int):
+    token = db.get_setting(user_id, "tg_bot_token", config.TG_BOT_TOKEN)
+    chat_id = db.get_setting(user_id, "tg_chat_id", config.TG_CHAT_ID)
     return token, chat_id
 
 
-def send(user_id: int, text: str) -> bool:
-    ok, _err = send_detailed(user_id, text)
+def send(user_id: int, message: str) -> bool:
+    """Fire-and-forget notification for a given user. Returns True/False and
+    swallows errors (logging them) so a Telegram outage never breaks a
+    reminder/habit-checkin flow that's calling this."""
+    ok, err = send_detailed(user_id, message)
+    if not ok:
+        logger.warning("Telegram send failed for user_id=%s: %s", user_id, err)
     return ok
 
 
-def send_detailed(user_id: int, text: str) -> tuple[bool, str]:
-    """Same as send(), but also returns Telegram's actual error message
-    (e.g. 'Unauthorized' for a bad token, 'chat not found' for a bad chat
-    ID or a bot you haven't started a conversation with) instead of just
-    True/False, so failures are actually diagnosable."""
-    token, chat_id = get_credentials(user_id)
+def send_detailed(user_id: int, message: str):
+    """Same as send(), but returns (ok, error_message) so callers like the
+    Settings 'Send test notification' button can show the real reason a
+    message didn't go through."""
+    token, chat_id = _credentials(user_id)
     if not token or not chat_id:
-        return False, "Bot token or chat ID isn't set."
+        return False, "Telegram bot token / chat ID not configured."
+
     try:
         resp = requests.post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+            TELEGRAM_API.format(token=token),
+            json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
             timeout=10,
         )
-        if not resp.ok:
-            try:
-                err = resp.json().get("description", resp.text)
-            except ValueError:
-                err = resp.text
-            logger.error("Telegram notify failed: %s", err)
-            return False, err
-        return True, ""
     except requests.RequestException as e:
-        logger.exception("Telegram notify request failed")
         return False, str(e)
+
+    if resp.status_code == 200 and resp.json().get("ok"):
+        return True, None
+
+    try:
+        return False, resp.json().get("description", resp.text)
+    except ValueError:
+        return False, resp.text
