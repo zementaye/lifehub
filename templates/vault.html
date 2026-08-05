@@ -154,23 +154,17 @@ const filledState = document.getElementById('dropzone-filled');
 const preview = document.getElementById('vault-preview');
 const fileInfo = document.getElementById('vault-file-info');
 
-// Guard against malformed years (e.g. "200001") that Chromium's date
-// picker lets you type before month/day are filled in. min/max on the
-// inputs above stop it from being submitted at all; this clears/clamps it
-// as soon as the field loses focus, instead of leaving obviously-broken
-// text sitting there.
+// Guard against out-of-range years (e.g. typing "200001" into the year
+// segment) without fighting normal, in-progress typing. min/max on the
+// inputs above already stop bad values from being submitted; this only
+// steps in when the browser's own validity flags confirm the *completed*
+// date is actually above max or below min — an incomplete/mid-typing date
+// reports badInput instead, which we deliberately ignore and leave alone.
 document.querySelectorAll('input[type="date"]').forEach((el) => {
-  const clamp = () => {
-    if (!el.value || el.checkValidity()) return;
-    const minYear = el.min ? parseInt(el.min.slice(0, 4), 10) : 1900;
-    const maxYear = el.max ? parseInt(el.max.slice(0, 4), 10) : 2099;
-    const year = parseInt(el.value.slice(0, 4), 10);
-    if (isNaN(year) || year < minYear) el.value = el.min || '';
-    else if (year > maxYear) el.value = el.max || '';
-    else el.value = ''; // malformed in some other way — just clear it
-  };
-  el.addEventListener('change', clamp);
-  el.addEventListener('blur', clamp);
+  el.addEventListener('change', () => {
+    if (el.validity.rangeUnderflow) el.value = el.min;
+    else if (el.validity.rangeOverflow) el.value = el.max;
+  });
 });
 
 function showFile(file) {
