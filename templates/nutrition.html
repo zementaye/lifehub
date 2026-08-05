@@ -56,10 +56,16 @@
       <div class="stat"><span class="stat-value"><span data-countup="{{ recommendation.fiber_g }}">0</span><small>g</small></span><span class="stat-label">fiber</span></div>
     </div>
     <p class="muted">{{ recommendation.activity_label }} · BMR {{ recommendation.bmr }} kcal · age {{ recommendation.age }}</p>
-    <form method="post" action="{{ url_for('use_recommended_nutrition') }}">
+    {% set already_applied = goals.calories and goals.protein_g
+        and (goals.calories | round | int) == (recommendation.calories | round | int)
+        and (goals.protein_g | round | int) == (recommendation.protein_g | round | int) %}
+    <form method="post" action="{{ url_for('use_recommended_nutrition') }}" id="use-recommended-form">
       <input type="hidden" name="calories" value="{{ recommendation.calories }}">
       <input type="hidden" name="protein_g" value="{{ recommendation.protein_g }}">
-      <button type="submit">Use this as my daily goal</button>
+      <button type="submit" id="use-recommended-btn"
+              {% if already_applied %}disabled class="secondary"{% endif %}>
+        {{ '✓ This is your current goal' if already_applied else 'Use this as my daily goal' }}
+      </button>
     </form>
   {% else %}
     <p class="muted">
@@ -90,4 +96,23 @@
     {% endfor %}
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Lock "Use this as my daily goal" the instant it's clicked, so a second
+// click before the page reloads can't fire a duplicate POST. Once applied,
+// the button re-renders disabled server-side (see already_applied above),
+// so this only needs to guard the in-flight window.
+(function () {
+  const form = document.getElementById('use-recommended-form');
+  const btn = document.getElementById('use-recommended-btn');
+  if (!form || !btn || btn.disabled) return;
+
+  form.addEventListener('submit', () => {
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+  });
+})();
+</script>
 {% endblock %}
