@@ -3,16 +3,52 @@
 {% block content %}
 <h1>Budget</h1>
 
-<div class="card">
-  <form method="get" class="inline-form">
-    <label>Month <input type="month" name="month" value="{{ month }}" onchange="this.form.submit()"></label>
-    <input type="hidden" name="year" value="{{ year }}">
-  </form>
-  <a href="#yearly-summary" class="btn-secondary">Jump to yearly summary ↓</a>
-  <div class="stat-row">
-    <div class="stat"><span class="stat-value" data-countup="{{ income_total | round | int }}">0</span><span class="stat-label">Income ({{ currency }})</span></div>
-    <div class="stat"><span class="stat-value" data-countup="{{ expense_total | round | int }}">0</span><span class="stat-label">Expenses ({{ currency }})</span></div>
-    <div class="stat"><span class="stat-value {{ 'net-negative' if net < 0 else 'net-positive' }}" data-countup="{{ net | round | int }}">0</span><span class="stat-label">Net</span></div>
+<div class="grid">
+  <div class="card">
+    <h3>Monthly — {{ month }}</h3>
+    <form method="get" class="inline-form">
+      <label>Month <input type="month" name="month" value="{{ month }}" onchange="this.form.submit()"></label>
+      <input type="hidden" name="year" value="{{ year }}">
+    </form>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-value" data-countup="{{ income_total | round | int }}">0</span><span class="stat-label">Income ({{ currency }})</span></div>
+      <div class="stat"><span class="stat-value" data-countup="{{ expense_total | round | int }}">0</span><span class="stat-label">Expenses ({{ currency }})</span></div>
+      <div class="stat"><span class="stat-value {{ 'net-negative' if net < 0 else 'net-positive' }}" data-countup="{{ net | round | int }}">0</span><span class="stat-label">Net</span></div>
+    </div>
+  </div>
+
+  <div class="card" id="yearly-summary">
+    <h3>Yearly — {{ year }}</h3>
+    <form method="get" class="inline-form">
+      <input type="hidden" name="month" value="{{ month }}">
+      <label>Year
+        <select name="year" onchange="this.form.submit()">
+          {% for y in available_years %}
+            <option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-value" data-countup="{{ yearly_income_total | round | int }}">0</span><span class="stat-label">Income ({{ currency }})</span></div>
+      <div class="stat"><span class="stat-value" data-countup="{{ yearly_expense_total | round | int }}">0</span><span class="stat-label">Expenses ({{ currency }})</span></div>
+      <div class="stat"><span class="stat-value {{ 'net-negative' if yearly_net < 0 else 'net-positive' }}" data-countup="{{ yearly_net | round | int }}">0</span><span class="stat-label">Net</span></div>
+    </div>
+    <div class="yearly-chart">
+      {% for m in yearly_months %}
+        <div class="yearly-chart-col" title="{{ m.label }} {{ year }}: {{ m.income | round | int }} income, {{ m.expense | round | int }} {{ currency }} expenses">
+          <div class="yearly-chart-bars">
+            <div class="yearly-bar income" style="height: {{ m.income_pct }}%;"></div>
+            <div class="yearly-bar expense" style="height: {{ m.expense_pct }}%;"></div>
+          </div>
+          <span class="yearly-chart-label">{{ m.label }}</span>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="yearly-chart-legend">
+      <span><span class="swatch income"></span> Income</span>
+      <span><span class="swatch expense"></span> Expenses</span>
+    </div>
   </div>
 </div>
 
@@ -254,44 +290,9 @@
   {% endif %}
 </div>
 
-<div class="card wide" id="yearly-summary">
-  <div class="pw-header">
-    <h3>Yearly Summary — {{ year }}</h3>
-    <form method="get" class="inline-form" style="margin:0;">
-      <input type="hidden" name="month" value="{{ month }}">
-      <label>Year
-        <select name="year" onchange="this.form.submit()">
-          {% for y in available_years %}
-            <option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }}</option>
-          {% endfor %}
-        </select>
-      </label>
-    </form>
-  </div>
-
-  <div class="stat-row">
-    <div class="stat"><span class="stat-value" data-countup="{{ yearly_income_total | round | int }}">0</span><span class="stat-label">Income ({{ currency }})</span></div>
-    <div class="stat"><span class="stat-value" data-countup="{{ yearly_expense_total | round | int }}">0</span><span class="stat-label">Expenses ({{ currency }})</span></div>
-    <div class="stat"><span class="stat-value {{ 'net-negative' if yearly_net < 0 else 'net-positive' }}" data-countup="{{ yearly_net | round | int }}">0</span><span class="stat-label">Net</span></div>
-  </div>
-
-  <div class="yearly-chart">
-    {% for m in yearly_months %}
-      <div class="yearly-chart-col" title="{{ m.label }} {{ year }}: {{ m.income | round | int }} income, {{ m.expense | round | int }} {{ currency }} expenses">
-        <div class="yearly-chart-bars">
-          <div class="yearly-bar income" style="height: {{ m.income_pct }}%;"></div>
-          <div class="yearly-bar expense" style="height: {{ m.expense_pct }}%;"></div>
-        </div>
-        <span class="yearly-chart-label">{{ m.label }}</span>
-      </div>
-    {% endfor %}
-  </div>
-  <div class="yearly-chart-legend">
-    <span><span class="swatch income"></span> Income</span>
-    <span><span class="swatch expense"></span> Expenses</span>
-  </div>
-
-  <table class="table" style="margin-top:18px;">
+<div class="card wide">
+  <h3>Yearly Detail — {{ year }}</h3>
+  <table class="table">
     <thead><tr><th>Month</th><th>Income</th><th>Expenses</th><th>Net</th></tr></thead>
     <tbody>
       {% for m in yearly_months %}
