@@ -721,7 +721,7 @@ def _augment_savings_goal(g):
 def budget():
     month = request.args.get("month") or scheduler.today_local().strftime("%Y-%m")
     year = request.args.get("year") or month[:4]
-    currency = db.get_setting("currency", "ETB")
+    currency = db.get_setting("currency", "ETB") or "ETB"
 
     with db.get_conn() as conn:
         categories = conn.execute("SELECT * FROM budget_categories ORDER BY name").fetchall()
