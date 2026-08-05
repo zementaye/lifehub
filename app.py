@@ -4,15 +4,14 @@ import time
 import uuid
 from datetime import date, timedelta
 
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, make_response, session
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, make_response
 
-import auth
 import config
+import crypto
 import db
 import nutrition_api
 import nutrition_calc
 import scheduler
-import storage
 import telegram_notify
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -20,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
-app.permanent_session_lifetime = timedelta(days=365)
 
 # Changes every time the app process starts (i.e. every deploy/restart).
 # Appended as a ?v= query string on static assets in base.html so browsers
@@ -31,19 +29,26 @@ app.jinja_env.globals["asset_version"] = str(int(time.time()))
 db.init_db()
 
 
-# ── Auth gate ────────────────────────────────────────────────────────────
-# Every page requires a logged-in user, except the auth pages themselves
-# and static assets. Individual data routes still call auth.current_user_id()
-# to scope their queries — this just blocks anonymous access globally.
-_PUBLIC_ENDPOINTS = {"login", "register", "forgot_password", "reset_password", "static"}
-
-
+# ── Optional lightweight access gate ────────────────────────────────────
 @app.before_request
-def require_login():
-    if request.endpoint in _PUBLIC_ENDPOINTS or request.endpoint is None:
+def check_access():
+    if not config.APP_ACCESS_TOKEN:
+        return  # gate disabled — zero friction
+    if request.cookies.get("access_ok") == config.APP_ACCESS_TOKEN:
         return
-    if not auth.current_user_id():
-        return redirect(url_for("login", next=request.path))
+    if request.args.get("key") == config.APP_ACCESS_TOKEN:
+        return  # will set cookie in after_request
+    return "Access denied.", 403
+
+
+@app.after_request
+def set_access_cookie(resp):
+    if config.APP_ACCESS_TOKEN and request.args.get("key") == config.APP_ACCESS_TOKEN:
+        resp.set_cookie(
+            "access_ok", config.APP_ACCESS_TOKEN, max_age=60 * 60 * 24 * 365,
+            httponly=True, samesite="Lax",
+        )
+    return resp
 
 
 @app.after_request
@@ -54,95 +59,6 @@ def no_cache_static(resp):
     if request.path.startswith("/static/"):
         resp.headers["Cache-Control"] = "no-cache, must-revalidate"
     return resp
-
-
-# ── Auth routes ──────────────────────────────────────────────────────────
-
-@app.route("/register", methods=["GET", "POST"])
-def register():
-    if auth.current_user_id():
-        return redirect(url_for("dashboard"))
-    if request.method == "POST":
-        email = request.form.get("email", "").strip()
-        password = request.form.get("password", "")
-        confirm = request.form.get("confirm", "")
-        if not email or "@" not in email:
-            flash("Enter a valid email address.")
-        elif len(password) < 8:
-            flash("Password must be at least 8 characters.")
-        elif password != confirm:
-            flash("Passwords don't match.")
-        else:
-            try:
-                user_id = auth.create_user(email, password)
-            except ValueError as e:
-                flash(str(e))
-            else:
-                auth.login_user(user_id)
-                flash("Welcome to LifeHub!")
-                return redirect(url_for("dashboard"))
-    return render_template("register.html")
-
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if auth.current_user_id():
-        return redirect(url_for("dashboard"))
-    if request.method == "POST":
-        email = request.form.get("email", "").strip()
-        password = request.form.get("password", "")
-        user = auth.get_user_by_email(email)
-        if user and auth.verify_password(password, user["password_hash"]):
-            auth.login_user(user["id"])
-            next_path = request.args.get("next") or url_for("dashboard")
-            return redirect(next_path)
-        flash("Incorrect email or password.")
-    return render_template("login.html")
-
-
-@app.route("/logout", methods=["POST"])
-def logout():
-    auth.logout_user()
-    return redirect(url_for("login"))
-
-
-@app.route("/forgot-password", methods=["GET", "POST"])
-def forgot_password():
-    if request.method == "POST":
-        email = request.form.get("email", "").strip()
-        user = auth.get_user_by_email(email)
-        if user:
-            token = auth.create_reset_token(user["id"])
-            auth.send_reset_email(user["email"], token)
-        # Same message either way — don't reveal whether an email is registered.
-        flash("If that email has an account, a reset link is on its way.")
-        return redirect(url_for("login"))
-    return render_template("forgot_password.html")
-
-
-@app.route("/reset-password/<token>", methods=["GET", "POST"])
-def reset_password(token):
-    if request.method == "POST":
-        password = request.form.get("password", "")
-        confirm = request.form.get("confirm", "")
-        if len(password) < 8:
-            flash("Password must be at least 8 characters.")
-            return render_template("reset_password.html", token=token)
-        if password != confirm:
-            flash("Passwords don't match.")
-            return render_template("reset_password.html", token=token)
-        user_id = auth.consume_reset_token(token)
-        if not user_id:
-            flash("That reset link is invalid or has expired. Request a new one.")
-            return redirect(url_for("forgot_password"))
-        with db.get_conn() as conn:
-            conn.execute(
-                "UPDATE users SET password_hash = ? WHERE id = ?",
-                (auth.hash_password(password), user_id),
-            )
-        flash("Password updated — you can log in now.")
-        return redirect(url_for("login"))
-    return render_template("reset_password.html", token=token)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
@@ -197,19 +113,18 @@ def weight_sparkline_svg(weights_desc, width=560, height=90, pad=10) -> str | No
 
 @app.route("/")
 def dashboard():
-    user_id = auth.current_user_id()
-    today = scheduler.today_local(user_id).isoformat()
+    today = scheduler.today_local().isoformat()
     with db.get_conn() as conn:
-        profile = conn.execute("SELECT * FROM profile WHERE user_id = ?", (user_id,)).fetchone()
+        profile = conn.execute("SELECT * FROM profile WHERE id = 1").fetchone()
         latest_weight = conn.execute(
-            "SELECT * FROM weight_entries WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT 1", (user_id,)
+            "SELECT * FROM weight_entries ORDER BY date DESC, id DESC LIMIT 1"
         ).fetchone()
         upcoming_reminders = conn.execute(
-            "SELECT * FROM reminders WHERE user_id = ? AND active = 1 ORDER BY date(next_due) LIMIT 5", (user_id,)
+            "SELECT * FROM reminders WHERE active = 1 ORDER BY date(next_due) LIMIT 5"
         ).fetchall()
-        habits = conn.execute("SELECT * FROM habits WHERE user_id = ? AND active = 1", (user_id,)).fetchall()
+        habits = conn.execute("SELECT * FROM habits WHERE active = 1").fetchall()
         today_food = conn.execute(
-            "SELECT * FROM food_log WHERE user_id = ? AND date = ?", (user_id, today)
+            "SELECT * FROM food_log WHERE date = ?", (today,)
         ).fetchall()
 
     bmi = bmi_of(latest_weight["weight_kg"], profile["height_cm"]) if latest_weight and profile["height_cm"] else None
@@ -238,11 +153,10 @@ def dashboard():
 
 @app.route("/health")
 def health():
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        profile = conn.execute("SELECT * FROM profile WHERE user_id = ?", (user_id,)).fetchone()
-        weights = conn.execute("SELECT * FROM weight_entries WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT 30", (user_id,)).fetchall()
-        sessions = conn.execute("SELECT * FROM sessions WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT 30", (user_id,)).fetchall()
+        profile = conn.execute("SELECT * FROM profile WHERE id = 1").fetchone()
+        weights = conn.execute("SELECT * FROM weight_entries ORDER BY date DESC, id DESC LIMIT 30").fetchall()
+        sessions = conn.execute("SELECT * FROM sessions ORDER BY date DESC, id DESC LIMIT 30").fetchall()
 
     latest = weights[0] if weights else None
     bmi = bmi_of(latest["weight_kg"], profile["height_cm"]) if latest and profile["height_cm"] else None
@@ -256,14 +170,13 @@ def health():
 
 @app.route("/health/height", methods=["POST"])
 def set_height():
-    user_id = auth.current_user_id()
     height = request.form.get("height_cm", type=float)
     birth_date = request.form.get("birth_date", "").strip() or None
     sex = request.form.get("sex", "").strip() or None
     with db.get_conn() as conn:
         conn.execute(
-            "UPDATE profile SET height_cm = ?, birth_date = ?, sex = ? WHERE user_id = ?",
-            (height, birth_date, sex, user_id),
+            "UPDATE profile SET height_cm = ?, birth_date = ?, sex = ? WHERE id = 1",
+            (height, birth_date, sex),
         )
     flash("Profile updated.")
     return redirect(url_for("health"))
@@ -271,14 +184,13 @@ def set_height():
 
 @app.route("/health/weight", methods=["POST"])
 def add_weight():
-    user_id = auth.current_user_id()
     d = request.form.get("date") or date.today().isoformat()
     w = request.form.get("weight_kg", type=float)
     if w:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO weight_entries (user_id, date, weight_kg, created_at) VALUES (?,?,?,?)",
-                (user_id, d, w, db.now()),
+                "INSERT INTO weight_entries (date, weight_kg, created_at) VALUES (?, ?, ?)",
+                (d, w, db.now()),
             )
         flash("Weight logged.")
     return redirect(url_for("health"))
@@ -286,15 +198,13 @@ def add_weight():
 
 @app.route("/health/weight/<int:entry_id>/delete", methods=["POST"])
 def delete_weight(entry_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        conn.execute("DELETE FROM weight_entries WHERE id = ? AND user_id = ?", (entry_id, user_id))
+        conn.execute("DELETE FROM weight_entries WHERE id = ?", (entry_id,))
     return redirect(url_for("health"))
 
 
 @app.route("/health/session", methods=["POST"])
 def add_session():
-    user_id = auth.current_user_id()
     d = request.form.get("date") or date.today().isoformat()
     stype = request.form.get("type", "").strip()
     duration = request.form.get("duration_minutes", type=int)
@@ -302,8 +212,8 @@ def add_session():
     if stype:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO sessions (user_id, date, type, duration_minutes, notes, created_at) VALUES (?,?,?,?,?,?)",
-                (user_id, d, stype, duration, notes, db.now()),
+                "INSERT INTO sessions (date, type, duration_minutes, notes, created_at) VALUES (?,?,?,?,?)",
+                (d, stype, duration, notes, db.now()),
             )
         flash("Session logged.")
     return redirect(url_for("health"))
@@ -311,9 +221,8 @@ def add_session():
 
 @app.route("/health/session/<int:session_id>/delete", methods=["POST"])
 def delete_session(session_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        conn.execute("DELETE FROM sessions WHERE id = ? AND user_id = ?", (session_id, user_id))
+        conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
     return redirect(url_for("health"))
 
 
@@ -321,18 +230,17 @@ def delete_session(session_id):
 
 @app.route("/nutrition")
 def nutrition():
-    user_id = auth.current_user_id()
     d = request.args.get("date") or date.today().isoformat()
     with db.get_conn() as conn:
-        log = conn.execute("SELECT * FROM food_log WHERE user_id = ? AND date = ? ORDER BY id", (user_id, d)).fetchall()
+        log = conn.execute("SELECT * FROM food_log WHERE date = ? ORDER BY id", (d,)).fetchall()
 
-        profile = conn.execute("SELECT * FROM profile WHERE user_id = ?", (user_id,)).fetchone()
+        profile = conn.execute("SELECT * FROM profile WHERE id = 1").fetchone()
         latest_weight = conn.execute(
-            "SELECT weight_kg FROM weight_entries WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT 1", (user_id,)
+            "SELECT weight_kg FROM weight_entries ORDER BY date DESC, id DESC LIMIT 1"
         ).fetchone()
         week_ago = (date.today() - timedelta(days=7)).isoformat()
         session_count = conn.execute(
-            "SELECT COUNT(*) AS c FROM sessions WHERE user_id = ? AND date >= ?", (user_id, week_ago)
+            "SELECT COUNT(*) AS c FROM sessions WHERE date >= ?", (week_ago,)
         ).fetchone()["c"]
 
     totals = {"calories": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0, "fiber_g": 0.0}
@@ -347,8 +255,8 @@ def nutrition():
         meal_summary[m]["calories"] += f["calories"] * f["servings"]
         meal_summary[m]["count"] += 1
 
-    goal_cal = db.get_setting(user_id, "nutrition_goal_calories")
-    goal_protein = db.get_setting(user_id, "nutrition_goal_protein")
+    goal_cal = db.get_setting("nutrition_goal_calories")
+    goal_protein = db.get_setting("nutrition_goal_protein")
     goals = {
         "calories": float(goal_cal) if goal_cal else None,
         "protein_g": float(goal_protein) if goal_protein else None,
@@ -374,13 +282,12 @@ MEAL_LABELS = {"breakfast": "🍳 Breakfast", "lunch": "🥗 Lunch", "dinner": "
 def nutrition_meal(meal):
     if meal not in MEAL_LABELS:
         return redirect(url_for("nutrition"))
-    user_id = auth.current_user_id()
     d = request.args.get("date") or date.today().isoformat()
     with db.get_conn() as conn:
         entries = conn.execute(
-            "SELECT * FROM food_log WHERE user_id = ? AND date = ? AND meal = ? ORDER BY id", (user_id, d, meal)
+            "SELECT * FROM food_log WHERE date = ? AND meal = ? ORDER BY id", (d, meal)
         ).fetchall()
-        custom_foods = conn.execute("SELECT * FROM custom_foods WHERE user_id = ? ORDER BY name", (user_id,)).fetchall()
+        custom_foods = conn.execute("SELECT * FROM custom_foods ORDER BY name").fetchall()
 
     totals = {"calories": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0, "fiber_g": 0.0}
     for f in entries:
@@ -393,13 +300,12 @@ def nutrition_meal(meal):
 
 @app.route("/nutrition/use-recommendation", methods=["POST"])
 def use_recommended_nutrition():
-    user_id = auth.current_user_id()
     calories = request.form.get("calories", type=int)
     protein_g = request.form.get("protein_g", type=int)
     if calories:
-        db.set_setting(user_id, "nutrition_goal_calories", str(calories))
+        db.set_setting("nutrition_goal_calories", str(calories))
     if protein_g:
-        db.set_setting(user_id, "nutrition_goal_protein", str(protein_g))
+        db.set_setting("nutrition_goal_protein", str(protein_g))
     flash("Recommended intake applied as your daily goal.")
     return redirect(url_for("nutrition"))
 
@@ -413,7 +319,6 @@ def nutrition_search():
 
 @app.route("/nutrition/log", methods=["POST"])
 def log_food():
-    user_id = auth.current_user_id()
     d = request.form.get("date") or date.today().isoformat()
     grams = request.form.get("grams", type=float)
     if grams is not None:
@@ -434,10 +339,10 @@ def log_food():
     if name:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO food_log (user_id, date, source, custom_food_id, name, meal, servings, "
+                "INSERT INTO food_log (date, source, custom_food_id, name, meal, servings, "
                 "calories, protein_g, carbs_g, fat_g, fiber_g, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (user_id, d, source, request.form.get("custom_food_id", type=int), name, meal, servings,
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (d, source, request.form.get("custom_food_id", type=int), name, meal, servings,
                  fields["calories"], fields["protein_g"], fields["carbs_g"], fields["fat_g"],
                  fields["fiber_g"], db.now()),
             )
@@ -447,27 +352,25 @@ def log_food():
 
 @app.route("/nutrition/log/<int:log_id>/delete", methods=["POST"])
 def delete_food_log(log_id):
-    user_id = auth.current_user_id()
     d = request.form.get("date") or date.today().isoformat()
     with db.get_conn() as conn:
-        entry = conn.execute("SELECT meal FROM food_log WHERE id = ? AND user_id = ?", (log_id, user_id)).fetchone()
-        conn.execute("DELETE FROM food_log WHERE id = ? AND user_id = ?", (log_id, user_id))
+        entry = conn.execute("SELECT meal FROM food_log WHERE id = ?", (log_id,)).fetchone()
+        conn.execute("DELETE FROM food_log WHERE id = ?", (log_id,))
     meal = entry["meal"] if entry else "snack"
     return redirect(url_for("nutrition_meal", meal=meal, date=d))
 
 
 @app.route("/nutrition/custom", methods=["POST"])
 def add_custom_food():
-    user_id = auth.current_user_id()
     name = request.form.get("name", "").strip()
     meal = request.form.get("meal", "")
     d = request.form.get("date") or date.today().isoformat()
     if name:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO custom_foods (user_id, name, calories, protein_g, carbs_g, fat_g, fiber_g, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?)",
-                (user_id, name,
+                "INSERT INTO custom_foods (name, calories, protein_g, carbs_g, fat_g, fiber_g, created_at) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (name,
                  request.form.get("calories", type=float) or 0,
                  request.form.get("protein_g", type=float) or 0,
                  request.form.get("carbs_g", type=float) or 0,
@@ -483,12 +386,11 @@ def add_custom_food():
 
 @app.route("/nutrition/custom/<int:food_id>/delete", methods=["POST"])
 def delete_custom_food(food_id):
-    user_id = auth.current_user_id()
     meal = request.form.get("meal", "")
     d = request.form.get("date") or date.today().isoformat()
     with db.get_conn() as conn:
-        food = conn.execute("SELECT name FROM custom_foods WHERE id = ? AND user_id = ?", (food_id, user_id)).fetchone()
-        conn.execute("DELETE FROM custom_foods WHERE id = ? AND user_id = ?", (food_id, user_id))
+        food = conn.execute("SELECT name FROM custom_foods WHERE id = ?", (food_id,)).fetchone()
+        conn.execute("DELETE FROM custom_foods WHERE id = ?", (food_id,))
     if food:
         flash(f"Deleted custom food: {food['name']}")
     if meal in MEAL_LABELS:
@@ -503,11 +405,10 @@ ALLOWED_EXT = {"png", "jpg", "jpeg", "webp", "heic", "pdf"}
 
 @app.route("/vault")
 def vault():
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        rows = conn.execute("SELECT * FROM documents WHERE user_id = ? ORDER BY label", (user_id,)).fetchall()
+        rows = conn.execute("SELECT * FROM documents ORDER BY label").fetchall()
 
-    today = scheduler.today_local(user_id)
+    today = scheduler.today_local()
     docs = []
     for d in rows:
         entry = dict(d)
@@ -521,37 +422,15 @@ def vault():
         entry["acknowledged"] = d["expiry_ack_date"] == d["expiry_date"] and d["expiry_date"] is not None
         docs.append(entry)
 
-    upload_token = uuid.uuid4().hex
-    # A list, not a single value: opening /vault in a second tab (or a
-    # reload) used to overwrite the one stored token and silently invalidate
-    # whatever the first tab was about to submit. Keeping the last few keeps
-    # multiple tabs/reloads independently valid.
-    tokens = session.get("vault_upload_tokens", [])
-    tokens.append(upload_token)
-    session["vault_upload_tokens"] = tokens[-5:]
-    return render_template("vault.html", docs=docs, upload_token=upload_token)
+    return render_template("vault.html", docs=docs)
 
 
 @app.route("/vault/upload", methods=["POST"])
 def vault_upload():
-    user_id = auth.current_user_id()
     label = request.form.get("label", "").strip()
     notes = request.form.get("notes", "").strip()
     expiry_date = request.form.get("expiry_date", "").strip() or None
     file = request.files.get("file")
-    submitted_token = request.form.get("upload_token", "")
-
-    # Idempotency guard: the token is minted fresh every time /vault renders
-    # and is cleared the instant it's used, so a duplicate submission (a
-    # double click that slips past the JS guard, a retried request, a
-    # back-button resubmit) carries a stale token and gets silently dropped
-    # instead of creating a second document.
-    tokens = session.get("vault_upload_tokens", [])
-    if not submitted_token or submitted_token not in tokens:
-        flash("That upload was already saved (or the form expired) — refresh and try again if not.")
-        return redirect(url_for("vault"))
-    tokens.remove(submitted_token)
-    session["vault_upload_tokens"] = tokens
 
     if not label or not file or file.filename == "":
         flash("Label and file are required.")
@@ -563,12 +442,12 @@ def vault_upload():
         return redirect(url_for("vault"))
 
     filename = f"{uuid.uuid4().hex}.{ext}"
-    storage.upload_fileobj(file, filename, content_type=file.mimetype)
+    file.save(config.UPLOAD_DIR / filename)
 
     with db.get_conn() as conn:
         conn.execute(
-            "INSERT INTO documents (user_id, label, filename, notes, expiry_date, created_at) VALUES (?,?,?,?,?,?)",
-            (user_id, label, filename, notes, expiry_date, db.now()),
+            "INSERT INTO documents (label, filename, notes, expiry_date, created_at) VALUES (?,?,?,?,?)",
+            (label, filename, notes, expiry_date, db.now()),
         )
 
     flash(f"Saved {label}." + (" You'll get expiry reminders automatically as the date approaches." if expiry_date else ""))
@@ -577,14 +456,13 @@ def vault_upload():
 
 @app.route("/vault/<int:doc_id>/renew", methods=["POST"])
 def vault_renew(doc_id):
-    user_id = auth.current_user_id()
     new_expiry = request.form.get("expiry_date", "").strip() or None
     with db.get_conn() as conn:
         # Renewing to a new date naturally resets the reminder cycle, since
         # expiry_ack_date is cleared and no longer matches the old expiry.
         conn.execute(
-            "UPDATE documents SET expiry_date = ?, expiry_ack_date = NULL WHERE id = ? AND user_id = ?",
-            (new_expiry, doc_id, user_id),
+            "UPDATE documents SET expiry_date = ?, expiry_ack_date = NULL WHERE id = ?",
+            (new_expiry, doc_id),
         )
     flash("Expiry date updated.")
     return redirect(url_for("vault"))
@@ -592,13 +470,12 @@ def vault_renew(doc_id):
 
 @app.route("/vault/<int:doc_id>/acknowledge", methods=["POST"])
 def vault_acknowledge(doc_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        doc = conn.execute("SELECT * FROM documents WHERE id = ? AND user_id = ?", (doc_id, user_id)).fetchone()
+        doc = conn.execute("SELECT * FROM documents WHERE id = ?", (doc_id,)).fetchone()
         if doc:
             conn.execute(
-                "UPDATE documents SET expiry_ack_date = ? WHERE id = ? AND user_id = ?",
-                (doc["expiry_date"], doc_id, user_id),
+                "UPDATE documents SET expiry_ack_date = ? WHERE id = ?",
+                (doc["expiry_date"], doc_id),
             )
     flash("Got it — reminders paused for this expiry until you renew it.")
     return redirect(url_for("vault"))
@@ -606,37 +483,30 @@ def vault_acknowledge(doc_id):
 
 @app.route("/vault/file/<filename>")
 def vault_file(filename):
-    user_id = auth.current_user_id()
-    with db.get_conn() as conn:
-        doc = conn.execute(
-            "SELECT id FROM documents WHERE filename = ? AND user_id = ?", (filename, user_id)
-        ).fetchone()
-    if not doc:
-        return "Not found.", 404
-    return redirect(storage.presigned_url(filename))
+    return send_from_directory(config.UPLOAD_DIR, filename)
 
 
 @app.route("/vault/<int:doc_id>/download")
 def vault_download(doc_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        doc = conn.execute("SELECT * FROM documents WHERE id = ? AND user_id = ?", (doc_id, user_id)).fetchone()
+        doc = conn.execute("SELECT * FROM documents WHERE id = ?", (doc_id,)).fetchone()
     if not doc:
         return redirect(url_for("vault"))
     ext = doc["filename"].rsplit(".", 1)[-1] if "." in doc["filename"] else ""
     safe_label = "".join(c for c in doc["label"] if c.isalnum() or c in " -_").strip() or "document"
     download_name = f"{safe_label}.{ext}" if ext else safe_label
-    return redirect(storage.presigned_url(doc["filename"], download_name=download_name))
+    return send_from_directory(config.UPLOAD_DIR, doc["filename"], as_attachment=True, download_name=download_name)
 
 
 @app.route("/vault/<int:doc_id>/delete", methods=["POST"])
 def vault_delete(doc_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        doc = conn.execute("SELECT * FROM documents WHERE id = ? AND user_id = ?", (doc_id, user_id)).fetchone()
+        doc = conn.execute("SELECT * FROM documents WHERE id = ?", (doc_id,)).fetchone()
         if doc:
-            storage.delete_file(doc["filename"])
-            conn.execute("DELETE FROM documents WHERE id = ? AND user_id = ?", (doc_id, user_id))
+            path = config.UPLOAD_DIR / doc["filename"]
+            if path.exists():
+                path.unlink()
+            conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
     return redirect(url_for("vault"))
 
 
@@ -644,23 +514,21 @@ def vault_delete(doc_id):
 
 @app.route("/reminders")
 def reminders():
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        items = conn.execute("SELECT * FROM reminders WHERE user_id = ? ORDER BY active DESC, date(next_due)", (user_id,)).fetchall()
+        items = conn.execute("SELECT * FROM reminders ORDER BY active DESC, date(next_due)").fetchall()
     return render_template("reminders.html", reminders=items)
 
 
 @app.route("/reminders", methods=["POST"])
 def add_reminder():
-    user_id = auth.current_user_id()
     title = request.form.get("title", "").strip()
     next_due = request.form.get("next_due")
     recurrence = request.form.get("recurrence", "once")
     if title and next_due:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO reminders (user_id, title, next_due, recurrence, active, created_at) VALUES (?,?,?,?,1,?)",
-                (user_id, title, next_due, recurrence, db.now()),
+                "INSERT INTO reminders (title, next_due, recurrence, active, created_at) VALUES (?,?,?,1,?)",
+                (title, next_due, recurrence, db.now()),
             )
         flash(f"Reminder set: {title}")
     return redirect(url_for("reminders"))
@@ -668,34 +536,31 @@ def add_reminder():
 
 @app.route("/reminders/<int:reminder_id>/snooze", methods=["POST"])
 def snooze_reminder(reminder_id):
-    user_id = auth.current_user_id()
     days = request.form.get("days", type=int) or 1
     with db.get_conn() as conn:
-        r = conn.execute("SELECT next_due FROM reminders WHERE id = ? AND user_id = ?", (reminder_id, user_id)).fetchone()
+        r = conn.execute("SELECT next_due FROM reminders WHERE id = ?", (reminder_id,)).fetchone()
         if r:
-            base = max(date.fromisoformat(r["next_due"]), scheduler.today_local(user_id))
+            base = max(date.fromisoformat(r["next_due"]), scheduler.today_local())
             new_due = base + timedelta(days=days)
-            conn.execute("UPDATE reminders SET next_due = ?, active = 1 WHERE id = ? AND user_id = ?",
-                         (new_due.isoformat(), reminder_id, user_id))
+            conn.execute("UPDATE reminders SET next_due = ?, active = 1 WHERE id = ?",
+                         (new_due.isoformat(), reminder_id))
     flash(f"Snoozed {days} day(s).")
     return redirect(url_for("reminders"))
 
 
 @app.route("/reminders/<int:reminder_id>/toggle", methods=["POST"])
 def toggle_reminder(reminder_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        r = conn.execute("SELECT active FROM reminders WHERE id = ? AND user_id = ?", (reminder_id, user_id)).fetchone()
+        r = conn.execute("SELECT active FROM reminders WHERE id = ?", (reminder_id,)).fetchone()
         if r:
-            conn.execute("UPDATE reminders SET active = ? WHERE id = ? AND user_id = ?", (0 if r["active"] else 1, reminder_id, user_id))
+            conn.execute("UPDATE reminders SET active = ? WHERE id = ?", (0 if r["active"] else 1, reminder_id))
     return redirect(url_for("reminders"))
 
 
 @app.route("/reminders/<int:reminder_id>/delete", methods=["POST"])
 def delete_reminder(reminder_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        conn.execute("DELETE FROM reminders WHERE id = ? AND user_id = ?", (reminder_id, user_id))
+        conn.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
     return redirect(url_for("reminders"))
 
 
@@ -703,12 +568,11 @@ def delete_reminder(reminder_id):
 
 @app.route("/habits")
 def habits():
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        items = conn.execute("SELECT * FROM habits WHERE user_id = ? AND active = 1 ORDER BY frequency, title", (user_id,)).fetchall()
-        todos = conn.execute("SELECT * FROM todos WHERE user_id = ? ORDER BY done, created_at DESC", (user_id,)).fetchall()
+        items = conn.execute("SELECT * FROM habits WHERE active = 1 ORDER BY frequency, title").fetchall()
+        todos = conn.execute("SELECT * FROM todos ORDER BY done, created_at DESC").fetchall()
 
-    today = scheduler.today_local(user_id)
+    today = scheduler.today_local()
     status = []
     status_by_id = scheduler.get_habit_status_batch(items)
     for h in items:
@@ -721,7 +585,6 @@ def habits():
 
 @app.route("/habits", methods=["POST"])
 def add_habit():
-    user_id = auth.current_user_id()
     title = request.form.get("title", "").strip()
     frequency = request.form.get("frequency", "daily")
     reminder_hour = request.form.get("reminder_hour", type=int)
@@ -730,8 +593,8 @@ def add_habit():
     if title:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO habits (user_id, title, frequency, reminder_hour, active, created_at) VALUES (?,?,?,?,1,?)",
-                (user_id, title, frequency, reminder_hour, db.now()),
+                "INSERT INTO habits (title, frequency, reminder_hour, active, created_at) VALUES (?,?,?,1,?)",
+                (title, frequency, reminder_hour, db.now()),
             )
         flash(f"Habit added: {title}")
     return redirect(url_for("habits"))
@@ -739,22 +602,20 @@ def add_habit():
 
 @app.route("/habits/<int:habit_id>/reminder", methods=["POST"])
 def set_habit_reminder(habit_id):
-    user_id = auth.current_user_id()
     reminder_hour = request.form.get("reminder_hour", type=int)
     if reminder_hour is not None:
         reminder_hour = max(0, min(reminder_hour, 23))
     with db.get_conn() as conn:
-        conn.execute("UPDATE habits SET reminder_hour = ? WHERE id = ? AND user_id = ?", (reminder_hour, habit_id, user_id))
+        conn.execute("UPDATE habits SET reminder_hour = ? WHERE id = ?", (reminder_hour, habit_id))
     return redirect(url_for("habits"))
 
 
 @app.route("/habits/<int:habit_id>/checkin", methods=["POST"])
 def checkin_habit(habit_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        h = conn.execute("SELECT * FROM habits WHERE id = ? AND user_id = ?", (habit_id, user_id)).fetchone()
+        h = conn.execute("SELECT * FROM habits WHERE id = ?", (habit_id,)).fetchone()
         if h:
-            pkey = scheduler.period_key_for(h["frequency"], scheduler.today_local(user_id))
+            pkey = scheduler.period_key_for(h["frequency"], scheduler.today_local())
             conn.execute(
                 "INSERT OR IGNORE INTO habit_checkins (habit_id, period_key, done_at) VALUES (?,?,?)",
                 (habit_id, pkey, db.now()),
@@ -764,11 +625,10 @@ def checkin_habit(habit_id):
 
 @app.route("/habits/<int:habit_id>/uncheck", methods=["POST"])
 def uncheck_habit(habit_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        h = conn.execute("SELECT * FROM habits WHERE id = ? AND user_id = ?", (habit_id, user_id)).fetchone()
+        h = conn.execute("SELECT * FROM habits WHERE id = ?", (habit_id,)).fetchone()
         if h:
-            pkey = scheduler.period_key_for(h["frequency"], scheduler.today_local(user_id))
+            pkey = scheduler.period_key_for(h["frequency"], scheduler.today_local())
             conn.execute(
                 "DELETE FROM habit_checkins WHERE habit_id = ? AND period_key = ?",
                 (habit_id, pkey),
@@ -778,9 +638,8 @@ def uncheck_habit(habit_id):
 
 @app.route("/habits/<int:habit_id>/delete", methods=["POST"])
 def delete_habit(habit_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        conn.execute("UPDATE habits SET active = 0 WHERE id = ? AND user_id = ?", (habit_id, user_id))
+        conn.execute("UPDATE habits SET active = 0 WHERE id = ?", (habit_id,))
     return redirect(url_for("habits"))
 
 
@@ -788,48 +647,43 @@ def delete_habit(habit_id):
 
 @app.route("/todos", methods=["POST"])
 def add_todo():
-    user_id = auth.current_user_id()
     title = request.form.get("title", "").strip()
     if title:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO todos (user_id, title, done, created_at) VALUES (?,?,0,?)",
-                (user_id, title, db.now()),
+                "INSERT INTO todos (title, done, created_at) VALUES (?,0,?)",
+                (title, db.now()),
             )
     return redirect(url_for("habits"))
 
 
 @app.route("/todos/<int:todo_id>/check", methods=["POST"])
 def check_todo(todo_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
         conn.execute(
-            "UPDATE todos SET done = 1, completed_at = ? WHERE id = ? AND user_id = ?",
-            (db.now(), todo_id, user_id),
+            "UPDATE todos SET done = 1, completed_at = ? WHERE id = ?",
+            (db.now(), todo_id),
         )
     return redirect(url_for("habits"))
 
 
 @app.route("/todos/<int:todo_id>/uncheck", methods=["POST"])
 def uncheck_todo(todo_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        conn.execute("UPDATE todos SET done = 0, completed_at = NULL WHERE id = ? AND user_id = ?", (todo_id, user_id))
+        conn.execute("UPDATE todos SET done = 0, completed_at = NULL WHERE id = ?", (todo_id,))
     return redirect(url_for("habits"))
 
 
 @app.route("/todos/<int:todo_id>/delete", methods=["POST"])
 def delete_todo(todo_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        conn.execute("DELETE FROM todos WHERE id = ? AND user_id = ?", (todo_id, user_id))
+        conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
     return redirect(url_for("habits"))
-
 
 
 # ── Budget ───────────────────────────────────────────────────────────────
 
-def _augment_savings_goal(g, user_id):
+def _augment_savings_goal(g):
     """Adds computed fields to a savings_goals row: how much is left to
     save, and — if a target date is set — how much per week that works out
     to given what's already saved and how much time is left."""
@@ -852,7 +706,7 @@ def _augment_savings_goal(g, user_id):
         except ValueError:
             td = None
         if td:
-            days_left = (td - scheduler.today_local(user_id)).days
+            days_left = (td - scheduler.today_local()).days
             entry["days_left"] = days_left
             if days_left <= 0:
                 entry["status"] = "overdue"
@@ -865,44 +719,43 @@ def _augment_savings_goal(g, user_id):
 
 @app.route("/budget")
 def budget():
-    user_id = auth.current_user_id()
-    month = request.args.get("month") or scheduler.today_local(user_id).strftime("%Y-%m")
-    currency = db.get_setting(user_id, "currency", "ETB")
+    month = request.args.get("month") or scheduler.today_local().strftime("%Y-%m")
+    year = request.args.get("year") or month[:4]
+    currency = db.get_setting("currency", "ETB")
 
     with db.get_conn() as conn:
-        categories = conn.execute("SELECT * FROM budget_categories WHERE user_id = ? ORDER BY name", (user_id,)).fetchall()
+        categories = conn.execute("SELECT * FROM budget_categories ORDER BY name").fetchall()
         txns = conn.execute(
             "SELECT t.*, c.name AS category_name FROM transactions t "
             "LEFT JOIN budget_categories c ON c.id = t.category_id "
-            "WHERE t.user_id = ? AND strftime('%Y-%m', t.date) = ? ORDER BY t.date DESC, t.id DESC",
-            (user_id, month),
+            "WHERE strftime('%Y-%m', t.date) = ? ORDER BY t.date DESC, t.id DESC",
+            (month,),
         ).fetchall()
         recurring = conn.execute(
             "SELECT r.*, c.name AS category_name FROM recurring_transactions r "
             "LEFT JOIN budget_categories c ON c.id = r.category_id "
-            "WHERE r.user_id = ? ORDER BY r.active DESC, r.next_run",
-            (user_id,),
+            "ORDER BY r.active DESC, r.next_run"
         ).fetchall()
         savings_goals_raw = conn.execute(
-            "SELECT * FROM savings_goals WHERE user_id = ? ORDER BY created_at", (user_id,)
+            "SELECT * FROM savings_goals ORDER BY created_at"
         ).fetchall()
-        savings_goals = [_augment_savings_goal(g, user_id) for g in savings_goals_raw]
+        savings_goals = [_augment_savings_goal(g) for g in savings_goals_raw]
 
         income_total = conn.execute(
-            "SELECT COALESCE(SUM(amount),0) AS t FROM transactions WHERE user_id = ? AND type='income' AND strftime('%Y-%m', date)=?",
-            (user_id, month),
+            "SELECT COALESCE(SUM(amount),0) AS t FROM transactions WHERE type='income' AND strftime('%Y-%m', date)=?",
+            (month,),
         ).fetchone()["t"]
         expense_total = conn.execute(
-            "SELECT COALESCE(SUM(amount),0) AS t FROM transactions WHERE user_id = ? AND type='expense' AND strftime('%Y-%m', date)=?",
-            (user_id, month),
+            "SELECT COALESCE(SUM(amount),0) AS t FROM transactions WHERE type='expense' AND strftime('%Y-%m', date)=?",
+            (month,),
         ).fetchone()["t"]
 
         category_spend = []
         for c in categories:
             spent = conn.execute(
                 "SELECT COALESCE(SUM(amount),0) AS t FROM transactions "
-                "WHERE user_id = ? AND type='expense' AND category_id=? AND strftime('%Y-%m', date)=?",
-                (user_id, c["id"], month),
+                "WHERE type='expense' AND category_id=? AND strftime('%Y-%m', date)=?",
+                (c["id"], month),
             ).fetchone()["t"]
             limit = c["monthly_limit"]
             pct = min(round(spent / limit * 100), 100) if limit else None
@@ -911,18 +764,72 @@ def budget():
                 "over": bool(limit and spent > limit),
             })
 
+        # ── Yearly summary section ──
+        yearly_rows = conn.execute(
+            "SELECT strftime('%m', date) AS m, type, COALESCE(SUM(amount),0) AS total "
+            "FROM transactions WHERE strftime('%Y', date) = ? GROUP BY m, type",
+            (year,),
+        ).fetchall()
+        year_rows = conn.execute(
+            "SELECT DISTINCT strftime('%Y', date) AS y FROM transactions ORDER BY y DESC"
+        ).fetchall()
+
+        yearly_category_totals = []
+        for c in categories:
+            spent = conn.execute(
+                "SELECT COALESCE(SUM(amount),0) AS t FROM transactions "
+                "WHERE type='expense' AND category_id=? AND strftime('%Y', date)=?",
+                (c["id"], year),
+            ).fetchone()["t"]
+            if spent:
+                annual_limit = c["monthly_limit"] * 12 if c["monthly_limit"] else None
+                pct = min(round(spent / annual_limit * 100), 100) if annual_limit else None
+                yearly_category_totals.append({
+                    "category": c, "spent": spent, "annual_limit": annual_limit, "pct": pct,
+                    "over": bool(annual_limit and spent > annual_limit),
+                })
+        yearly_category_totals.sort(key=lambda x: x["spent"], reverse=True)
+
+    by_month = {f"{i:02d}": {"income": 0.0, "expense": 0.0} for i in range(1, 13)}
+    for r in yearly_rows:
+        if r["m"] in by_month and r["type"] in ("income", "expense"):
+            by_month[r["m"]][r["type"]] = r["total"]
+
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    max_val = 0.01  # avoid div-by-zero for empty years
+    for v in by_month.values():
+        max_val = max(max_val, v["income"], v["expense"])
+
+    yearly_months = []
+    for i in range(1, 13):
+        key = f"{i:02d}"
+        inc, exp = by_month[key]["income"], by_month[key]["expense"]
+        yearly_months.append({
+            "num": key, "label": month_names[i - 1], "income": inc, "expense": exp,
+            "net": inc - exp,
+            "income_pct": round(inc / max_val * 100),
+            "expense_pct": round(exp / max_val * 100),
+        })
+
+    yearly_income_total = sum(m["income"] for m in yearly_months)
+    yearly_expense_total = sum(m["expense"] for m in yearly_months)
+    available_years = sorted({r["y"] for r in year_rows} | {year}, reverse=True)
+
     return render_template(
         "budget.html", month=month, categories=categories, txns=txns,
         income_total=income_total, expense_total=expense_total,
         net=income_total - expense_total, category_spend=category_spend,
         currency=currency, recurring=recurring, savings_goals=savings_goals,
+        year=year, available_years=available_years, yearly_months=yearly_months,
+        yearly_income_total=yearly_income_total, yearly_expense_total=yearly_expense_total,
+        yearly_net=yearly_income_total - yearly_expense_total,
+        yearly_category_totals=yearly_category_totals,
     )
 
 
 @app.route("/budget/transaction", methods=["POST"])
 def add_transaction():
-    user_id = auth.current_user_id()
-    month = request.form.get("month") or scheduler.today_local(user_id).strftime("%Y-%m")
+    month = request.form.get("month") or scheduler.today_local().strftime("%Y-%m")
     d = request.form.get("date") or date.today().isoformat()
     ttype = request.form.get("type", "expense")
     amount = request.form.get("amount", type=float)
@@ -932,9 +839,9 @@ def add_transaction():
     if amount:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO transactions (user_id, date, type, category_id, description, amount, created_at) "
-                "VALUES (?,?,?,?,?,?,?)",
-                (user_id, d, ttype, category_id if ttype == "expense" else None, description, abs(amount), db.now()),
+                "INSERT INTO transactions (date, type, category_id, description, amount, created_at) "
+                "VALUES (?,?,?,?,?,?)",
+                (d, ttype, category_id if ttype == "expense" else None, description, abs(amount), db.now()),
             )
         flash(f"Logged {'income' if ttype == 'income' else 'expense'}: {amount}")
     return redirect(url_for("budget", month=month))
@@ -942,39 +849,33 @@ def add_transaction():
 
 @app.route("/budget/transaction/<int:txn_id>/delete", methods=["POST"])
 def delete_transaction(txn_id):
-    user_id = auth.current_user_id()
-    month = request.form.get("month") or scheduler.today_local(user_id).strftime("%Y-%m")
+    month = request.form.get("month") or scheduler.today_local().strftime("%Y-%m")
     with db.get_conn() as conn:
-        conn.execute("DELETE FROM transactions WHERE id = ? AND user_id = ?", (txn_id, user_id))
+        conn.execute("DELETE FROM transactions WHERE id = ?", (txn_id,))
     return redirect(url_for("budget", month=month))
 
 
 @app.route("/budget/category", methods=["POST"])
 def add_budget_category():
-    user_id = auth.current_user_id()
     name = request.form.get("name", "").strip()
     limit = request.form.get("monthly_limit", type=float)
     if name:
         with db.get_conn() as conn:
-            existing = conn.execute(
-                "SELECT id FROM budget_categories WHERE user_id = ? AND name = ?", (user_id, name)
-            ).fetchone()
-            if existing:
-                flash(f"'{name}' already exists.")
-            else:
-                conn.execute(
-                    "INSERT INTO budget_categories (user_id, name, monthly_limit, created_at) VALUES (?,?,?,?)",
-                    (user_id, name, limit, db.now()),
-                )
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO budget_categories (name, monthly_limit, created_at) VALUES (?,?,?)",
+                (name, limit, db.now()),
+            )
+            if cur.rowcount:
                 flash(f"Category added: {name}")
+            else:
+                flash(f"'{name}' already exists.")
     return redirect(url_for("budget"))
 
 
 @app.route("/budget/category/<int:cat_id>/delete", methods=["POST"])
 def delete_budget_category(cat_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        conn.execute("DELETE FROM budget_categories WHERE id = ? AND user_id = ?", (cat_id, user_id))
+        conn.execute("DELETE FROM budget_categories WHERE id = ?", (cat_id,))
     return redirect(url_for("budget"))
 
 
@@ -983,7 +884,6 @@ def add_recurring_transaction():
     import calendar
     from datetime import timedelta
 
-    user_id = auth.current_user_id()
     title = request.form.get("title", "").strip()
     ttype = request.form.get("type", "expense")
     amount = request.form.get("amount", type=float)
@@ -995,7 +895,7 @@ def add_recurring_transaction():
     day_of_month = max(1, min(day_of_month, 28))
     day_of_week = request.form.get("day_of_week", type=int)
     day_of_week = 0 if day_of_week is None else max(0, min(day_of_week, 6))
-    start_raw = request.form.get("start_date") or scheduler.today_local(user_id).isoformat()
+    start_raw = request.form.get("start_date") or scheduler.today_local().isoformat()
 
     if title and amount:
         if len(start_raw) == 7:  # "YYYY-MM" from the month picker (monthly only)
@@ -1006,20 +906,20 @@ def add_recurring_transaction():
             next_run = start
             while next_run.weekday() != day_of_week:
                 next_run += timedelta(days=1)
-            while next_run < scheduler.today_local(user_id):
+            while next_run < scheduler.today_local():
                 next_run += timedelta(days=7)
         else:
             clamped_day = min(day_of_month, calendar.monthrange(start.year, start.month)[1])
             next_run = start.replace(day=clamped_day)
-            if next_run < scheduler.today_local(user_id):
+            if next_run < scheduler.today_local():
                 next_run = scheduler.add_months(next_run, 1)
 
         with db.get_conn() as conn:
             conn.execute(
                 "INSERT INTO recurring_transactions "
-                "(user_id, title, type, amount, category_id, frequency, day_of_month, day_of_week, next_run, active, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,1,?)",
-                (user_id, title, ttype, amount, category_id if ttype == "expense" else None,
+                "(title, type, amount, category_id, frequency, day_of_month, day_of_week, next_run, active, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,1,?)",
+                (title, ttype, amount, category_id if ttype == "expense" else None,
                  frequency, day_of_month, day_of_week if frequency == "weekly" else None,
                  next_run.isoformat(), db.now()),
             )
@@ -1029,20 +929,18 @@ def add_recurring_transaction():
 
 @app.route("/budget/recurring/<int:rid>/toggle", methods=["POST"])
 def toggle_recurring_transaction(rid):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        r = conn.execute("SELECT active FROM recurring_transactions WHERE id = ? AND user_id = ?", (rid, user_id)).fetchone()
+        r = conn.execute("SELECT active FROM recurring_transactions WHERE id = ?", (rid,)).fetchone()
         if r:
-            conn.execute("UPDATE recurring_transactions SET active = ? WHERE id = ? AND user_id = ?",
-                         (0 if r["active"] else 1, rid, user_id))
+            conn.execute("UPDATE recurring_transactions SET active = ? WHERE id = ?",
+                         (0 if r["active"] else 1, rid))
     return redirect(url_for("budget"))
 
 
 @app.route("/budget/recurring/<int:rid>/delete", methods=["POST"])
 def delete_recurring_transaction(rid):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        conn.execute("DELETE FROM recurring_transactions WHERE id = ? AND user_id = ?", (rid, user_id))
+        conn.execute("DELETE FROM recurring_transactions WHERE id = ?", (rid,))
     return redirect(url_for("budget"))
 
 
@@ -1050,16 +948,15 @@ def delete_recurring_transaction(rid):
 
 @app.route("/budget/savings", methods=["POST"])
 def add_savings_goal():
-    user_id = auth.current_user_id()
     name = request.form.get("name", "").strip()
     target_amount = request.form.get("target_amount", type=float)
     target_date = request.form.get("target_date", "").strip() or None
     if name:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO savings_goals (user_id, name, target_amount, target_date, current_amount, created_at) "
-                "VALUES (?,?,?,?,0,?)",
-                (user_id, name, target_amount, target_date, db.now()),
+                "INSERT INTO savings_goals (name, target_amount, target_date, current_amount, created_at) "
+                "VALUES (?,?,?,0,?)",
+                (name, target_amount, target_date, db.now()),
             )
         flash(f"Savings goal created: {name}")
     return redirect(url_for("budget"))
@@ -1067,29 +964,27 @@ def add_savings_goal():
 
 @app.route("/budget/savings/<int:goal_id>/target", methods=["POST"])
 def set_savings_target(goal_id):
-    user_id = auth.current_user_id()
     target_date = request.form.get("target_date", "").strip() or None
     with db.get_conn() as conn:
-        conn.execute("UPDATE savings_goals SET target_date = ? WHERE id = ? AND user_id = ?", (target_date, goal_id, user_id))
+        conn.execute("UPDATE savings_goals SET target_date = ? WHERE id = ?", (target_date, goal_id))
     return redirect(url_for("budget"))
 
 
 @app.route("/budget/savings/<int:goal_id>/contribute", methods=["POST"])
 def contribute_savings_goal(goal_id):
-    user_id = auth.current_user_id()
     amount = request.form.get("amount", type=float)
-    today = scheduler.today_local(user_id).isoformat()
+    today = scheduler.today_local().isoformat()
     if amount and amount > 0:
         with db.get_conn() as conn:
-            goal = conn.execute("SELECT * FROM savings_goals WHERE id = ? AND user_id = ?", (goal_id, user_id)).fetchone()
+            goal = conn.execute("SELECT * FROM savings_goals WHERE id = ?", (goal_id,)).fetchone()
             if goal:
                 # Money moving into savings reduces what's available to spend,
                 # so it's logged as a normal expense transaction — the goal's
                 # progress bar and your budget totals both stay accurate.
                 cur = conn.execute(
-                    "INSERT INTO transactions (user_id, date, type, category_id, description, amount, created_at) "
-                    "VALUES (?,?,?,?,?,?,?)",
-                    (user_id, today, "expense", None, f"Savings: {goal['name']}", amount, db.now()),
+                    "INSERT INTO transactions (date, type, category_id, description, amount, created_at) "
+                    "VALUES (?,?,?,?,?,?)",
+                    (today, "expense", None, f"Savings: {goal['name']}", amount, db.now()),
                 )
                 conn.execute(
                     "INSERT INTO savings_contributions (goal_id, date, amount, transaction_id, created_at) "
@@ -1097,8 +992,8 @@ def contribute_savings_goal(goal_id):
                     (goal_id, today, amount, cur.lastrowid, db.now()),
                 )
                 conn.execute(
-                    "UPDATE savings_goals SET current_amount = current_amount + ? WHERE id = ? AND user_id = ?",
-                    (amount, goal_id, user_id),
+                    "UPDATE savings_goals SET current_amount = current_amount + ? WHERE id = ?",
+                    (amount, goal_id),
                 )
         flash(f"Added {amount:.0f} to savings")
     return redirect(url_for("budget"))
@@ -1106,20 +1001,19 @@ def contribute_savings_goal(goal_id):
 
 @app.route("/budget/savings/<int:goal_id>/withdraw", methods=["POST"])
 def withdraw_savings_goal(goal_id):
-    user_id = auth.current_user_id()
     amount = request.form.get("amount", type=float)
-    today = scheduler.today_local(user_id).isoformat()
+    today = scheduler.today_local().isoformat()
     if amount and amount > 0:
         with db.get_conn() as conn:
-            goal = conn.execute("SELECT * FROM savings_goals WHERE id = ? AND user_id = ?", (goal_id, user_id)).fetchone()
+            goal = conn.execute("SELECT * FROM savings_goals WHERE id = ?", (goal_id,)).fetchone()
             if goal:
                 amount = min(amount, goal["current_amount"])  # can't withdraw more than saved
                 # Money coming back out of savings adds back to what's
                 # available to spend, so it's logged as income.
                 cur = conn.execute(
-                    "INSERT INTO transactions (user_id, date, type, category_id, description, amount, created_at) "
-                    "VALUES (?,?,?,?,?,?,?)",
-                    (user_id, today, "income", None, f"Savings withdrawal: {goal['name']}", amount, db.now()),
+                    "INSERT INTO transactions (date, type, category_id, description, amount, created_at) "
+                    "VALUES (?,?,?,?,?,?)",
+                    (today, "income", None, f"Savings withdrawal: {goal['name']}", amount, db.now()),
                 )
                 conn.execute(
                     "INSERT INTO savings_contributions (goal_id, date, amount, transaction_id, created_at) "
@@ -1127,8 +1021,8 @@ def withdraw_savings_goal(goal_id):
                     (goal_id, today, -amount, cur.lastrowid, db.now()),
                 )
                 conn.execute(
-                    "UPDATE savings_goals SET current_amount = current_amount - ? WHERE id = ? AND user_id = ?",
-                    (amount, goal_id, user_id),
+                    "UPDATE savings_goals SET current_amount = current_amount - ? WHERE id = ?",
+                    (amount, goal_id),
                 )
         flash(f"Withdrew {amount:.0f} from savings")
     return redirect(url_for("budget"))
@@ -1136,37 +1030,137 @@ def withdraw_savings_goal(goal_id):
 
 @app.route("/budget/savings/<int:goal_id>/delete", methods=["POST"])
 def delete_savings_goal(goal_id):
-    user_id = auth.current_user_id()
     with db.get_conn() as conn:
-        conn.execute("DELETE FROM savings_goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+        conn.execute("DELETE FROM savings_goals WHERE id = ?", (goal_id,))
     return redirect(url_for("budget"))
+
+
+# ── Passwords ────────────────────────────────────────────────────────────
+
+@app.route("/passwords")
+def passwords():
+    with db.get_conn() as conn:
+        rows = conn.execute("SELECT * FROM passwords ORDER BY label").fetchall()
+    items = []
+    for r in rows:
+        entry = dict(r)
+        entry["password"] = crypto.decrypt(r["password_enc"])
+        items.append(entry)
+    return render_template("passwords.html", items=items)
+
+
+@app.route("/passwords", methods=["POST"])
+def add_password():
+    label = request.form.get("label", "").strip()
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+    url = request.form.get("url", "").strip()
+    notes = request.form.get("notes", "").strip()
+    if label and password:
+        with db.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO passwords (label, username, password_enc, url, notes, created_at) "
+                "VALUES (?,?,?,?,?,?)",
+                (label, username, crypto.encrypt(password), url, notes, db.now()),
+            )
+        flash(f"Saved password: {label}")
+    return redirect(url_for("passwords"))
+
+
+@app.route("/passwords/<int:pw_id>/edit", methods=["POST"])
+def edit_password(pw_id):
+    label = request.form.get("label", "").strip()
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")  # blank = keep existing password
+    url = request.form.get("url", "").strip()
+    notes = request.form.get("notes", "").strip()
+    with db.get_conn() as conn:
+        if password:
+            conn.execute(
+                "UPDATE passwords SET label=?, username=?, password_enc=?, url=?, notes=? WHERE id=?",
+                (label, username, crypto.encrypt(password), url, notes, pw_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE passwords SET label=?, username=?, url=?, notes=? WHERE id=?",
+                (label, username, url, notes, pw_id),
+            )
+    flash(f"Updated: {label}")
+    return redirect(url_for("passwords"))
+
+
+@app.route("/passwords/<int:pw_id>/delete", methods=["POST"])
+def delete_password(pw_id):
+    with db.get_conn() as conn:
+        conn.execute("DELETE FROM passwords WHERE id = ?", (pw_id,))
+    return redirect(url_for("passwords"))
+
+
+# ── Notes ────────────────────────────────────────────────────────────────
+
+@app.route("/notes")
+def notes():
+    with db.get_conn() as conn:
+        items = conn.execute("SELECT * FROM notes ORDER BY updated_at DESC").fetchall()
+    return render_template("notes.html", items=items)
+
+
+@app.route("/notes", methods=["POST"])
+def add_note():
+    title = request.form.get("title", "").strip()
+    body = request.form.get("body", "").strip()
+    if title:
+        with db.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO notes (title, body, created_at, updated_at) VALUES (?,?,?,?)",
+                (title, body, db.now(), db.now()),
+            )
+        flash(f"Note added: {title}")
+    return redirect(url_for("notes"))
+
+
+@app.route("/notes/<int:note_id>/edit", methods=["POST"])
+def edit_note(note_id):
+    title = request.form.get("title", "").strip()
+    body = request.form.get("body", "").strip()
+    with db.get_conn() as conn:
+        conn.execute(
+            "UPDATE notes SET title=?, body=?, updated_at=? WHERE id=?",
+            (title, body, db.now(), note_id),
+        )
+    flash("Note updated.")
+    return redirect(url_for("notes"))
+
+
+@app.route("/notes/<int:note_id>/delete", methods=["POST"])
+def delete_note(note_id):
+    with db.get_conn() as conn:
+        conn.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+    return redirect(url_for("notes"))
 
 
 # ── Settings ─────────────────────────────────────────────────────────────
 
 @app.route("/settings")
 def settings():
-    user_id = auth.current_user_id()
-    user = auth.get_user_by_id(user_id)
     values = {
-        "tg_bot_token": db.get_setting(user_id, "tg_bot_token", config.TG_BOT_TOKEN),
-        "tg_chat_id": db.get_setting(user_id, "tg_chat_id", config.TG_CHAT_ID),
-        "timezone": db.get_setting(user_id, "timezone", config.TIMEZONE),
-        "reminder_hour": db.get_setting(user_id, "reminder_hour", config.REMINDER_HOUR),
-        "nudge_hour": db.get_setting(user_id, "nudge_hour", config.NUDGE_HOUR),
-        "week_end_day": db.get_setting(user_id, "week_end_day", config.WEEK_END_DAY),
-        "currency": db.get_setting(user_id, "currency", "ETB"),
-        "nutrition_goal_calories": db.get_setting(user_id, "nutrition_goal_calories", ""),
-        "nutrition_goal_protein": db.get_setting(user_id, "nutrition_goal_protein", ""),
+        "tg_bot_token": db.get_setting("tg_bot_token", config.TG_BOT_TOKEN),
+        "tg_chat_id": db.get_setting("tg_chat_id", config.TG_CHAT_ID),
+        "timezone": db.get_setting("timezone", config.TIMEZONE),
+        "reminder_hour": db.get_setting("reminder_hour", config.REMINDER_HOUR),
+        "nudge_hour": db.get_setting("nudge_hour", config.NUDGE_HOUR),
+        "week_end_day": db.get_setting("week_end_day", config.WEEK_END_DAY),
+        "currency": db.get_setting("currency", "ETB"),
+        "nutrition_goal_calories": db.get_setting("nutrition_goal_calories", ""),
+        "nutrition_goal_protein": db.get_setting("nutrition_goal_protein", ""),
     }
-    return render_template("settings.html", values=values, user=user)
+    return render_template("settings.html", values=values)
 
 
 @app.route("/settings", methods=["POST"])
 def save_settings():
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-    user_id = auth.current_user_id()
     for key in ("tg_bot_token", "tg_chat_id", "timezone", "reminder_hour", "nudge_hour",
                 "week_end_day", "currency", "nutrition_goal_calories", "nutrition_goal_protein"):
         val = request.form.get(key)
@@ -1174,7 +1168,7 @@ def save_settings():
             continue  # field wasn't part of the form that was submitted — leave untouched
         val = val.strip()  # copy-pasted tokens/IDs often carry a stray space or newline
         if val == "":
-            db.delete_setting(user_id, key)  # explicit blank = revert to default
+            db.delete_setting(key)  # explicit blank = revert to default
             continue
         if key == "timezone":
             try:
@@ -1182,15 +1176,14 @@ def save_settings():
             except (ZoneInfoNotFoundError, ValueError, KeyError):
                 flash(f"'{val}' isn't a valid timezone (e.g. Africa/Addis_Ababa) — not saved.")
                 continue
-        db.set_setting(user_id, key, val)
+        db.set_setting(key, val)
     flash("Settings saved.")
     return redirect(url_for("settings"))
 
 
 @app.route("/settings/test-notify", methods=["POST"])
 def test_notify():
-    user_id = auth.current_user_id()
-    ok, err = telegram_notify.send_detailed(user_id, "✅ Test notification from your Life Hub!")
+    ok, err = telegram_notify.send_detailed("✅ Test notification from your Life Hub!")
     if ok:
         flash("Test message sent!")
     else:
@@ -1201,32 +1194,19 @@ def test_notify():
 @app.route("/settings/export")
 def export_data():
     import json
-    user_id = auth.current_user_id()
-    direct_tables = [
+    tables = [
         "profile", "weight_entries", "sessions", "custom_foods", "food_log",
-        "documents", "reminders", "habits", "budget_categories",
-        "transactions", "recurring_transactions", "savings_goals",
+        "documents", "reminders", "habits", "habit_checkins", "budget_categories",
+        "transactions", "recurring_transactions", "savings_goals", "savings_contributions", "settings",
     ]
     data = {}
     with db.get_conn() as conn:
-        for t in direct_tables:
-            rows = conn.execute(f"SELECT * FROM {t} WHERE user_id = ?", (user_id,)).fetchall()
+        for t in tables:
+            rows = conn.execute(f"SELECT * FROM {t}").fetchall()
             data[t] = [dict(r) for r in rows]
 
-        data["habit_checkins"] = [dict(r) for r in conn.execute(
-            "SELECT hc.* FROM habit_checkins hc JOIN habits h ON h.id = hc.habit_id WHERE h.user_id = ?",
-            (user_id,),
-        ).fetchall()]
-        data["savings_contributions"] = [dict(r) for r in conn.execute(
-            "SELECT sc.* FROM savings_contributions sc JOIN savings_goals sg ON sg.id = sc.goal_id WHERE sg.user_id = ?",
-            (user_id,),
-        ).fetchall()]
-        data["settings"] = [dict(r) for r in conn.execute(
-            "SELECT * FROM settings WHERE user_id = ?", (user_id,)
-        ).fetchall()]
-
     payload = json.dumps(data, indent=2, default=str)
-    filename = f"lifehub_export_{scheduler.today_local(user_id).isoformat()}.json"
+    filename = f"lifehub_export_{scheduler.today_local().isoformat()}.json"
     resp = make_response(payload)
     resp.headers["Content-Type"] = "application/json"
     resp.headers["Content-Disposition"] = f"attachment; filename={filename}"
