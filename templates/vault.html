@@ -10,7 +10,16 @@
     <input type="hidden" name="upload_token" value="{{ upload_token }}">
     <label>Label <input type="text" name="label" placeholder="e.g. Driver's License" required></label>
     <label>Notes <input type="text" name="notes" placeholder="optional"></label>
-    <label>Expiry date <input type="date" name="expiry_date" id="expiry-input" min="1900-01-01" max="2099-12-31"></label>
+    <label>Expiry date
+      <span class="date-parts" data-date-parts>
+        <input type="text" inputmode="numeric" maxlength="2" placeholder="MM" class="date-part" data-part="mm" autocomplete="off">
+        <span class="date-sep">/</span>
+        <input type="text" inputmode="numeric" maxlength="2" placeholder="DD" class="date-part" data-part="dd" autocomplete="off">
+        <span class="date-sep">/</span>
+        <input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY" class="date-part date-part-yyyy" data-part="yyyy" autocomplete="off">
+      </span>
+      <input type="hidden" name="expiry_date" data-date-hidden>
+    </label>
     <p class="muted" style="flex-basis:100%;margin:0;">If set, you'll automatically get reminders at 1 month out, 2 weeks out, then daily for the final week.</p>
   </form>
 
@@ -45,6 +54,7 @@
       <p><a href="{{ url_for('vault_download', doc_id=d.id) }}" class="link">⬇️ Download</a></p>
       {% if d.notes %}<p class="muted">{{ d.notes }}</p>{% endif %}
       {% if d.expiry_date %}
+        {% set expiry_parts = d.expiry_date.split('-') %}
         <p class="muted">
           📅 Expires {{ d.expiry_date }}
           {% if d.days_left is not none %}
@@ -59,7 +69,14 @@
           {% if d.acknowledged %}<span class="expiry-badge muted-badge">Acknowledged</span>{% endif %}
         </p>
         <form method="post" action="{{ url_for('vault_renew', doc_id=d.id) }}" class="doc-expiry-actions">
-          <input type="date" name="expiry_date" value="{{ d.expiry_date }}" min="1900-01-01" max="2099-12-31">
+          <span class="date-parts" data-date-parts>
+            <input type="text" inputmode="numeric" maxlength="2" placeholder="MM" class="date-part" data-part="mm" autocomplete="off" value="{{ expiry_parts[1] }}">
+            <span class="date-sep">/</span>
+            <input type="text" inputmode="numeric" maxlength="2" placeholder="DD" class="date-part" data-part="dd" autocomplete="off" value="{{ expiry_parts[2] }}">
+            <span class="date-sep">/</span>
+            <input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY" class="date-part date-part-yyyy" data-part="yyyy" autocomplete="off" value="{{ expiry_parts[0] }}">
+          </span>
+          <input type="hidden" name="expiry_date" data-date-hidden value="{{ d.expiry_date }}">
           <button type="submit" class="btn-icon" title="Renew / update expiry date">🔄</button>
         </form>
         {% if not d.acknowledged %}
@@ -92,6 +109,22 @@
 
 {% block scripts %}
 <style>
+.date-parts {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.date-parts .date-part {
+  width: 2.6em;
+  text-align: center;
+  padding: 8px 4px;
+}
+.date-parts .date-part-yyyy {
+  width: 3.8em;
+}
+.date-sep {
+  color: #888;
+}
 .vault-modal-overlay,
 #vault-delete-overlay {
   position: fixed;
@@ -154,18 +187,69 @@ const filledState = document.getElementById('dropzone-filled');
 const preview = document.getElementById('vault-preview');
 const fileInfo = document.getElementById('vault-file-info');
 
-// Guard against out-of-range years (e.g. typing "200001" into the year
-// segment) without fighting normal, in-progress typing. min/max on the
-// inputs above already stop bad values from being submitted; this only
-// steps in when the browser's own validity flags confirm the *completed*
-// date is actually above max or below min — an incomplete/mid-typing date
-// reports badInput instead, which we deliberately ignore and leave alone.
-document.querySelectorAll('input[type="date"]').forEach((el) => {
-  el.addEventListener('change', () => {
-    if (el.validity.rangeUnderflow) el.value = el.min;
-    else if (el.validity.rangeOverflow) el.value = el.max;
+// Custom MM/DD/YYYY date entry (replaces native <input type="date">, whose
+// year segment slides digits in from the right once full, e.g. "2001" + "3"
+// becomes "0013"). Each segment here fully resets to the new digit once
+// it's already full, matching how the month/day segments normally behave —
+// so "2001" + "3" becomes "3", growing to "0003" once you tab away. On
+// blur each segment zero-pads and clamps to a sane range, then the three
+// are combined into the hidden "expiry_date" field the server reads.
+(function () {
+  function syncHidden(group) {
+    const hidden = group.parentElement.querySelector('[data-date-hidden]');
+    if (!hidden) return;
+    const mm = group.querySelector('[data-part="mm"]').value;
+    const dd = group.querySelector('[data-part="dd"]').value;
+    const yyyy = group.querySelector('[data-part="yyyy"]').value;
+    if (mm.length === 2 && dd.length === 2 && yyyy.length === 4) {
+      hidden.value = `${yyyy}-${mm}-${dd}`;
+    } else if (!mm && !dd && !yyyy) {
+      hidden.value = ''; // fully cleared — expiry date is optional
+    } else {
+      hidden.value = ''; // incomplete — don't submit a half-typed date
+    }
+  }
+
+  function wirePart(input, group, maxLen, min, max, next) {
+    input.addEventListener('keydown', (e) => {
+      if (!/^[0-9]$/.test(e.key)) return; // let backspace/tab/arrows behave natively
+      e.preventDefault();
+      let val = input.value;
+      if (val.length >= maxLen) val = ''; // segment was already full — start fresh
+      val += e.key;
+      input.value = val;
+      if (val.length >= maxLen) {
+        syncHidden(group);
+        if (next) next.focus();
+      }
+    });
+
+    input.addEventListener('input', () => {
+      // Safety net for mobile/autofill paths that bypass keydown above.
+      input.value = input.value.replace(/\D/g, '').slice(0, maxLen);
+      syncHidden(group);
+    });
+
+    input.addEventListener('blur', () => {
+      if (!input.value) { syncHidden(group); return; }
+      let num = parseInt(input.value, 10);
+      if (isNaN(num)) num = min;
+      num = Math.min(Math.max(num, min), max);
+      input.value = String(num).padStart(maxLen, '0');
+      syncHidden(group);
+    });
+  }
+
+  document.querySelectorAll('[data-date-parts]').forEach((group) => {
+    const mm = group.querySelector('[data-part="mm"]');
+    const dd = group.querySelector('[data-part="dd"]');
+    const yyyy = group.querySelector('[data-part="yyyy"]');
+    wirePart(mm, group, 2, 1, 12, dd);
+    wirePart(dd, group, 2, 1, 31, yyyy);
+    wirePart(yyyy, group, 4, 1900, 2099, null);
+    syncHidden(group); // pick up any server-rendered prefill (renew form)
   });
-});
+})();
 
 function showFile(file) {
   if (!file) return;
