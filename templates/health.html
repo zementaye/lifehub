@@ -6,21 +6,23 @@
 <div class="grid">
   <div class="card">
     <h3>Profile</h3>
-    <form method="post" action="{{ url_for('set_height') }}" class="inline-form">
-      <label>Height (cm)
-        <input type="number" step="0.1" name="height_cm" value="{{ profile.height_cm or '' }}" required>
-      </label>
-      <label>Birth date
-        <input type="date" name="birth_date" value="{{ profile.birth_date or '' }}">
-      </label>
-      <label>Sex
-        <select name="sex">
-          <option value="">— unset —</option>
-          <option value="male" {{ 'selected' if profile.sex == 'male' }}>Male</option>
-          <option value="female" {{ 'selected' if profile.sex == 'female' }}>Female</option>
-        </select>
-      </label>
-      <button type="submit">Save</button>
+    <form method="post" action="{{ url_for('set_height') }}" class="inline-form settings-form">
+      <div class="settings-fields">
+        <label>Height (cm)
+          <input type="number" step="0.1" name="height_cm" value="{{ profile.height_cm or '' }}" required>
+        </label>
+        <label>Birth date
+          <input type="date" name="birth_date" value="{{ profile.birth_date or '' }}">
+        </label>
+        <label>Sex
+          <select name="sex">
+            <option value="">— unset —</option>
+            <option value="male" {{ 'selected' if profile.sex == 'male' }}>Male</option>
+            <option value="female" {{ 'selected' if profile.sex == 'female' }}>Female</option>
+          </select>
+        </label>
+      </div>
+      <button type="submit" class="settings-save-btn">Save</button>
     </form>
     <p class="muted">Birth date and sex are only used to calculate your recommended daily intake on the Nutrition page.</p>
     {% if bmi %}
@@ -116,4 +118,70 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.settings-fields input[readonly] {
+  opacity: .6;
+  cursor: default;
+}
+.settings-fields select.settings-locked-field {
+  opacity: .6;
+  cursor: default;
+  pointer-events: none;
+}
+</style>
+<script>
+// Same Save→Edit lock as the Settings page: a form that already has saved
+// values renders read-only with an "Edit" button instead of a permanent
+// "Save" button. Clicking Edit unlocks the fields; submitting reloads the
+// page, which re-locks against the freshly saved values.
+document.querySelectorAll('.settings-form').forEach((form) => {
+  const fieldWrap = form.querySelector('.settings-fields');
+  const btn = form.querySelector('.settings-save-btn');
+  if (!fieldWrap || !btn) return;
+
+  const fields = fieldWrap.querySelectorAll('input, select');
+  const hasSavedValue = Array.from(fields).some(
+    (el) => el.value != null && String(el.value).trim() !== ''
+  );
+
+  function lock() {
+    fields.forEach((el) => {
+      if (el.tagName === 'SELECT') {
+        el.classList.add('settings-locked-field');
+        el.setAttribute('tabindex', '-1');
+      } else {
+        el.setAttribute('readonly', 'readonly');
+      }
+    });
+    btn.textContent = 'Edit';
+    btn.classList.add('secondary');
+    btn.type = 'button';
+  }
+
+  function unlock() {
+    fields.forEach((el) => {
+      el.classList.remove('settings-locked-field');
+      el.removeAttribute('readonly');
+      el.removeAttribute('tabindex');
+    });
+    btn.textContent = 'Save';
+    btn.classList.remove('secondary');
+    btn.type = 'submit';
+    if (fields[0]) fields[0].focus();
+  }
+
+  btn.addEventListener('click', (e) => {
+    if (btn.type === 'button') {
+      e.preventDefault();
+      unlock();
+    }
+    // type === 'submit' → let the click submit the form normally
+  });
+
+  if (hasSavedValue) lock();
+});
+</script>
 {% endblock %}
