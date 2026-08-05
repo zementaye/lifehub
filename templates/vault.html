@@ -10,7 +10,7 @@
     <input type="hidden" name="upload_token" value="{{ upload_token }}">
     <label>Label <input type="text" name="label" placeholder="e.g. Driver's License" required></label>
     <label>Notes <input type="text" name="notes" placeholder="optional"></label>
-    <label>Expiry date <input type="date" name="expiry_date" id="expiry-input"></label>
+    <label>Expiry date <input type="date" name="expiry_date" id="expiry-input" min="1900-01-01" max="2099-12-31"></label>
     <p class="muted" style="flex-basis:100%;margin:0;">If set, you'll automatically get reminders at 1 month out, 2 weeks out, then daily for the final week.</p>
   </form>
 
@@ -59,7 +59,7 @@
           {% if d.acknowledged %}<span class="expiry-badge muted-badge">Acknowledged</span>{% endif %}
         </p>
         <form method="post" action="{{ url_for('vault_renew', doc_id=d.id) }}" class="doc-expiry-actions">
-          <input type="date" name="expiry_date" value="{{ d.expiry_date }}">
+          <input type="date" name="expiry_date" value="{{ d.expiry_date }}" min="1900-01-01" max="2099-12-31">
           <button type="submit" class="btn-icon" title="Renew / update expiry date">🔄</button>
         </form>
         {% if not d.acknowledged %}
@@ -153,6 +153,25 @@ const emptyState = document.getElementById('dropzone-empty');
 const filledState = document.getElementById('dropzone-filled');
 const preview = document.getElementById('vault-preview');
 const fileInfo = document.getElementById('vault-file-info');
+
+// Guard against malformed years (e.g. "200001") that Chromium's date
+// picker lets you type before month/day are filled in. min/max on the
+// inputs above stop it from being submitted at all; this clears/clamps it
+// as soon as the field loses focus, instead of leaving obviously-broken
+// text sitting there.
+document.querySelectorAll('input[type="date"]').forEach((el) => {
+  const clamp = () => {
+    if (!el.value || el.checkValidity()) return;
+    const minYear = el.min ? parseInt(el.min.slice(0, 4), 10) : 1900;
+    const maxYear = el.max ? parseInt(el.max.slice(0, 4), 10) : 2099;
+    const year = parseInt(el.value.slice(0, 4), 10);
+    if (isNaN(year) || year < minYear) el.value = el.min || '';
+    else if (year > maxYear) el.value = el.max || '';
+    else el.value = ''; // malformed in some other way — just clear it
+  };
+  el.addEventListener('change', clamp);
+  el.addEventListener('blur', clamp);
+});
 
 function showFile(file) {
   if (!file) return;
