@@ -76,9 +76,76 @@
     <p class="muted">No documents saved yet.</p>
   {% endfor %}
 </div>
+
+<!-- Custom delete-confirmation modal (replaces the native browser confirm() popup) -->
+<div id="vault-confirm-overlay" class="vault-modal-overlay" style="display:none;">
+  <div class="vault-modal-box" role="alertdialog" aria-modal="true" aria-labelledby="vault-confirm-title">
+    <p id="vault-confirm-title">Delete <strong id="vault-confirm-label"></strong>?</p>
+    <p class="muted" style="margin:4px 0 0;font-size:13px;">This can't be undone.</p>
+    <div class="vault-modal-actions">
+      <button type="button" id="vault-confirm-cancel" class="secondary">Cancel</button>
+      <button type="button" id="vault-confirm-ok" class="vault-modal-danger">Delete</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
+<style>
+.vault-modal-overlay,
+#vault-delete-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.vault-modal-box {
+  background: #1c1c1c;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 22px 26px;
+  max-width: 320px;
+  width: 90%;
+  color: #eee;
+  font-size: 15px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.5);
+}
+.vault-modal-box p { margin: 0; }
+.vault-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+.vault-modal-danger {
+  background: #b3382c;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.vault-modal-danger:hover { background: #c9432f; }
+#vault-delete-overlay .vault-modal-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.vault-delete-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #444;
+  border-top-color: #e0952c;
+  border-radius: 50%;
+  animation: vault-delete-spin .8s linear infinite;
+}
+@keyframes vault-delete-spin { to { transform: rotate(360deg); } }
+</style>
 <script>
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('vault-file');
@@ -202,13 +269,29 @@ dropzone.addEventListener('drop', (e) => {
   });
 })();
 
-// Delete progress + page lock: confirm, then disable every interactive
-// element and show a "Deleting…" overlay until the redirect lands, so a
-// second click — on this delete or anything else on the page — can't
-// fire while the request is in flight.
+// Delete flow: custom in-page confirm modal (no native confirm() popup),
+// then a full-page "Deleting…" lock until the redirect lands, so nothing
+// else on the page can be clicked while the request is in flight.
 (function () {
   const deleteForms = document.querySelectorAll('.vault-delete-form');
   if (!deleteForms.length) return;
+
+  const confirmOverlay = document.getElementById('vault-confirm-overlay');
+  const confirmLabel = document.getElementById('vault-confirm-label');
+  const confirmOk = document.getElementById('vault-confirm-ok');
+  const confirmCancel = document.getElementById('vault-confirm-cancel');
+  let pendingForm = null;
+
+  function openConfirm(form) {
+    pendingForm = form;
+    confirmLabel.textContent = form.dataset.label || 'this document';
+    confirmOverlay.style.display = 'flex';
+  }
+
+  function closeConfirm() {
+    pendingForm = null;
+    confirmOverlay.style.display = 'none';
+  }
 
   function lockPage(message) {
     document.querySelectorAll('button, a, input, select, textarea').forEach((el) => {
@@ -223,38 +306,38 @@ dropzone.addEventListener('drop', (e) => {
 
     const overlay = document.createElement('div');
     overlay.id = 'vault-delete-overlay';
-    overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;' +
-      'align-items:center;justify-content:center;z-index:9999;';
     overlay.innerHTML =
-      '<div style="background:#fff;padding:24px 32px;border-radius:10px;' +
-      'display:flex;flex-direction:column;align-items:center;gap:12px;' +
-      'font-size:15px;color:#222;">' +
-      '<div style="width:28px;height:28px;border:3px solid #ddd;' +
-      'border-top-color:#2f6f5e;border-radius:50%;' +
-      'animation:vault-delete-spin .8s linear infinite;"></div>' +
-      '<p style="margin:0;">' + message + '</p></div>';
+      '<div class="vault-modal-box">' +
+      '<div class="vault-delete-spinner"></div>' +
+      '<p>' + message + '</p></div>';
     document.body.appendChild(overlay);
   }
 
-  const spinStyle = document.createElement('style');
-  spinStyle.textContent = '@keyframes vault-delete-spin{to{transform:rotate(360deg);}}';
-  document.head.appendChild(spinStyle);
-
   deleteForms.forEach((form) => {
     form.addEventListener('submit', (e) => {
-      const label = form.dataset.label || 'this document';
-      if (!confirm(`Delete ${label}?`)) {
-        e.preventDefault();
-        return;
-      }
-      lockPage(`Deleting "${label}"…`);
+      e.preventDefault();
+      openConfirm(form);
     });
+  });
+
+  confirmCancel.addEventListener('click', closeConfirm);
+  confirmOverlay.addEventListener('click', (e) => {
+    if (e.target === confirmOverlay) closeConfirm(); // click outside the box = cancel
+  });
+
+  confirmOk.addEventListener('click', () => {
+    const form = pendingForm;
+    if (!form) return;
+    const label = form.dataset.label || 'this document';
+    closeConfirm();
+    lockPage(`Deleting "${label}"…`);
+    form.submit(); // real submit — doesn't re-fire the 'submit' listener above
   });
 
   // Safety net if the page is ever restored from bfcache (e.g. the
   // request failed and the user hit back) — don't leave it locked.
   window.addEventListener('pageshow', () => {
+    closeConfirm();
     const overlay = document.getElementById('vault-delete-overlay');
     if (overlay) overlay.remove();
     document.querySelectorAll('[data-vault-lock-was-disabled]').forEach((el) => {
