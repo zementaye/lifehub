@@ -101,7 +101,7 @@ body {
   margin: 0;
   font-family: var(--font-body);
   background: var(--bg);
-  background-image: radial-gradient(circle at 50% -10%, var(--bg-glow) 0%, var(--bg) 60%);
+  background-image: radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--bg-glow) 75%, var(--primary) 25%) 0%, var(--bg) 60%);
   background-attachment: fixed;
   color: var(--ink);
   padding-bottom: 24px;
@@ -115,16 +115,16 @@ body.page-nutrition_meal { --tab-color: var(--success); }
 body.page-habits {
   --tab-color: var(--success);
   background-image:
-    radial-gradient(circle at 50% -10%, var(--bg-glow) 0%, var(--bg) 60%),
-    radial-gradient(rgba(143,209,79,0.10) 1px, transparent 1px);
+    radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--bg-glow) 75%, var(--success) 25%) 0%, var(--bg) 60%),
+    radial-gradient(color-mix(in srgb, var(--success) 10%, transparent) 1px, transparent 1px);
   background-size: auto, 22px 22px;
 }
 body.page-budget {
   --tab-color: var(--primary);
   background-image:
-    radial-gradient(circle at 50% -10%, var(--bg-glow) 0%, var(--bg) 60%),
-    linear-gradient(rgba(240,178,61,0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(240,178,61,0.06) 1px, transparent 1px);
+    radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--bg-glow) 75%, var(--primary) 25%) 0%, var(--bg) 60%),
+    linear-gradient(color-mix(in srgb, var(--primary) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 6%, transparent) 1px, transparent 1px);
   background-size: auto, 28px 28px, 28px 28px;
 }
 body.page-vault,
@@ -187,8 +187,8 @@ a:hover { text-decoration: underline; }
   animation: brand-breathe 3s ease-in-out infinite;
 }
 @keyframes brand-breathe {
-  0%, 100% { filter: drop-shadow(0 0 0 rgba(240,178,61,0)); }
-  50% { filter: drop-shadow(0 0 5px rgba(240,178,61,0.55)); }
+  0%, 100% { filter: drop-shadow(0 0 0 transparent); }
+  50% { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--primary) 55%, transparent)); }
 }
 
 /* Auth pages: login, register, forgot/reset password */
@@ -438,13 +438,13 @@ body.auth-page {
   border-color: var(--ink);
   box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--tab-color);
 }
-/* The dots grid doubles as a live preview tile: each quadrant shows one of
-   the palette's actual brand colors, so the swatch background represents
-   what picking it will actually look like. */
+/* The dots grid doubles as a live preview tile: each half shows one of the
+   palette's actual brand colors, so the swatch background represents what
+   picking it will actually look like. */
 .palette-dots {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
+  grid-template-rows: 1fr;
   height: 54px;
   width: 100%;
 }
@@ -961,13 +961,13 @@ body[data-theme="light"] .habit-reminder-form input[type="time"]::-webkit-calend
 .streak-badge {
   font-family: var(--font-mono);
   font-size: 0.72rem; font-weight: 600; color: var(--primary);
-  background: rgba(240,178,61,0.14); padding: 2px 7px; border-radius: 4px; margin-left: 4px;
+  background: color-mix(in srgb, var(--primary) 14%, transparent); padding: 2px 7px; border-radius: 4px; margin-left: 4px;
   display: inline-block;
   animation: flame-pulse 1.8s ease-in-out infinite;
 }
 @keyframes flame-pulse {
-  0%, 100% { text-shadow: 0 0 0 rgba(240,178,61,0); transform: scale(1); }
-  50% { text-shadow: 0 0 8px rgba(240,178,61,0.55); transform: scale(1.05); }
+  0%, 100% { text-shadow: 0 0 0 transparent; transform: scale(1); }
+  50% { text-shadow: 0 0 8px color-mix(in srgb, var(--primary) 55%, transparent); transform: scale(1.05); }
 }
 .status-dot {
   display: inline-block;
@@ -1036,7 +1036,7 @@ body[data-theme="light"] .habit-reminder-form input[type="time"]::-webkit-calend
   0%, 100% { box-shadow: 0 0 0 rgba(242,101,60,0); }
   50% { box-shadow: 0 0 10px rgba(242,101,60,0.7); }
 }
-.stat-value.net-positive { color: var(--success); text-shadow: 0 0 14px rgba(143,209,79,0.35); }
+.stat-value.net-positive { color: var(--success); text-shadow: 0 0 14px color-mix(in srgb, var(--success) 35%, transparent); }
 .stat-value.net-negative { color: var(--danger); animation: net-warn 1.8s ease-in-out infinite; }
 @keyframes net-warn {
   0%, 100% { text-shadow: 0 0 0 rgba(242,101,60,0); }
@@ -1059,7 +1059,7 @@ body[data-theme="light"] .habit-reminder-form input[type="time"]::-webkit-calend
   border-radius: 3px;
   margin-left: 6px;
 }
-.expiry-badge.soon { background: rgba(240,178,61,0.16); color: var(--primary); }
+.expiry-badge.soon { background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--primary); }
 .expiry-badge.urgent { background: rgba(242,101,60,0.18); color: var(--danger); }
 .expiry-badge.expired { background: var(--danger); color: #fff; }
 .expiry-badge.muted-badge { background: rgba(107,116,128,0.16); color: var(--muted); }
