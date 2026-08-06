@@ -527,6 +527,10 @@ a:hover { text-decoration: underline; }
   background: var(--surface-raised);
   color: var(--ink);
 }
+.inline-form input[type="time"] { color-scheme: dark; font-family: var(--font-mono); }
+body[data-theme="light"] .inline-form input[type="time"] { color-scheme: light; }
+.inline-form input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: pointer; }
+body[data-theme="light"] .inline-form input[type="time"]::-webkit-calendar-picker-indicator { filter: none; }
 #food-search {
   width: 100%;
   padding: 10px 12px;
@@ -706,19 +710,49 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   padding: 9px 0;
 }
 .checklist.interactive li:last-child { border-bottom: none; }
-.checklist.interactive li span { flex: 1; text-decoration: inherit; }
-.checkbox-form, .delete-form, .habit-reminder-form { display: inline-flex; align-items: center; gap: 4px; }
-.habit-reminder-form input {
-  width: 42px;
-  padding: 4px 6px;
+.checklist.interactive li > span:first-of-type { flex: 1; text-decoration: inherit; min-width: 0; }
+.checkbox-form, .delete-form, .habit-reminder-form { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.reminder-time-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--tab-color) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tab-color) 30%, transparent);
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.reminder-time-label.unset { color: var(--muted); background: var(--surface-raised); border-color: var(--border); }
+.habit-reminder-form input[type="time"] {
+  width: auto;
+  min-width: 118px;
+  padding: 5px 8px;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--surface-raised);
   color: var(--ink);
   font-family: var(--font-mono);
   font-size: 0.78rem;
-  text-align: center;
+  color-scheme: dark;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
+body[data-theme="light"] .habit-reminder-form input[type="time"] { color-scheme: light; }
+.habit-reminder-form input[type="time"]:hover,
+.habit-reminder-form input[type="time"]:focus {
+  border-color: var(--tab-color);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tab-color) 20%, transparent);
+}
+.habit-reminder-form input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.6);
+  cursor: pointer;
+}
+body[data-theme="light"] .habit-reminder-form input[type="time"]::-webkit-calendar-picker-indicator { filter: none; }
 .checkbox-btn {
   width: 34px; height: 18px;
   border: none;
