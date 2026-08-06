@@ -26,7 +26,7 @@
     </form>
     <p class="muted">Birth date and sex are only used to calculate your recommended daily intake on the Nutrition page.</p>
     {% if bmi %}
-      <p class="stat-value">{{ bmi }} <small>BMI · {{ bmi_category }}</small></p>
+      <p class="stat-value">{{ bmi }} <small class="bmi-tag bmi-{{ bmi_category_slug }}">BMI · {{ bmi_category }}</small></p>
     {% endif %}
   </div>
 
