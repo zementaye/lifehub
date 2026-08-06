@@ -142,8 +142,8 @@
   });
 })();
 
-// Grouped nav: desktop dropdowns (Vault/Tasks in .topnav) and mobile
-// slide-up sheets (Vault/Tasks in .bottomnav). Runs on every page.
+// Grouped nav: desktop dropdowns (Health/Vault/Tasks in .topnav) and the
+// mobile sidebar drawer. Runs on every page.
 (function () {
   document.addEventListener('DOMContentLoaded', () => {
     // --- Desktop dropdown groups ---
@@ -164,35 +164,32 @@
     document.addEventListener('click', () => closeAllGroups(null));
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllGroups(null); });
 
-    // --- Mobile slide-up sheets ---
-    const backdrop = document.querySelector('[data-sheet-backdrop]');
-    const sheetToggles = document.querySelectorAll('.bottomnav-toggle[data-sheet]');
-    const sheets = document.querySelectorAll('.nav-sheet');
+    // --- Mobile sidebar drawer ---
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarClose = document.getElementById('sidebarClose');
+    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    if (!sidebar || !sidebarToggle) return;
 
-    function closeAllSheets() {
-      sheets.forEach((s) => s.classList.remove('open'));
-      if (backdrop) backdrop.classList.remove('open');
+    function openSidebar() {
+      sidebar.classList.add('open');
+      sidebar.setAttribute('aria-hidden', 'false');
+      if (sidebarBackdrop) sidebarBackdrop.classList.add('open');
+      sidebarToggle.setAttribute('aria-expanded', 'true');
     }
-    function openSheet(id) {
-      closeAllSheets();
-      const sheet = document.getElementById(id);
-      if (!sheet) return;
-      sheet.classList.add('open');
-      if (backdrop) backdrop.classList.add('open');
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      sidebar.setAttribute('aria-hidden', 'true');
+      if (sidebarBackdrop) sidebarBackdrop.classList.remove('open');
+      sidebarToggle.setAttribute('aria-expanded', 'false');
     }
-    sheetToggles.forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const id = btn.dataset.sheet;
-        const sheet = document.getElementById(id);
-        if (sheet && sheet.classList.contains('open')) {
-          closeAllSheets();
-        } else {
-          openSheet(id);
-        }
-      });
+
+    sidebarToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
     });
-    if (backdrop) backdrop.addEventListener('click', closeAllSheets);
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllSheets(); });
+    if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+    if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeSidebar);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
   });
 })();
