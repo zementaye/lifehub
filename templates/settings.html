@@ -4,6 +4,15 @@
 <h1>Settings</h1>
 
 <div class="card wide">
+  <h3>Appearance</h3>
+  <p class="muted">Switch between dark and light mode. Your choice is saved on this device.</p>
+  <div class="mode-switch" id="modeSwitch" role="switch" aria-checked="false" aria-label="Toggle light mode">
+    <span class="mode-rocker" id="modeRocker"></span>
+    <span class="mode-label" id="modeLabel">DARK</span>
+  </div>
+</div>
+
+<div class="card wide">
   <h3>Notifications (Telegram)</h3>
   <p class="muted">Point this at any bot you own. Message <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> to find your own chat ID. Note: Telegram won't let a bot message you until you've sent <em>it</em> a message first (open your bot and hit Start) — the most common cause of "chat not found" even with a correct token/ID.</p>
   <form method="post" action="{{ url_for('save_settings') }}" class="inline-form settings-form">
