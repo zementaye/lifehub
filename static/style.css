@@ -52,6 +52,42 @@ body[data-theme="light"] {
   --violet: #8452B8;
 }
 
+/* Color palettes (Settings → Appearance). Each palette defines its four raw
+   brand hues once; dark mode uses them directly, light mode derives a
+   darkened/higher-contrast variant via color-mix so every palette works
+   in both modes without hand-tuning a second set of hex values. "amber"
+   is the built-in default and needs no override — see :root / [data-theme
+   ="light"] above. */
+body[data-palette="ocean"] {
+  --p1: #3D8FF0; --p2: #4CE0C7; --p3: #59C2E8; --p4: #7C9CF0;
+}
+body[data-palette="sunset"] {
+  --p1: #F0703D; --p2: #F0B23D; --p3: #E85C8A; --p4: #E8748C;
+}
+body[data-palette="forest"] {
+  --p1: #8FD14F; --p2: #4CC98F; --p3: #B0D14F; --p4: #79B84C;
+}
+body[data-palette="grape"] {
+  --p1: #B98CE8; --p2: #D14FC2; --p3: #8FD14F; --p4: #9D6FE8;
+}
+body[data-palette="mono"] {
+  --p1: #C7CCD3; --p2: #8FD9E8; --p3: #A8D18F; --p4: #B0B6C0;
+}
+body[data-palette]:not([data-palette="amber"]) {
+  --primary: var(--p1);
+  --primary-dark: color-mix(in srgb, var(--p1) 80%, black);
+  --accent: var(--p2);
+  --success: var(--p3);
+  --violet: var(--p4);
+}
+body[data-palette][data-theme="light"]:not([data-palette="amber"]) {
+  --primary: color-mix(in srgb, var(--p1) 68%, black);
+  --primary-dark: color-mix(in srgb, var(--p1) 52%, black);
+  --accent: color-mix(in srgb, var(--p2) 58%, black);
+  --success: color-mix(in srgb, var(--p3) 60%, black);
+  --violet: color-mix(in srgb, var(--p4) 62%, black);
+}
+
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; forced-color-adjust: none; }
 button { -webkit-tap-highlight-color: transparent; outline: none; background-clip: padding-box; }
 button:focus-visible,
@@ -314,6 +350,62 @@ a:hover { text-decoration: underline; }
 }
 .mode-rocker.on::after { left: 17px; }
 
+/* Color theme picker, Settings → Appearance */
+.palette-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+}
+.palette-swatch {
+  display: flex;
+  flex-direction: column;
+  width: 108px;
+  padding: 0;
+  background: var(--surface-raised);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.palette-swatch:hover {
+  transform: translateY(-2px);
+  border-color: var(--muted);
+}
+.palette-swatch.selected {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--tab-color);
+}
+/* The dots grid doubles as a live preview tile: each quadrant shows one of
+   the palette's actual brand colors, so the swatch background represents
+   what picking it will actually look like. */
+.palette-dots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  height: 54px;
+  width: 100%;
+}
+.palette-dots span {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.palette-name {
+  padding: 6px 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: var(--ink);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
 /* Hamburger button — mobile sidebar trigger */
 .hamburger-btn {
   display: flex;
@@ -428,6 +520,13 @@ a:hover { text-decoration: underline; }
   border-radius: 4px;
   margin-bottom: 8px;
   font-size: 0.9rem;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.flash-msg.flash-out {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 /* Consistent vertical rhythm: standalone cards get a fixed gap to their
@@ -522,7 +621,7 @@ a:hover { text-decoration: underline; }
   font-size: 0.72rem; color: var(--muted); font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.04em;
 }
-.inline-form input, .inline-form select {
+.inline-form input, .inline-form select, .inline-form textarea {
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -531,6 +630,10 @@ a:hover { text-decoration: underline; }
   background: var(--surface-raised);
   color: var(--ink);
 }
+.inline-form textarea {
+  line-height: 1.4;
+}
+.inline-form textarea::placeholder { color: var(--muted); }
 .inline-form input[type="time"] { color-scheme: dark; font-family: var(--font-mono); }
 body[data-theme="light"] .inline-form input[type="time"] { color-scheme: light; }
 .inline-form input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: pointer; }
@@ -547,7 +650,7 @@ body[data-theme="light"] .inline-form input[type="time"]::-webkit-calendar-picke
   margin-top: 4px;
 }
 #food-search::placeholder { color: var(--muted); }
-.inline-form input:focus, .inline-form select:focus, #food-search:focus {
+.inline-form input:focus, .inline-form select:focus, .inline-form textarea:focus, #food-search:focus {
   outline: 2px solid var(--tab-color);
   outline-offset: 1px;
 }
