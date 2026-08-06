@@ -1,115 +1,195 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% block title %}Life Hub{% endblock %}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version }}">
-<script>
-  // Set the theme before first paint so there's no flash of the wrong mode.
-  (function () {
-    var saved = localStorage.getItem('lifehub-theme');
-    var theme = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-    document.documentElement.dataset.themePending = theme;
-  })();
-</script>
-</head>
-<body class="page-{{ request.endpoint }}" data-theme="dark">
-<script>document.body.dataset.theme = document.documentElement.dataset.themePending || 'dark';</script>
-<header class="topbar">
-  <button type="button" class="hamburger-btn" id="sidebarToggle" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
-    <span></span><span></span><span></span>
-  </button>
-  <a href="{{ url_for('dashboard') }}" class="brand"><span class="brand-mark"></span>LIFEHUB</a>
-  <nav class="topnav">
-    <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}">Dashboard</a>
+// Light/dark mode toggle. Theme is applied pre-paint by an inline script in
+// base.html (to avoid a flash); this just wires up the switch and persists
+// the choice for next time.
+(function () {
+  const body = document.body;
+  const switchEl = document.getElementById('modeSwitch');
+  const rocker = document.getElementById('modeRocker');
+  const label = document.getElementById('modeLabel');
+  if (!switchEl) return;
 
-    <div class="nav-group">
-      <button type="button" class="nav-group-toggle {{ 'active' if request.endpoint in ['health','nutrition'] }}">
-        Health <span class="caret">▾</span>
-      </button>
-      <div class="nav-group-menu">
-        <a href="{{ url_for('health') }}" class="{{ 'active' if request.endpoint=='health' }}">Health</a>
-        <a href="{{ url_for('nutrition') }}" class="{{ 'active' if request.endpoint=='nutrition' }}">Nutrition</a>
-      </div>
-    </div>
+  function reflect() {
+    const light = body.dataset.theme === 'light';
+    rocker.classList.toggle('on', light);
+    label.textContent = light ? 'LIGHT' : 'DARK';
+  }
 
-    <div class="nav-group">
-      <button type="button" class="nav-group-toggle {{ 'active' if request.endpoint in ['vault','passwords','notes'] }}">
-        Vault <span class="caret">▾</span>
-      </button>
-      <div class="nav-group-menu">
-        <a href="{{ url_for('vault') }}" class="{{ 'active' if request.endpoint=='vault' }}">ID Vault</a>
-        <a href="{{ url_for('passwords') }}" class="{{ 'active' if request.endpoint=='passwords' }}">Passwords</a>
-        <a href="{{ url_for('notes') }}" class="{{ 'active' if request.endpoint=='notes' }}">Notes</a>
-      </div>
-    </div>
+  function setTheme(theme) {
+    body.dataset.theme = theme;
+    localStorage.setItem('lifehub-theme', theme);
+    reflect();
+  }
 
-    <a href="{{ url_for('budget') }}" class="{{ 'active' if request.endpoint=='budget' }}">Budget</a>
+  reflect();
+  switchEl.addEventListener('click', () => {
+    setTheme(body.dataset.theme === 'light' ? 'dark' : 'light');
+  });
+  switchEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchEl.click(); }
+  });
+  switchEl.tabIndex = 0;
+})();
 
-    <div class="nav-group">
-      <button type="button" class="nav-group-toggle {{ 'active' if request.endpoint in ['habits','reminders'] }}">
-        Tasks <span class="caret">▾</span>
-      </button>
-      <div class="nav-group-menu">
-        <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}">Habits &amp; To-dos</a>
-        <a href="{{ url_for('reminders') }}" class="{{ 'active' if request.endpoint=='reminders' }}">Reminders</a>
-      </div>
-    </div>
+// Debounced food search against /nutrition/search, only runs on the nutrition page.
+(function () {
+  const input = document.getElementById('food-search');
+  if (!input) return;
 
-    <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">Settings</a>
-  </nav>
-  <div class="mode-switch" id="modeSwitch" role="button" aria-label="Toggle light/dark mode" title="Toggle light/dark mode">
-    <span class="mode-label" id="modeLabel">DARK</span>
-    <span class="mode-rocker" id="modeRocker"></span>
-  </div>
-</header>
+  const resultsBox = document.getElementById('search-results');
+  const logForm = document.getElementById('log-form');
+  const preview = document.getElementById('log-preview');
 
-<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
-<aside class="sidebar" id="sidebar" aria-hidden="true">
-  <div class="sidebar-header">
-    <a href="{{ url_for('dashboard') }}" class="brand"><span class="brand-mark"></span>LIFEHUB</a>
-    <button type="button" class="sidebar-close" id="sidebarClose" aria-label="Close menu">✕</button>
-  </div>
-  <nav class="sidebar-nav">
-    <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}">🏠 Dashboard</a>
+  let timer = null;
 
-    <div class="sidebar-group-label">Health</div>
-    <a href="{{ url_for('health') }}" class="{{ 'active' if request.endpoint=='health' }}">💪 Health</a>
-    <a href="{{ url_for('nutrition') }}" class="{{ 'active' if request.endpoint=='nutrition' }}">🍽️ Nutrition</a>
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 2) {
+      resultsBox.innerHTML = '';
+      return;
+    }
+    timer = setTimeout(() => runSearch(q), 350);
+  });
 
-    <div class="sidebar-group-label">Vault</div>
-    <a href="{{ url_for('vault') }}" class="{{ 'active' if request.endpoint=='vault' }}">🪪 ID Vault</a>
-    <a href="{{ url_for('passwords') }}" class="{{ 'active' if request.endpoint=='passwords' }}">🔑 Passwords</a>
-    <a href="{{ url_for('notes') }}" class="{{ 'active' if request.endpoint=='notes' }}">📝 Notes</a>
+  async function runSearch(q) {
+    resultsBox.innerHTML = '<p class="muted">Searching…</p>';
+    try {
+      const resp = await fetch(`/nutrition/search?q=${encodeURIComponent(q)}`);
+      const data = await resp.json();
+      renderResults(data.results || []);
+    } catch (e) {
+      resultsBox.innerHTML = '<p class="muted">Search failed — try again.</p>';
+    }
+  }
 
-    <div class="sidebar-group-label">Money</div>
-    <a href="{{ url_for('budget') }}" class="{{ 'active' if request.endpoint=='budget' }}">💰 Budget</a>
+  function renderResults(results) {
+    if (results.length === 0) {
+      resultsBox.innerHTML = '<p class="muted">No matches found.</p>';
+      return;
+    }
+    resultsBox.innerHTML = '';
+    results.forEach((r) => {
+      const div = document.createElement('div');
+      div.className = 'search-result';
+      const tag = r.generic
+        ? '<span class="tag">generic</span>'
+        : `<span class="tag">branded${r.brand ? ': ' + escapeHtml(r.brand) : ''}</span>`;
+      div.innerHTML = `<div class="sr-name">${escapeHtml(r.name)} ${tag}</div>
+        <div class="sr-macro">${Math.round(r.calories)} cal · ${round1(r.protein_g)}g protein · ${round1(r.carbs_g)}g carbs · ${round1(r.fat_g)}g fat — per 100g</div>`;
+      div.addEventListener('click', () => selectFood(r));
+      resultsBox.appendChild(div);
+    });
+  }
 
-    <div class="sidebar-group-label">Tasks</div>
-    <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}">✅ Habits &amp; To-dos</a>
-    <a href="{{ url_for('reminders') }}" class="{{ 'active' if request.endpoint=='reminders' }}">🔔 Reminders</a>
+  function selectFood(r) {
+    document.getElementById('log-name').value = r.name;
+    document.getElementById('log-calories').value = r.calories;
+    document.getElementById('log-protein').value = r.protein_g;
+    document.getElementById('log-carbs').value = r.carbs_g;
+    document.getElementById('log-fat').value = r.fat_g;
+    document.getElementById('log-fiber').value = r.fiber_g;
+    preview.textContent = `Selected: ${r.name} — ${Math.round(r.calories)} cal per 100g. Enter how many grams you actually ate below.`;
+    logForm.style.display = 'flex';
+  }
 
-    <div class="sidebar-group-label">&nbsp;</div>
-    <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">⚙ Settings</a>
-  </nav>
-</aside>
+  function round1(n) { return Math.round((n || 0) * 10) / 10; }
+  function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+})();
 
-<main class="content">
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      <div class="flash">
-        {% for m in messages %}<div class="flash-msg">{{ m }}</div>{% endfor %}
-      </div>
-    {% endif %}
-  {% endwith %}
+// Count-up animation for any [data-countup] stat number, and animated
+// fill-in for any .animated-fill progress bar. Runs on every page.
+(function () {
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
-  {% block content %}{% endblock %}
-</main>
+  function animateCountUp(el) {
+    const target = parseFloat(el.dataset.countup);
+    if (isNaN(target)) return;
+    const duration = 800;
+    const start = performance.now();
+    const isNegative = target < 0;
+    const absTarget = Math.abs(target);
 
-<script src="{{ url_for('static', filename='app.js') }}?v={{ asset_version }}"></script>
-{% block scripts %}{% endblock %}
-</body>
-</html>
+    function frame(now) {
+      const t = Math.min((now - start) / duration, 1);
+      const value = Math.round(absTarget * easeOutCubic(t));
+      el.textContent = (isNegative ? '-' : '') + value.toLocaleString();
+      if (t < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function animateFills() {
+    document.querySelectorAll('.animated-fill').forEach((el) => {
+      const pct = parseFloat(el.dataset.targetPct);
+      if (isNaN(pct)) return;
+      // Force layout so the browser registers width:0 first, otherwise it
+      // may jump straight to the target instead of animating.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          el.style.width = Math.max(0, Math.min(pct, 100)) + '%';
+        });
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-countup]').forEach(animateCountUp);
+    animateFills();
+  });
+})();
+
+// Grouped nav: desktop dropdowns (Health/Vault/Tasks in .topnav) and the
+// mobile sidebar drawer. Runs on every page.
+(function () {
+  document.addEventListener('DOMContentLoaded', () => {
+    // --- Desktop dropdown groups ---
+    const groups = document.querySelectorAll('.nav-group');
+    function closeAllGroups(except) {
+      groups.forEach((g) => { if (g !== except) g.classList.remove('open'); });
+    }
+    groups.forEach((group) => {
+      const toggle = group.querySelector('.nav-group-toggle');
+      if (!toggle) return;
+      toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const willOpen = !group.classList.contains('open');
+        closeAllGroups(group);
+        group.classList.toggle('open', willOpen);
+      });
+    });
+    document.addEventListener('click', () => closeAllGroups(null));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllGroups(null); });
+
+    // --- Mobile sidebar drawer ---
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarClose = document.getElementById('sidebarClose');
+    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    if (!sidebar || !sidebarToggle) return;
+
+    function openSidebar() {
+      sidebar.classList.add('open');
+      sidebar.setAttribute('aria-hidden', 'false');
+      if (sidebarBackdrop) sidebarBackdrop.classList.add('open');
+      sidebarToggle.setAttribute('aria-expanded', 'true');
+    }
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      sidebar.setAttribute('aria-hidden', 'true');
+      if (sidebarBackdrop) sidebarBackdrop.classList.remove('open');
+      sidebarToggle.setAttribute('aria-expanded', 'false');
+    }
+
+    sidebarToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+    });
+    if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+    if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeSidebar);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
+  });
+})();
