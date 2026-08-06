@@ -127,6 +127,61 @@ a:hover { text-decoration: underline; }
 .topnav a:hover::after, .topnav a.active::after { transform: scaleX(1); }
 .topnav a.active { color: var(--ink); }
 
+/* Grouped dropdown items in the top nav (Vault, Tasks) */
+.nav-group { position: relative; }
+.nav-group-toggle {
+  background: none;
+  border: none;
+  padding: 0 0 6px;
+  margin: 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.2s ease;
+}
+.nav-group-toggle .caret { font-size: 0.7rem; transition: transform 0.2s ease; }
+.nav-group-toggle:hover, .nav-group-toggle.active { color: var(--ink); }
+.nav-group.open .nav-group-toggle .caret { transform: rotate(180deg); }
+.nav-group-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  min-width: 160px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 20;
+}
+.nav-group.open .nav-group-menu { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+.nav-group-menu a {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 10px;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.nav-group-menu a:hover { color: var(--ink); background: var(--surface); text-decoration: none; }
+.nav-group-menu a.active { color: var(--primary); }
+
 .settings-gear {
   display: inline-flex;
   align-items: center;
@@ -174,11 +229,75 @@ a:hover { text-decoration: underline; }
 .bottomnav a:hover span, .bottomnav a.active span { transform: translateY(-2px) scale(1.12); }
 .bottomnav a.active { color: var(--primary); }
 
+.bottomnav-toggle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 0 10px;
+  font-size: 0.65rem;
+  color: var(--muted);
+  font-weight: 600;
+  font-family: var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.bottomnav-toggle span { font-size: 1.2rem; display: inline-block; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.bottomnav-toggle:hover span, .bottomnav-toggle.active span { transform: translateY(-2px) scale(1.12); }
+.bottomnav-toggle.active { color: var(--primary); }
+
+/* Slide-up sheets for grouped mobile nav items (Vault, Tasks) */
+.nav-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 15;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.nav-sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+.nav-sheet {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border);
+  border-radius: 14px 14px 0 0;
+  padding: 10px 14px calc(env(safe-area-inset-bottom, 0px) + 14px);
+  z-index: 16;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transform: translateY(100%);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav-sheet.open { transform: translateY(0); }
+.nav-sheet-handle {
+  width: 36px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 2px auto 10px;
+}
+.nav-sheet a {
+  padding: 13px 10px;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: 6px;
+}
+.nav-sheet a:hover, .nav-sheet a.active { background: var(--surface); text-decoration: none; color: var(--primary); }
+
 @media (min-width: 860px) {
   .topnav { display: flex; }
   .settings-gear { display: none; }
   body { padding-bottom: 24px; }
   .bottomnav { display: none; }
+  .nav-sheet, .nav-sheet-backdrop { display: none; }
 }
 
 .content {
@@ -517,8 +636,6 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 }
 .stat-value.net-positive { color: var(--success); text-shadow: 0 0 14px rgba(79,157,110,0.35); }
 .stat-value.net-negative { color: var(--danger); animation: net-warn 1.8s ease-in-out infinite; }
-.net-positive { color: var(--success); }
-.net-negative { color: var(--danger); font-weight: 600; }
 @keyframes net-warn {
   0%, 100% { text-shadow: 0 0 0 rgba(193,80,58,0); }
   50% { text-shadow: 0 0 10px rgba(193,80,58,0.55); }
@@ -631,74 +748,3 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   font-size: 0.85rem;
 }
 .note-body { white-space: pre-wrap; font-size: 0.9rem; margin: 6px 0; }
-
-/* Link styled like button.secondary, for <a> tags */
-a.btn-secondary {
-  display: inline-block;
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--accent);
-  padding: 9px 16px;
-  border-radius: 4px;
-  font-weight: 700;
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  text-decoration: none;
-  margin: 8px 8px 0 0;
-}
-a.btn-secondary:hover { background: var(--accent); color: #fff; }
-
-/* Yearly budget bar chart */
-.yearly-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  height: 130px;
-  margin-top: 16px;
-  padding: 0 2px;
-}
-.yearly-chart-col {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-}
-.yearly-chart-bars {
-  flex: 1;
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  width: 100%;
-  justify-content: center;
-}
-.yearly-bar {
-  width: 40%;
-  min-height: 2px;
-  border-radius: 3px 3px 0 0;
-  transition: height 0.4s ease;
-}
-.yearly-bar.income { background: var(--accent, #4caf7d); }
-.yearly-bar.expense { background: #d9776f; }
-.yearly-chart-label {
-  margin-top: 6px;
-  font-size: 0.65rem;
-  color: var(--muted);
-}
-.yearly-chart-legend {
-  display: flex;
-  gap: 18px;
-  margin-top: 10px;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-.yearly-chart-legend .swatch {
-  display: inline-block;
-  width: 10px; height: 10px;
-  border-radius: 2px;
-  margin-right: 5px;
-}
-.yearly-chart-legend .swatch.income { background: var(--accent, #4caf7d); }
-.yearly-chart-legend .swatch.expense { background: #d9776f; }
