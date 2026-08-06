@@ -15,10 +15,30 @@
     <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}">Dashboard</a>
     <a href="{{ url_for('health') }}" class="{{ 'active' if request.endpoint=='health' }}">Health</a>
     <a href="{{ url_for('nutrition') }}" class="{{ 'active' if request.endpoint=='nutrition' }}">Nutrition</a>
-    <a href="{{ url_for('vault') }}" class="{{ 'active' if request.endpoint=='vault' }}">Vault</a>
+
+    <div class="nav-group">
+      <button type="button" class="nav-group-toggle {{ 'active' if request.endpoint in ['vault','passwords','notes'] }}">
+        Vault <span class="caret">▾</span>
+      </button>
+      <div class="nav-group-menu">
+        <a href="{{ url_for('vault') }}" class="{{ 'active' if request.endpoint=='vault' }}">ID Vault</a>
+        <a href="{{ url_for('passwords') }}" class="{{ 'active' if request.endpoint=='passwords' }}">Passwords</a>
+        <a href="{{ url_for('notes') }}" class="{{ 'active' if request.endpoint=='notes' }}">Notes</a>
+      </div>
+    </div>
+
     <a href="{{ url_for('budget') }}" class="{{ 'active' if request.endpoint=='budget' }}">Budget</a>
-    <a href="{{ url_for('reminders') }}" class="{{ 'active' if request.endpoint=='reminders' }}">Reminders</a>
-    <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}">Habits</a>
+
+    <div class="nav-group">
+      <button type="button" class="nav-group-toggle {{ 'active' if request.endpoint in ['habits','reminders'] }}">
+        Tasks <span class="caret">▾</span>
+      </button>
+      <div class="nav-group-menu">
+        <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}">Habits &amp; To-dos</a>
+        <a href="{{ url_for('reminders') }}" class="{{ 'active' if request.endpoint=='reminders' }}">Reminders</a>
+      </div>
+    </div>
+
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">Settings</a>
   </nav>
   <a href="{{ url_for('settings') }}" class="settings-gear {{ 'active' if request.endpoint=='settings' }}" aria-label="Settings" title="Settings">⚙</a>
@@ -40,10 +60,29 @@
   <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}"><span>🏠</span>Home</a>
   <a href="{{ url_for('health') }}" class="{{ 'active' if request.endpoint=='health' }}"><span>💪</span>Health</a>
   <a href="{{ url_for('nutrition') }}" class="{{ 'active' if request.endpoint=='nutrition' }}"><span>🍽️</span>Food</a>
-  <a href="{{ url_for('vault') }}" class="{{ 'active' if request.endpoint=='vault' }}"><span>🪪</span>Vault</a>
+  <button type="button" class="bottomnav-toggle {{ 'active' if request.endpoint in ['vault','passwords','notes'] }}" data-sheet="vault-sheet">
+    <span>🪪</span>Vault
+  </button>
   <a href="{{ url_for('budget') }}" class="{{ 'active' if request.endpoint=='budget' }}"><span>💰</span>Budget</a>
-  <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}"><span>✅</span>Habits</a>
+  <button type="button" class="bottomnav-toggle {{ 'active' if request.endpoint in ['habits','reminders'] }}" data-sheet="tasks-sheet">
+    <span>✅</span>Tasks
+  </button>
 </nav>
+
+<div class="nav-sheet-backdrop" data-sheet-backdrop></div>
+
+<div class="nav-sheet" id="vault-sheet">
+  <div class="nav-sheet-handle"></div>
+  <a href="{{ url_for('vault') }}" class="{{ 'active' if request.endpoint=='vault' }}">🪪 ID Vault</a>
+  <a href="{{ url_for('passwords') }}" class="{{ 'active' if request.endpoint=='passwords' }}">🔑 Passwords</a>
+  <a href="{{ url_for('notes') }}" class="{{ 'active' if request.endpoint=='notes' }}">📝 Notes</a>
+</div>
+
+<div class="nav-sheet" id="tasks-sheet">
+  <div class="nav-sheet-handle"></div>
+  <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}">✅ Habits &amp; To-dos</a>
+  <a href="{{ url_for('reminders') }}" class="{{ 'active' if request.endpoint=='reminders' }}">🔔 Reminders</a>
+</div>
 
 <script src="{{ url_for('static', filename='app.js') }}?v={{ asset_version }}"></script>
 {% block scripts %}{% endblock %}
