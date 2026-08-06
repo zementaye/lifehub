@@ -39,8 +39,9 @@
     {% if todos %}
       <ul class="checklist interactive">
         {% for t in todos %}
-          <li class="{{ 'done' if t.done }}">
-            <form method="post" action="{{ url_for('uncheck_todo' if t.done else 'check_todo', todo_id=t.id) }}" class="checkbox-form">
+          <li class="{{ 'done' if t.done }}" data-item-id="todo-{{ t.id }}">
+            <form method="post" action="{{ url_for('uncheck_todo' if t.done else 'check_todo', todo_id=t.id) }}" class="checkbox-form"
+                  data-check-url="{{ url_for('check_todo', todo_id=t.id) }}" data-uncheck-url="{{ url_for('uncheck_todo', todo_id=t.id) }}">
               <button type="submit" class="checkbox-btn {{ 'checked' if t.done }}" aria-label="{{ 'Mark not done' if t.done else 'Mark done' }}"></button>
             </form>
             <span>{{ t.title }}</span>
@@ -64,8 +65,9 @@
         <h3>{{ group_name }}</h3>
         <ul class="checklist interactive">
           {% for hs in items %}
-            <li class="{{ 'done' if hs.done }}">
-              <form method="post" action="{{ url_for('uncheck_habit' if hs.done else 'checkin_habit', habit_id=hs.habit.id) }}" class="checkbox-form">
+            <li class="{{ 'done' if hs.done }}" data-item-id="habit-{{ hs.habit.id }}">
+              <form method="post" action="{{ url_for('uncheck_habit' if hs.done else 'checkin_habit', habit_id=hs.habit.id) }}" class="checkbox-form"
+                    data-check-url="{{ url_for('checkin_habit', habit_id=hs.habit.id) }}" data-uncheck-url="{{ url_for('uncheck_habit', habit_id=hs.habit.id) }}">
                 <button type="submit" class="checkbox-btn {{ 'checked' if hs.done }}" aria-label="{{ 'Mark not done' if hs.done else 'Mark done' }}"></button>
               </form>
               <span>{{ hs.habit.title }}</span>
