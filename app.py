@@ -60,6 +60,19 @@ def login_required(view):
     return wrapped
 
 
+@app.context_processor
+def inject_user():
+    """Makes {{ user }} available in every template (e.g. settings.html's
+    'Logged in as ...') without every render_template() call needing to
+    remember to pass it explicitly."""
+    user_id = g.get("user_id")
+    if not user_id:
+        return {}
+    with db.get_conn() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    return {"user": row}
+
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "GET":
