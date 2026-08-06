@@ -242,6 +242,12 @@ def bmi_category(bmi: float) -> str:
     return "Obese"
 
 
+def bmi_category_slug(bmi: float) -> str:
+    """CSS-friendly hook (e.g. 'underweight'/'normal'/'overweight'/'obese')
+    so templates can color-code the BMI category label."""
+    return bmi_category(bmi).lower()
+
+
 def weight_sparkline_svg(weights_desc, width=560, height=90, pad=10) -> str | None:
     """weights_desc: rows ordered most-recent-first (as queried). Renders oldest
     to newest, left to right."""
@@ -320,6 +326,7 @@ def dashboard():
         "dashboard.html",
         profile=profile, latest_weight=latest_weight, bmi=bmi,
         bmi_category=bmi_category(bmi) if bmi else None,
+        bmi_category_slug=bmi_category_slug(bmi) if bmi else None,
         upcoming_reminders=upcoming_reminders, habit_status=habit_status,
         totals=totals,
     )
@@ -347,6 +354,7 @@ def health():
     return render_template(
         "health.html", profile=profile, weights=weights, sessions=sessions,
         bmi=bmi, bmi_category=bmi_category(bmi) if bmi else None,
+        bmi_category_slug=bmi_category_slug(bmi) if bmi else None,
         today=date.today().isoformat(),
         sparkline_svg=weight_sparkline_svg(weights),
     )
