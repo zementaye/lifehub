@@ -30,6 +30,109 @@
   switchEl.tabIndex = 0;
 })();
 
+// Color palette picker (Settings → Appearance). Same pre-paint pattern as
+// the theme switch above: base.html applies the saved palette before first
+// paint, this just wires up the swatches and persists the choice.
+(function () {
+  const picker = document.getElementById('palettePicker');
+  if (!picker) return;
+  const body = document.body;
+  const swatches = picker.querySelectorAll('.palette-swatch');
+
+  function reflect() {
+    const current = body.dataset.palette || 'amber';
+    swatches.forEach((sw) => sw.classList.toggle('selected', sw.dataset.palette === current));
+  }
+
+  function setPalette(palette) {
+    body.dataset.palette = palette;
+    localStorage.setItem('lifehub-palette', palette);
+    reflect();
+  }
+
+  reflect();
+  swatches.forEach((sw) => {
+    sw.addEventListener('click', () => setPalette(sw.dataset.palette));
+  });
+})();
+
+// Auto-dismiss flash messages ("Note added: ...", etc.) after a few seconds
+// instead of leaving them sitting on screen until the next page load.
+(function () {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.flash-msg').forEach((msg, i) => {
+      setTimeout(() => {
+        msg.classList.add('flash-out');
+        msg.addEventListener('transitionend', () => msg.remove(), { once: true });
+      }, 3500 + i * 300); // stagger slightly if there are several at once
+    });
+  });
+})();
+
+// Habit/to-do checkboxes: tick instantly instead of waiting on a full page
+// reload for every click. The click updates the UI right away, and the
+// actual save is queued and flushed shortly after (or immediately if the
+// user navigates away/closes the tab before that timer fires), so a run of
+// quick clicks only costs one request instead of one full reload each.
+(function () {
+  const forms = document.querySelectorAll('.checklist.interactive .checkbox-form');
+  if (!forms.length) return;
+
+  const SAVE_DELAY = 600; // ms of inactivity on an item before we save it
+  const pending = new Map(); // itemId -> { url, timer }
+
+  function flush(itemId, useBeacon) {
+    const entry = pending.get(itemId);
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    pending.delete(itemId);
+    if (useBeacon && navigator.sendBeacon) {
+      navigator.sendBeacon(entry.url, new Blob([], { type: 'text/plain' }));
+    } else {
+      fetch(entry.url, { method: 'POST', keepalive: true }).catch(() => {
+        // Best-effort — if this fails the state just reverts on next reload,
+        // no dangling UI to clean up since we already updated optimistically.
+      });
+    }
+  }
+
+  function flushAll(useBeacon) {
+    Array.from(pending.keys()).forEach((id) => flush(id, useBeacon));
+  }
+
+  forms.forEach((form) => {
+    const li = form.closest('li');
+    const btn = form.querySelector('.checkbox-btn');
+    const itemId = li ? li.dataset.itemId : null;
+    if (!li || !btn || !itemId) return;
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const willBeDone = !li.classList.contains('done');
+      li.classList.toggle('done', willBeDone);
+      btn.classList.toggle('checked', willBeDone);
+      btn.setAttribute('aria-label', willBeDone ? 'Mark not done' : 'Mark done');
+
+      const url = willBeDone ? form.dataset.checkUrl : form.dataset.uncheckUrl;
+
+      const existing = pending.get(itemId);
+      if (existing) clearTimeout(existing.timer);
+      pending.set(itemId, {
+        url,
+        timer: setTimeout(() => flush(itemId, false), SAVE_DELAY),
+      });
+    });
+  });
+
+  // Make sure anything still pending gets saved if they navigate away or
+  // close the tab before its debounce timer fires.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushAll(true);
+  });
+  window.addEventListener('pagehide', () => flushAll(true));
+})();
+
 // Debounced food search against /nutrition/search, only runs on the nutrition page.
 (function () {
   const input = document.getElementById('food-search');
