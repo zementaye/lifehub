@@ -7,8 +7,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version }}">
+<script>
+  // Set the theme before first paint so there's no flash of the wrong mode.
+  (function () {
+    var saved = localStorage.getItem('lifehub-theme');
+    var theme = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    document.documentElement.dataset.themePending = theme;
+  })();
+</script>
 </head>
-<body class="page-{{ request.endpoint }}">
+<body class="page-{{ request.endpoint }}" data-theme="dark">
+<script>document.body.dataset.theme = document.documentElement.dataset.themePending || 'dark';</script>
 <header class="topbar">
   <a href="{{ url_for('dashboard') }}" class="brand"><span class="brand-mark"></span>LIFEHUB</a>
   <nav class="topnav">
@@ -41,6 +50,10 @@
 
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">Settings</a>
   </nav>
+  <div class="mode-switch" id="modeSwitch" role="button" aria-label="Toggle light/dark mode" title="Toggle light/dark mode">
+    <span class="mode-label" id="modeLabel">DARK</span>
+    <span class="mode-rocker" id="modeRocker"></span>
+  </div>
   <a href="{{ url_for('settings') }}" class="settings-gear {{ 'active' if request.endpoint=='settings' }}" aria-label="Settings" title="Settings">⚙</a>
 </header>
 
