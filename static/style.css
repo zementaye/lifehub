@@ -19,6 +19,9 @@
   --danger: #F2653C;        /* red-orange — reminders / over-limit */
   --violet: #B98CE8;        /* vault / passwords / notes */
 
+  --gap-sub: 20px;      /* fixed gap between sibling cards within the same section */
+  --gap-section: 32px;  /* larger gap between distinct sections (e.g. before/after a grid) */
+
   --radius: 6px;
   --font-display: 'Oswald', 'Space Grotesk', system-ui, sans-serif;
   --font-body: 'Inter', system-ui, sans-serif;
@@ -423,11 +426,21 @@ a:hover { text-decoration: underline; }
   font-size: 0.9rem;
 }
 
+/* Consistent vertical rhythm: standalone cards get a fixed gap to their
+   next sibling; grids (which usually start a new section) get a bigger
+   gap above and below. Adjacent margins collapse to the larger value,
+   so a card followed by a grid automatically gets the bigger gap. */
+.content > .card { margin-bottom: var(--gap-sub); }
+.content > .grid {
+  margin-top: var(--gap-section);
+  margin-bottom: var(--gap-section);
+}
+.content > .grid:first-child { margin-top: 0; }
+
 .grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 20px 16px;
-  margin-bottom: 16px;
 }
 @media (min-width: 700px) {
   .grid { grid-template-columns: repeat(2, 1fr); }
