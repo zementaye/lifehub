@@ -16,6 +16,7 @@ import db
 import nutrition_api
 import nutrition_calc
 import scheduler
+import storage
 import telegram_notify
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -661,7 +662,21 @@ def vault_upload():
         return redirect(url_for("vault"))
 
     filename = f"{uuid.uuid4().hex}.{ext}"
-    file.save(config.UPLOAD_DIR / filename)
+
+    if config.USE_B2:
+        try:
+            storage.upload_fileobj(file, filename, content_type=file.mimetype)
+        except Exception:
+            logger.exception("B2 upload failed for %s", filename)
+            flash("Upload failed — couldn't reach file storage. Please try again.")
+            return redirect(url_for("vault"))
+    else:
+        logger.warning(
+            "B2 not configured — saving %s to local disk, which Render wipes on "
+            "every restart/redeploy. Set B2_KEY_ID/B2_APPLICATION_KEY/B2_ENDPOINT_URL "
+            "to persist vault files.", filename,
+        )
+        file.save(config.UPLOAD_DIR / filename)
 
     with db.get_conn() as conn:
         conn.execute(
@@ -713,6 +728,8 @@ def vault_file(filename):
         ).fetchone()
     if not owned:
         return "Not found.", 404
+    if config.USE_B2:
+        return redirect(storage.presigned_url(filename))
     return send_from_directory(config.UPLOAD_DIR, filename)
 
 
@@ -728,6 +745,8 @@ def vault_download(doc_id):
     ext = doc["filename"].rsplit(".", 1)[-1] if "." in doc["filename"] else ""
     safe_label = "".join(c for c in doc["label"] if c.isalnum() or c in " -_").strip() or "document"
     download_name = f"{safe_label}.{ext}" if ext else safe_label
+    if config.USE_B2:
+        return redirect(storage.presigned_url(doc["filename"], download_name=download_name))
     return send_from_directory(config.UPLOAD_DIR, doc["filename"], as_attachment=True, download_name=download_name)
 
 
@@ -739,9 +758,15 @@ def vault_delete(doc_id):
             "SELECT * FROM documents WHERE id = ? AND user_id = ?", (doc_id, g.user_id)
         ).fetchone()
         if doc:
-            path = config.UPLOAD_DIR / doc["filename"]
-            if path.exists():
-                path.unlink()
+            if config.USE_B2:
+                try:
+                    storage.delete_file(doc["filename"])
+                except Exception:
+                    logger.exception("B2 delete failed for %s", doc["filename"])
+            else:
+                path = config.UPLOAD_DIR / doc["filename"]
+                if path.exists():
+                    path.unlink()
             conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
     return redirect(url_for("vault"))
 
