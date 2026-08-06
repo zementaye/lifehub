@@ -156,33 +156,40 @@ a:hover { text-decoration: underline; }
   0%, 100% { box-shadow: 0 0 0 rgba(240,178,61,0); }
   50% { box-shadow: 0 0 8px rgba(240,178,61,0.6); }
 }
-.topnav { display: none; gap: 22px; align-items: center; flex: 1; }
+.topnav { display: none; gap: 6px; align-items: center; flex: 1; }
 .topnav a {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   color: var(--muted);
   font-weight: 600;
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  padding-bottom: 6px;
-  transition: color 0.2s ease, transform 0.2s ease;
+  padding: 5px 12px;
+  border-radius: 999px;
+  isolation: isolate;
+  transition: color 0.25s ease, transform 0.25s ease;
 }
-.topnav a::after {
+.topnav a::before {
   content: "";
   position: absolute;
-  left: 0; right: 0; bottom: 0;
-  height: 2px;
-  background: var(--primary);
-  border-radius: 2px;
-  box-shadow: 0 0 10px var(--primary), 0 0 2px var(--primary);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  inset: 0;
+  border-radius: 999px;
+  z-index: -1;
+  background: color-mix(in srgb, var(--tab-color) 14%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tab-color) 30%, transparent), 0 0 0 rgba(0,0,0,0);
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
-.topnav a:hover { color: var(--ink); text-decoration: none; transform: translateY(-1px); text-shadow: 0 0 12px color-mix(in srgb, var(--ink) 40%, transparent); }
-.topnav a:hover::after, .topnav a.active::after { transform: scaleX(1); }
-.topnav a.active { color: var(--ink); }
+.topnav a:hover { color: var(--ink); text-decoration: none; transform: translateY(-1px); }
+.topnav a:hover::before, .topnav a.active::before {
+  opacity: 1;
+  transform: scale(1);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tab-color) 45%, transparent), 0 0 18px color-mix(in srgb, var(--tab-color) 40%, transparent);
+}
+.topnav a.active { color: var(--ink); transform: translateY(-1px); }
 
 /* Grouped dropdown items in the top nav (Vault, Tasks) */
 .nav-group { position: relative; }
@@ -190,8 +197,7 @@ a:hover { text-decoration: underline; }
   background: transparent;
   border: none;
   border-radius: 999px;
-  padding: 5px 12px 5px 12px;
-  margin: 0 -12px;
+  padding: 5px 12px;
   cursor: pointer;
   color: var(--muted);
   font-family: var(--font-body);
