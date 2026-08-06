@@ -9,16 +9,21 @@
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version }}">
 <script>
-  // Set the theme before first paint so there's no flash of the wrong mode.
+  // Set the theme + color palette before first paint so there's no flash
+  // of the wrong mode/colors.
   (function () {
     var saved = localStorage.getItem('lifehub-theme');
     var theme = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
     document.documentElement.dataset.themePending = theme;
+    document.documentElement.dataset.palettePending = localStorage.getItem('lifehub-palette') || 'amber';
   })();
 </script>
 </head>
-<body class="page-{{ request.endpoint }}" data-theme="dark">
-<script>document.body.dataset.theme = document.documentElement.dataset.themePending || 'dark';</script>
+<body class="page-{{ request.endpoint }}" data-theme="dark" data-palette="amber">
+<script>
+  document.body.dataset.theme = document.documentElement.dataset.themePending || 'dark';
+  document.body.dataset.palette = document.documentElement.dataset.palettePending || 'amber';
+</script>
 <header class="topbar">
   <button type="button" class="hamburger-btn" id="sidebarToggle" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
     <span></span><span></span><span></span>
