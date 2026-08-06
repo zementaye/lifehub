@@ -30,6 +30,21 @@ app.secret_key = config.SECRET_KEY
 # style.css/app.js for up to 12 hours (Flask's default static cache time).
 app.jinja_env.globals["asset_version"] = str(int(time.time()))
 
+
+def _hour12(hour):
+    """Format an integer hour (0-23) as a friendly 12-hour clock label, e.g. 15 -> '3 PM'."""
+    if hour is None:
+        return None
+    hour = int(hour) % 24
+    period = "AM" if hour < 12 else "PM"
+    display_hour = hour % 12
+    if display_hour == 0:
+        display_hour = 12
+    return f"{display_hour} {period}"
+
+
+app.jinja_env.filters["hour12"] = _hour12
+
 db.init_db()
 
 
