@@ -10,6 +10,25 @@
     <span class="mode-rocker" id="modeRocker"></span>
     <span class="mode-label" id="modeLabel">DARK</span>
   </div>
+
+  <p class="muted" style="margin-top:18px;">Pick a color theme. Also saved on this device.</p>
+  <div class="palette-picker" id="palettePicker">
+    {% for pid, pname, colors in [
+      ('amber', 'Amber', ['#F0B23D', '#4CC9E8', '#8FD14F', '#B98CE8']),
+      ('ocean', 'Ocean', ['#3D8FF0', '#4CE0C7', '#59C2E8', '#7C9CF0']),
+      ('sunset', 'Sunset', ['#F0703D', '#F0B23D', '#E85C8A', '#E8748C']),
+      ('forest', 'Forest', ['#8FD14F', '#4CC98F', '#B0D14F', '#79B84C']),
+      ('grape', 'Grape', ['#B98CE8', '#D14FC2', '#8FD14F', '#9D6FE8']),
+      ('mono', 'Mono', ['#C7CCD3', '#8FD9E8', '#A8D18F', '#B0B6C0']),
+    ] %}
+      <button type="button" class="palette-swatch" data-palette="{{ pid }}" aria-label="{{ pname }} theme">
+        <span class="palette-dots">
+          {% for c in colors %}<span style="background:{{ c }};"></span>{% endfor %}
+        </span>
+        <span class="palette-name">{{ pname }}</span>
+      </button>
+    {% endfor %}
+  </div>
 </div>
 
 <div class="card wide">
