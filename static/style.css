@@ -116,7 +116,7 @@ a:hover { text-decoration: underline; }
 .topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 14px;
   padding: 14px 24px;
   background: var(--surface);
