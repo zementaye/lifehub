@@ -1,3 +1,35 @@
+// Light/dark mode toggle. Theme is applied pre-paint by an inline script in
+// base.html (to avoid a flash); this just wires up the switch and persists
+// the choice for next time.
+(function () {
+  const body = document.body;
+  const switchEl = document.getElementById('modeSwitch');
+  const rocker = document.getElementById('modeRocker');
+  const label = document.getElementById('modeLabel');
+  if (!switchEl) return;
+
+  function reflect() {
+    const light = body.dataset.theme === 'light';
+    rocker.classList.toggle('on', light);
+    label.textContent = light ? 'LIGHT' : 'DARK';
+  }
+
+  function setTheme(theme) {
+    body.dataset.theme = theme;
+    localStorage.setItem('lifehub-theme', theme);
+    reflect();
+  }
+
+  reflect();
+  switchEl.addEventListener('click', () => {
+    setTheme(body.dataset.theme === 'light' ? 'dark' : 'light');
+  });
+  switchEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchEl.click(); }
+  });
+  switchEl.tabIndex = 0;
+})();
+
 // Debounced food search against /nutrition/search, only runs on the nutrition page.
 (function () {
   const input = document.getElementById('food-search');
