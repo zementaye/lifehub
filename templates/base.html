@@ -19,6 +19,9 @@
 <body class="page-{{ request.endpoint }}" data-theme="dark">
 <script>document.body.dataset.theme = document.documentElement.dataset.themePending || 'dark';</script>
 <header class="topbar">
+  <button type="button" class="hamburger-btn" id="sidebarToggle" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
   <a href="{{ url_for('dashboard') }}" class="brand"><span class="brand-mark"></span>LIFEHUB</a>
   <nav class="topnav">
     <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}">Dashboard</a>
@@ -62,9 +65,6 @@
     <span class="mode-label" id="modeLabel">DARK</span>
     <span class="mode-rocker" id="modeRocker"></span>
   </div>
-  <button type="button" class="hamburger-btn" id="sidebarToggle" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
-    <span></span><span></span><span></span>
-  </button>
 </header>
 
 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
