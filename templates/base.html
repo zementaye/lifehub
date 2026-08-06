@@ -62,8 +62,40 @@
     <span class="mode-label" id="modeLabel">DARK</span>
     <span class="mode-rocker" id="modeRocker"></span>
   </div>
-  <a href="{{ url_for('settings') }}" class="settings-gear {{ 'active' if request.endpoint=='settings' }}" aria-label="Settings" title="Settings">⚙</a>
+  <button type="button" class="hamburger-btn" id="sidebarToggle" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
 </header>
+
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar" aria-hidden="true">
+  <div class="sidebar-header">
+    <a href="{{ url_for('dashboard') }}" class="brand"><span class="brand-mark"></span>LIFEHUB</a>
+    <button type="button" class="sidebar-close" id="sidebarClose" aria-label="Close menu">✕</button>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}">🏠 Dashboard</a>
+
+    <div class="sidebar-group-label">Health</div>
+    <a href="{{ url_for('health') }}" class="{{ 'active' if request.endpoint=='health' }}">💪 Health</a>
+    <a href="{{ url_for('nutrition') }}" class="{{ 'active' if request.endpoint=='nutrition' }}">🍽️ Nutrition</a>
+
+    <div class="sidebar-group-label">Vault</div>
+    <a href="{{ url_for('vault') }}" class="{{ 'active' if request.endpoint=='vault' }}">🪪 ID Vault</a>
+    <a href="{{ url_for('passwords') }}" class="{{ 'active' if request.endpoint=='passwords' }}">🔑 Passwords</a>
+    <a href="{{ url_for('notes') }}" class="{{ 'active' if request.endpoint=='notes' }}">📝 Notes</a>
+
+    <div class="sidebar-group-label">Money</div>
+    <a href="{{ url_for('budget') }}" class="{{ 'active' if request.endpoint=='budget' }}">💰 Budget</a>
+
+    <div class="sidebar-group-label">Tasks</div>
+    <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}">✅ Habits &amp; To-dos</a>
+    <a href="{{ url_for('reminders') }}" class="{{ 'active' if request.endpoint=='reminders' }}">🔔 Reminders</a>
+
+    <div class="sidebar-group-label">&nbsp;</div>
+    <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">⚙ Settings</a>
+  </nav>
+</aside>
 
 <main class="content">
   {% with messages = get_flashed_messages() %}
@@ -76,41 +108,6 @@
 
   {% block content %}{% endblock %}
 </main>
-
-<nav class="bottomnav">
-  <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}"><span>🏠</span>Home</a>
-  <button type="button" class="bottomnav-toggle {{ 'active' if request.endpoint in ['health','nutrition'] }}" data-sheet="health-sheet">
-    <span>💪</span>Health
-  </button>
-  <button type="button" class="bottomnav-toggle {{ 'active' if request.endpoint in ['vault','passwords','notes'] }}" data-sheet="vault-sheet">
-    <span>🪪</span>Vault
-  </button>
-  <a href="{{ url_for('budget') }}" class="{{ 'active' if request.endpoint=='budget' }}"><span>💰</span>Budget</a>
-  <button type="button" class="bottomnav-toggle {{ 'active' if request.endpoint in ['habits','reminders'] }}" data-sheet="tasks-sheet">
-    <span>✅</span>Tasks
-  </button>
-</nav>
-
-<div class="nav-sheet-backdrop" data-sheet-backdrop></div>
-
-<div class="nav-sheet" id="health-sheet">
-  <div class="nav-sheet-handle"></div>
-  <a href="{{ url_for('health') }}" class="{{ 'active' if request.endpoint=='health' }}">💪 Health</a>
-  <a href="{{ url_for('nutrition') }}" class="{{ 'active' if request.endpoint=='nutrition' }}">🍽️ Nutrition</a>
-</div>
-
-<div class="nav-sheet" id="vault-sheet">
-  <div class="nav-sheet-handle"></div>
-  <a href="{{ url_for('vault') }}" class="{{ 'active' if request.endpoint=='vault' }}">🪪 ID Vault</a>
-  <a href="{{ url_for('passwords') }}" class="{{ 'active' if request.endpoint=='passwords' }}">🔑 Passwords</a>
-  <a href="{{ url_for('notes') }}" class="{{ 'active' if request.endpoint=='notes' }}">📝 Notes</a>
-</div>
-
-<div class="nav-sheet" id="tasks-sheet">
-  <div class="nav-sheet-handle"></div>
-  <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}">✅ Habits &amp; To-dos</a>
-  <a href="{{ url_for('reminders') }}" class="{{ 'active' if request.endpoint=='reminders' }}">🔔 Reminders</a>
-</div>
 
 <script src="{{ url_for('static', filename='app.js') }}?v={{ asset_version }}"></script>
 {% block scripts %}{% endblock %}
