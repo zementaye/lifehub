@@ -71,3 +71,8 @@ R2_ACCESS_KEY_ID = _clean_env("B2_KEY_ID")
 R2_SECRET_ACCESS_KEY = _clean_env("B2_APPLICATION_KEY")
 R2_BUCKET_NAME = _clean_env("B2_BUCKET_NAME", "lifehub-vault")
 R2_ENDPOINT_URL = _clean_env("B2_ENDPOINT_URL")
+
+# True once all three required B2 values are present — vault routes use this
+# to decide whether to read/write B2 (persistent) or local disk (ephemeral
+# on Render free tier; wiped on every restart/redeploy).
+USE_B2 = bool(R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY and R2_ENDPOINT_URL)
