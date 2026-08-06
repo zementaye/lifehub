@@ -146,15 +146,13 @@ a:hover { text-decoration: underline; }
 }
 .brand:hover { text-decoration: none; }
 .brand-mark {
-  width: 8px; height: 22px;
-  background: var(--primary);
-  border-radius: 1px;
-  display: inline-block;
+  flex-shrink: 0;
+  display: block;
   animation: brand-breathe 3s ease-in-out infinite;
 }
 @keyframes brand-breathe {
-  0%, 100% { box-shadow: 0 0 0 rgba(240,178,61,0); }
-  50% { box-shadow: 0 0 8px rgba(240,178,61,0.6); }
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(240,178,61,0)); }
+  50% { filter: drop-shadow(0 0 5px rgba(240,178,61,0.55)); }
 }
 .topnav { display: none; gap: 6px; align-items: center; flex: 1; }
 .topnav a {
