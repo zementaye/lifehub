@@ -22,8 +22,16 @@
   <a href="{{ url_for('dashboard') }}" class="brand"><span class="brand-mark"></span>LIFEHUB</a>
   <nav class="topnav">
     <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}">Dashboard</a>
-    <a href="{{ url_for('health') }}" class="{{ 'active' if request.endpoint=='health' }}">Health</a>
-    <a href="{{ url_for('nutrition') }}" class="{{ 'active' if request.endpoint=='nutrition' }}">Nutrition</a>
+
+    <div class="nav-group">
+      <button type="button" class="nav-group-toggle {{ 'active' if request.endpoint in ['health','nutrition'] }}">
+        Health <span class="caret">▾</span>
+      </button>
+      <div class="nav-group-menu">
+        <a href="{{ url_for('health') }}" class="{{ 'active' if request.endpoint=='health' }}">Health</a>
+        <a href="{{ url_for('nutrition') }}" class="{{ 'active' if request.endpoint=='nutrition' }}">Nutrition</a>
+      </div>
+    </div>
 
     <div class="nav-group">
       <button type="button" class="nav-group-toggle {{ 'active' if request.endpoint in ['vault','passwords','notes'] }}">
@@ -71,8 +79,9 @@
 
 <nav class="bottomnav">
   <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}"><span>🏠</span>Home</a>
-  <a href="{{ url_for('health') }}" class="{{ 'active' if request.endpoint=='health' }}"><span>💪</span>Health</a>
-  <a href="{{ url_for('nutrition') }}" class="{{ 'active' if request.endpoint=='nutrition' }}"><span>🍽️</span>Food</a>
+  <button type="button" class="bottomnav-toggle {{ 'active' if request.endpoint in ['health','nutrition'] }}" data-sheet="health-sheet">
+    <span>💪</span>Health
+  </button>
   <button type="button" class="bottomnav-toggle {{ 'active' if request.endpoint in ['vault','passwords','notes'] }}" data-sheet="vault-sheet">
     <span>🪪</span>Vault
   </button>
@@ -83,6 +92,12 @@
 </nav>
 
 <div class="nav-sheet-backdrop" data-sheet-backdrop></div>
+
+<div class="nav-sheet" id="health-sheet">
+  <div class="nav-sheet-handle"></div>
+  <a href="{{ url_for('health') }}" class="{{ 'active' if request.endpoint=='health' }}">💪 Health</a>
+  <a href="{{ url_for('nutrition') }}" class="{{ 'active' if request.endpoint=='nutrition' }}">🍽️ Nutrition</a>
+</div>
 
 <div class="nav-sheet" id="vault-sheet">
   <div class="nav-sheet-handle"></div>
