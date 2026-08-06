@@ -296,3 +296,55 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
   });
 })();
+
+// Global "saving…" state for every ordinary form submit (Save/Add/Renew/
+// Delete/etc. across the whole app). These are all full-page POSTs, so
+// without this nothing on screen shows a request is in flight until the
+// reload lands — inviting duplicate clicks/submits on a slow connection.
+// Opts out automatically for the habit/to-do checkbox forms above, which
+// already have their own instant-feedback handling.
+(function () {
+  const overlay = document.createElement('div');
+  overlay.className = 'page-loading-overlay';
+  overlay.setAttribute('aria-hidden', 'true');
+  overlay.innerHTML = '<div class="page-loading-spinner"></div>';
+
+  function mountOverlay() {
+    if (!overlay.isConnected) document.body.appendChild(overlay);
+  }
+  if (document.body) {
+    mountOverlay();
+  } else {
+    document.addEventListener('DOMContentLoaded', mountOverlay);
+  }
+
+  document.addEventListener('submit', (e) => {
+    const form = e.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if (form.classList.contains('checkbox-form')) return; // handled elsewhere, optimistic UI
+    if (form.dataset.noLoading !== undefined) return; // explicit opt-out
+    if (e.defaultPrevented) return; // some other handler already took over
+
+    const clicked = e.submitter; // the actual button that triggered this submit, if any
+    if (clicked && clicked.tagName === 'BUTTON') {
+      clicked.classList.add('btn-loading');
+    }
+    // Disable every submit button on the page (not just this form's) so a
+    // second action can't fire while this one is still in flight.
+    document.querySelectorAll('form button').forEach((b) => {
+      if (b.type !== 'button') b.disabled = true;
+    });
+    mountOverlay();
+    overlay.classList.add('visible');
+  });
+
+  // If the page is served from bfcache (back/forward) with the overlay
+  // still showing from a previous submit, clear it so the UI isn't stuck.
+  window.addEventListener('pageshow', () => {
+    overlay.classList.remove('visible');
+    document.querySelectorAll('form button:disabled').forEach((b) => {
+      b.disabled = false;
+      b.classList.remove('btn-loading');
+    });
+  });
+})();
