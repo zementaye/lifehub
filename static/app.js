@@ -109,3 +109,58 @@
     animateFills();
   });
 })();
+
+// Grouped nav: desktop dropdowns (Vault/Tasks in .topnav) and mobile
+// slide-up sheets (Vault/Tasks in .bottomnav). Runs on every page.
+(function () {
+  document.addEventListener('DOMContentLoaded', () => {
+    // --- Desktop dropdown groups ---
+    const groups = document.querySelectorAll('.nav-group');
+    function closeAllGroups(except) {
+      groups.forEach((g) => { if (g !== except) g.classList.remove('open'); });
+    }
+    groups.forEach((group) => {
+      const toggle = group.querySelector('.nav-group-toggle');
+      if (!toggle) return;
+      toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const willOpen = !group.classList.contains('open');
+        closeAllGroups(group);
+        group.classList.toggle('open', willOpen);
+      });
+    });
+    document.addEventListener('click', () => closeAllGroups(null));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllGroups(null); });
+
+    // --- Mobile slide-up sheets ---
+    const backdrop = document.querySelector('[data-sheet-backdrop]');
+    const sheetToggles = document.querySelectorAll('.bottomnav-toggle[data-sheet]');
+    const sheets = document.querySelectorAll('.nav-sheet');
+
+    function closeAllSheets() {
+      sheets.forEach((s) => s.classList.remove('open'));
+      if (backdrop) backdrop.classList.remove('open');
+    }
+    function openSheet(id) {
+      closeAllSheets();
+      const sheet = document.getElementById(id);
+      if (!sheet) return;
+      sheet.classList.add('open');
+      if (backdrop) backdrop.classList.add('open');
+    }
+    sheetToggles.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.sheet;
+        const sheet = document.getElementById(id);
+        if (sheet && sheet.classList.contains('open')) {
+          closeAllSheets();
+        } else {
+          openSheet(id);
+        }
+      });
+    });
+    if (backdrop) backdrop.addEventListener('click', closeAllSheets);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllSheets(); });
+  });
+})();
