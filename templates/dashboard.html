@@ -9,7 +9,7 @@
     {% if bmi %}
       <div class="stat-row">
         <div class="stat"><span class="stat-value">{{ latest_weight.weight_kg }}<small>kg</small></span><span class="stat-label">Latest weight</span></div>
-        <div class="stat"><span class="stat-value">{{ bmi }}</span><span class="stat-label">BMI · {{ bmi_category }}</span></div>
+        <div class="stat"><span class="stat-value">{{ bmi }}</span><span class="stat-label">BMI · <span class="bmi-tag bmi-{{ bmi_category_slug }}">{{ bmi_category }}</span></span></div>
       </div>
     {% else %}
       <p class="muted">Add your height and a weight entry on the Health page to see your BMI.</p>
