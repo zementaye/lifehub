@@ -19,7 +19,7 @@
     <div class="card note-card">
       <div class="pw-header">
         <h4>{{ n.title }}</h4>
-        <form method="post" action="{{ url_for('delete_note', note_id=n.id) }}" onsubmit="return confirm('Delete {{ n.title }}?');">
+        <form method="post" action="{{ url_for('delete_note', note_id=n.id) }}" data-confirm="Delete {{ n.title }}?">
           <button class="btn-icon" title="Delete">🗑️</button>
         </form>
       </div>
