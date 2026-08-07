@@ -95,7 +95,7 @@ def handle_upload_too_large(e):
 # Public routes: no session required. Everything else demands a logged-in
 # user, since the app is now open for anyone to sign up and use — there's
 # no longer a shared APP_ACCESS_TOKEN gate in front of it.
-_PUBLIC_ENDPOINTS = {"login", "register", "forgot_password", "reset_password", "verify_email", "static"}
+_PUBLIC_ENDPOINTS = {"home", "login", "register", "forgot_password", "reset_password", "verify_email", "static"}
 
 
 @app.before_request
@@ -432,9 +432,20 @@ def get_or_create_profile(conn, user_id):
     return profile
 
 
-# ── Dashboard ────────────────────────────────────────────────────────────
+# ── Public landing page ─────────────────────────────────────────────────
 
 @app.route("/")
+def home():
+    """Public marketing/landing page — what visitors see before signing up.
+    Logged-in users get a 'Go to Dashboard' link instead of Log In/Sign Up
+    (see home.html), but they're not force-redirected off this page, so the
+    URL still works as a normal home page for anyone, logged in or not."""
+    return render_template("home.html")
+
+
+# ── Dashboard ────────────────────────────────────────────────────────────
+
+@app.route("/dashboard")
 @login_required
 def dashboard():
     user_id = g.user_id
