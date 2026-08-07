@@ -4,6 +4,11 @@
 <h1>Digital ID Vault</h1>
 <p class="muted">Photos of your license, national ID, and other documents — for when you forget the physical copy.</p>
 
+<div class="vault-blur-toggle" id="vaultBlurToggle" role="switch" tabindex="0" aria-checked="false" aria-label="Blur document previews">
+  <span class="mode-rocker" id="vaultBlurRocker"></span>
+  <span class="mode-label" id="vaultBlurLabel">Blur previews: OFF</span>
+</div>
+
 <div class="card">
   <h3>Add a Document</h3>
   <form method="post" action="{{ url_for('vault_upload') }}" enctype="multipart/form-data" class="inline-form" id="vault-upload-form">
@@ -47,9 +52,12 @@
       {% if d.filename.rsplit('.',1)[-1].lower() == 'pdf' %}
         <a href="{{ url_for('vault_file', filename=d.filename) }}" target="_blank" class="link">📄 View PDF</a>
       {% else %}
-        <a href="{{ url_for('vault_file', filename=d.filename) }}" target="_blank">
-          <img src="{{ url_for('vault_file', filename=d.filename) }}" class="doc-thumb" alt="{{ d.label }}">
-        </a>
+        <div class="doc-thumb-wrap">
+          <a href="{{ url_for('vault_file', filename=d.filename) }}" target="_blank" class="doc-thumb-link">
+            <img src="{{ url_for('vault_file', filename=d.filename) }}" class="doc-thumb" alt="{{ d.label }}">
+          </a>
+          <button type="button" class="doc-reveal-btn" title="Show/hide preview" aria-label="Show or hide this preview">👁️</button>
+        </div>
       {% endif %}
       <p><a href="{{ url_for('vault_download', doc_id=d.id) }}" class="link">⬇️ Download</a></p>
       {% if d.notes %}<p class="muted">{{ d.notes }}</p>{% endif %}
@@ -242,7 +250,63 @@ dropzone.addEventListener('drop', (e) => {
   }
 });
 
-// Prevent double-submit (the actual bug being fixed here) and show real
+// Blur previews toggle — hides document photos behind a blur by default
+// once turned on (persisted per-device), with a per-card eye button and a
+// tap-to-reveal fallback so a shoulder-surfer can't see IDs at a glance.
+(function () {
+  const STORAGE_KEY = 'vault-blur-previews';
+  const toggle = document.getElementById('vaultBlurToggle');
+  const rocker = document.getElementById('vaultBlurRocker');
+  const label = document.getElementById('vaultBlurLabel');
+  if (!toggle) return;
+
+  function apply(on) {
+    document.body.classList.toggle('vault-blur-on', on);
+    rocker.classList.toggle('on', on);
+    toggle.setAttribute('aria-checked', String(on));
+    label.textContent = `Blur previews: ${on ? 'ON' : 'OFF'}`;
+    if (!on) {
+      // Turning global blur off should also clear any individual reveals
+      // so state doesn't carry over confusingly next time it's switched on.
+      document.querySelectorAll('.doc-thumb-wrap.doc-revealed')
+        .forEach(w => w.classList.remove('doc-revealed'));
+    }
+  }
+
+  let on = localStorage.getItem(STORAGE_KEY) === '1';
+  apply(on);
+
+  toggle.addEventListener('click', () => {
+    on = !on;
+    localStorage.setItem(STORAGE_KEY, on ? '1' : '0');
+    apply(on);
+  });
+  toggle.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle.click(); }
+  });
+
+  document.querySelectorAll('.doc-thumb-wrap').forEach((wrap) => {
+    const revealBtn = wrap.querySelector('.doc-reveal-btn');
+    const link = wrap.querySelector('.doc-thumb-link');
+
+    revealBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      wrap.classList.toggle('doc-revealed');
+    });
+
+    // While blurred and not yet revealed, the first click/tap on the photo
+    // itself reveals it instead of immediately opening the full-size image
+    // in a new tab — so a stray tap can't flash an ID document on screen.
+    link.addEventListener('click', (e) => {
+      if (document.body.classList.contains('vault-blur-on') && !wrap.classList.contains('doc-revealed')) {
+        e.preventDefault();
+        wrap.classList.add('doc-revealed');
+      }
+    });
+  });
+})();
+
 // upload progress instead of the form just sitting there with no feedback.
 // We take over the submit with XHR so we can read upload.progress events,
 // which a plain <form method=post> can never give us.
