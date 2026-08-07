@@ -297,6 +297,59 @@
   });
 })();
 
+// Shared delete/destructive-action confirmation modal (see the markup in
+// base.html). Any form with data-confirm="..." uses this instead of the
+// native browser confirm() popup, so every page's confirmation looks and
+// behaves the same. Runs in the capture phase so it intercepts the first
+// (unconfirmed) submit attempt before the "saving…" handler below ever
+// sees it; the real, confirmed submit is a second dispatch that's let
+// through and handled normally (loading overlay, button spinner, etc).
+(function () {
+  const overlay = document.getElementById('confirm-modal-overlay');
+  if (!overlay) return;
+  const titleEl = document.getElementById('confirm-modal-title');
+  const okBtn = document.getElementById('confirm-modal-ok');
+  const cancelBtn = document.getElementById('confirm-modal-cancel');
+  let pendingForm = null;
+
+  function open(form) {
+    pendingForm = form;
+    titleEl.textContent = form.dataset.confirm;
+    overlay.style.display = 'flex';
+  }
+  function close() {
+    pendingForm = null;
+    overlay.style.display = 'none';
+  }
+
+  document.addEventListener('submit', (e) => {
+    const form = e.target;
+    if (!(form instanceof HTMLFormElement) || !form.dataset.confirm) return;
+    if (form.dataset.confirmed === '1') {
+      delete form.dataset.confirmed; // this is the real, already-confirmed submit — let it through
+      return;
+    }
+    e.preventDefault();
+    open(form);
+  }, true);
+
+  cancelBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.style.display !== 'none') close();
+  });
+  okBtn.addEventListener('click', () => {
+    const form = pendingForm;
+    if (!form) return;
+    close();
+    form.dataset.confirmed = '1';
+    form.requestSubmit ? form.requestSubmit() : form.submit();
+  });
+
+  // Safety net if the page is restored from bfcache mid-confirm.
+  window.addEventListener('pageshow', close);
+})();
+
 // Global "saving…" state for every ordinary form submit (Save/Add/Renew/
 // Delete/etc. across the whole app). These are all full-page POSTs, so
 // without this nothing on screen shows a request is in flight until the
