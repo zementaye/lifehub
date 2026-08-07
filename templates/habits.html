@@ -45,7 +45,7 @@
               <button type="submit" class="checkbox-btn {{ 'checked' if t.done }}" aria-label="{{ 'Mark not done' if t.done else 'Mark done' }}"></button>
             </form>
             <span>{{ t.title }}</span>
-            <form method="post" action="{{ url_for('delete_todo', todo_id=t.id) }}" class="delete-form">
+            <form method="post" action="{{ url_for('delete_todo', todo_id=t.id) }}" class="delete-form" data-confirm="Delete {{ t.title }}?">
               <button class="btn-icon" title="Remove to-do">🗑️</button>
             </form>
           </li>
@@ -84,7 +84,7 @@
                 <input type="hidden" name="reminder_hour" value="{{ hs.habit.reminder_hour if hs.habit.reminder_hour is not none else '' }}">
                 <button type="submit" class="btn-icon" title="Save reminder time">💾</button>
               </form>
-              <form method="post" action="{{ url_for('delete_habit', habit_id=hs.habit.id) }}" class="delete-form">
+              <form method="post" action="{{ url_for('delete_habit', habit_id=hs.habit.id) }}" class="delete-form" data-confirm="Delete {{ hs.habit.title }}? Its streak history will be lost.">
                 <button class="btn-icon" title="Remove habit">🗑️</button>
               </form>
             </li>
