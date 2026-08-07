@@ -39,5 +39,13 @@
     </p>
   </div>
 </div>
+<script>
+  document.querySelector('.auth-form').addEventListener('submit', function (e) {
+    if (!e.target.checkValidity()) return; // let native validation block it first
+    var btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.textContent = 'Signing up…';
+  });
+</script>
 </body>
 </html>
