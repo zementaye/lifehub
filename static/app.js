@@ -1,3 +1,43 @@
+// CSRF protection (Flask-WTF CSRFProtect, added server-side in app.py).
+// Rather than hand-editing every one of this app's ~50 <form method=post>
+// templates, we read the token base.html renders into a <meta> tag once
+// and inject it into every POST form as a hidden field here — new forms
+// added later get it for free. The two spots elsewhere in this file that
+// POST via fetch()/sendBeacon() (bypassing <form> entirely) send it
+// explicitly instead, via window.LIFEHUB_CSRF_TOKEN.
+window.LIFEHUB_CSRF_TOKEN = (function () {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  return meta ? meta.content : '';
+})();
+
+(function () {
+  function injectToken(form) {
+    if (form.querySelector('input[name="csrf_token"]')) return;
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'csrf_token';
+    input.value = window.LIFEHUB_CSRF_TOKEN;
+    form.appendChild(input);
+  }
+
+  function isPost(form) {
+    return (form.getAttribute('method') || '').toLowerCase() === 'post';
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('form').forEach((form) => {
+      if (isPost(form)) injectToken(form);
+    });
+  });
+
+  // Belt-and-suspenders for any form injected into the DOM dynamically
+  // after page load (none today, but cheap insurance against a silent
+  // CSRF failure if one gets added later).
+  document.addEventListener('submit', (e) => {
+    if (isPost(e.target)) injectToken(e.target);
+  }, true);
+})();
+
 // Light/dark mode toggle. Theme is applied pre-paint by an inline script in
 // base.html (to avoid a flash); this just wires up the switch and persists
 // the choice for next time.
@@ -86,10 +126,21 @@
     if (!entry) return;
     clearTimeout(entry.timer);
     pending.delete(itemId);
+    // CSRFProtect checks the token in the request body (form-encoded) or
+    // the X-CSRFToken header. sendBeacon can't set custom headers, so it
+    // gets the token in an urlencoded body instead; fetch uses the header.
     if (useBeacon && navigator.sendBeacon) {
-      navigator.sendBeacon(entry.url, new Blob([], { type: 'text/plain' }));
+      const body = new Blob(
+        ['csrf_token=' + encodeURIComponent(window.LIFEHUB_CSRF_TOKEN || '')],
+        { type: 'application/x-www-form-urlencoded' }
+      );
+      navigator.sendBeacon(entry.url, body);
     } else {
-      fetch(entry.url, { method: 'POST', keepalive: true }).catch(() => {
+      fetch(entry.url, {
+        method: 'POST',
+        keepalive: true,
+        headers: { 'X-CSRFToken': window.LIFEHUB_CSRF_TOKEN || '' },
+      }).catch(() => {
         // Best-effort — if this fails the state just reverts on next reload,
         // no dangling UI to clean up since we already updated optimistically.
       });
