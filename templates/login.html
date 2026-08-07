@@ -28,6 +28,7 @@
       {% endif %}
     {% endwith %}
     <form method="post" class="inline-form auth-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>Email <input type="email" name="email" required autofocus></label>
       <label>Password <input type="password" name="password" required></label>
       <button type="submit">Log In</button>
