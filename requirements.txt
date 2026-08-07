@@ -5,3 +5,5 @@ python-dotenv==1.0.0
 gunicorn==22.0.0
 cryptography==43.0.3
 boto3>=1.36.1
+flask-wtf==1.2.1
+flask-limiter==3.8.0
