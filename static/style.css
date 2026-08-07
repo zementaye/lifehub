@@ -815,6 +815,45 @@ button.btn-icon.btn-loading::after {
   border-radius: 50%;
   animation: btn-spin 0.7s linear infinite;
 }
+
+/* Shared confirm modal (delete/destructive actions) — see base.html + app.js */
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  backdrop-filter: blur(1px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.confirm-modal-box {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 22px 24px;
+  max-width: 320px;
+  width: 100%;
+  color: var(--ink);
+  font-size: 0.95rem;
+  box-shadow: 0 12px 32px -8px rgba(0,0,0,0.5);
+}
+#confirm-modal-title { margin: 0; font-weight: 600; }
+.confirm-modal-sub { margin: 6px 0 0; font-size: 0.8rem; }
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+.confirm-modal-danger {
+  background: var(--danger);
+  color: #fff;
+}
+.confirm-modal-danger:hover {
+  box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--danger) 55%, transparent), 0 0 14px color-mix(in srgb, var(--danger) 35%, transparent);
+}
 button.secondary {
   background: transparent;
   color: var(--accent);
