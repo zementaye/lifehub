@@ -35,6 +35,16 @@ CREATE TABLE IF NOT EXISTS password_resets (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS email_verifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    expires_at REAL NOT NULL,
+    used_at REAL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
@@ -256,6 +266,7 @@ _MIGRATIONS = [
     ("savings_goals", "user_id", "INTEGER"),
     ("passwords", "user_id", "INTEGER"),
     ("notes", "user_id", "INTEGER"),
+    ("users", "email_verified_at", "REAL"),
 ]
 
 # Tables that carry a user_id column and get scanned for orphaned
@@ -469,11 +480,24 @@ def init_db() -> None:
             if existing and "user_id" not in existing:
                 _rebuild_legacy_table(conn, table)
 
+        # Snapshot BEFORE the migration loop below adds the column, so we
+        # can tell whether this is a fresh install (users table doesn't
+        # exist yet — nothing to backfill) vs. an existing database that
+        # predates email verification.
+        users_cols_before = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+
         conn.executescript(SCHEMA)
         for table, column, coltype in _MIGRATIONS:
             existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
             if column not in existing:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}")
+
+        if users_cols_before and "email_verified_at" not in users_cols_before:
+            # Email verification is a new feature — grandfather in every
+            # account that already existed before it shipped, rather than
+            # retroactively locking already-active users out. Only accounts
+            # created from this point forward go through real verification.
+            conn.execute("UPDATE users SET email_verified_at = created_at WHERE email_verified_at IS NULL")
 
 
 def now() -> float:
@@ -548,6 +572,40 @@ def get_password_reset(token: str):
 def use_password_reset(token: str) -> None:
     with get_conn() as conn:
         conn.execute("UPDATE password_resets SET used_at = ? WHERE token = ?", (now(), token))
+
+
+def is_email_verified(user_row) -> bool:
+    return user_row["email_verified_at"] is not None
+
+
+def mark_email_verified(user_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET email_verified_at = ? WHERE id = ? AND email_verified_at IS NULL",
+            (now(), user_id),
+        )
+
+
+def create_email_verification(user_id: int, ttl_seconds: int = 60 * 60 * 48) -> str:
+    token = secrets.token_urlsafe(32)
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO email_verifications (user_id, token, expires_at, created_at) VALUES (?,?,?,?)",
+            (user_id, token, now() + ttl_seconds, now()),
+        )
+    return token
+
+
+def get_email_verification(token: str):
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM email_verifications WHERE token = ?", (token,)
+        ).fetchone()
+
+
+def use_email_verification(token: str) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE email_verifications SET used_at = ? WHERE token = ?", (now(), token))
 
 
 # ── Settings (per-user) ──────────────────────────────────────────────────
