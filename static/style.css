@@ -1243,6 +1243,12 @@ body[data-theme="light"] .habit-reminder-form input[type="time"]::-webkit-calend
   margin-bottom: 6px;
 }
 .pw-header h4 { margin: 0; }
+.pw-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 .pw-field {
   display: flex;
   align-items: center;
@@ -1261,6 +1267,45 @@ body[data-theme="light"] .habit-reminder-form input[type="time"]::-webkit-calend
   font-size: 0.85rem;
 }
 .note-body { white-space: pre-wrap; font-size: 0.9rem; margin: 6px 0; }
+
+/* Bulk-select toolbar (Notes, and reusable wherever else it's needed) */
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 16px;
+}
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.bulk-bar .confirm-modal-danger {
+  padding: 9px 16px;
+  font-size: 0.82rem;
+}
+.bulk-bar .confirm-modal-danger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.note-select-check {
+  display: none;
+  align-items: center;
+}
+.note-select-check input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--tab-color);
+  cursor: pointer;
+}
+.grid.selecting .note-select-check { display: inline-flex; }
+.grid.selecting .note-card .note-delete-form { display: none; }
+.grid.selecting .note-card {
+  transition: box-shadow 0.15s ease;
+}
+.grid.selecting .note-card:has(.note-select-box:checked) {
+  box-shadow: 0 0 0 2px var(--tab-color);
+}
 
 /* Link styled like button.secondary, for <a> tags */
 a.btn-secondary {
