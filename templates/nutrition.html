@@ -62,9 +62,9 @@
     <form method="post" action="{{ url_for('use_recommended_nutrition') }}" id="use-recommended-form">
       <input type="hidden" name="calories" value="{{ recommendation.calories }}">
       <input type="hidden" name="protein_g" value="{{ recommendation.protein_g }}">
-      <button type="submit" id="use-recommended-btn"
-              {% if already_applied %}disabled class="secondary"{% endif %}>
-        {{ '✓ This is your current goal' if already_applied else 'Use this as my daily goal' }}
+      <input type="hidden" name="action" value="{{ 'clear' if already_applied else 'apply' }}">
+      <button type="submit" id="use-recommended-btn" class="{{ 'secondary' if already_applied }}">
+        {{ '✓ This is your current goal — click to edit' if already_applied else 'Use this as my daily goal' }}
       </button>
     </form>
   {% else %}
