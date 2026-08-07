@@ -100,6 +100,16 @@
 <div class="card wide">
   <h3>Account</h3>
   <p class="muted">Logged in as <strong>{{ user.email }}</strong></p>
+  {% if user.email_verified_at %}
+    <p class="muted">✅ Email verified</p>
+  {% else %}
+    <p class="muted">
+      ⚠️ Email not verified yet.
+      <form method="post" action="{{ url_for('resend_verification') }}" style="display:inline;">
+        <button type="submit" class="secondary" style="margin-left:6px;">Resend verification email</button>
+      </form>
+    </p>
+  {% endif %}
   <form method="post" action="{{ url_for('logout') }}">
     <button type="submit" class="secondary">Log out</button>
   </form>
