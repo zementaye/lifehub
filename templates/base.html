@@ -14,15 +14,15 @@
   // of the wrong mode/colors.
   (function () {
     var saved = localStorage.getItem('lifehub-theme');
-    var theme = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     document.documentElement.dataset.themePending = theme;
     document.documentElement.dataset.palettePending = localStorage.getItem('lifehub-palette') || 'amber';
   })();
 </script>
 </head>
-<body class="page-{{ request.endpoint }}" data-theme="dark" data-palette="amber">
+<body class="page-{{ request.endpoint }}" data-theme="light" data-palette="amber">
 <script>
-  document.body.dataset.theme = document.documentElement.dataset.themePending || 'dark';
+  document.body.dataset.theme = document.documentElement.dataset.themePending || 'light';
   document.body.dataset.palette = document.documentElement.dataset.palettePending || 'amber';
 </script>
 <div id="hud-stars" aria-hidden="true"></div>
