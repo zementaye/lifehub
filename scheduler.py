@@ -1,4 +1,5 @@
 import calendar
+import errno
 import logging
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -10,6 +11,40 @@ import db
 import telegram_notify
 
 logger = logging.getLogger(__name__)
+
+# Kept alive for the lifetime of the process that wins the lock below — if
+# this is garbage collected the OS releases the flock, so it must stay
+# referenced at module scope, not just inside start_scheduler().
+_lock_file = None
+
+
+def _acquire_singleton_lock() -> bool:
+    """Best-effort cross-process guard so only one worker runs the
+    scheduler. Fine with 1 gunicorn worker (today's setup); if this is ever
+    scaled to `-w 2+`, every worker importing this module would otherwise
+    start its own APScheduler instance and users would get duplicate
+    Telegram nudges/reminders. Uses a non-blocking flock on a file in
+    DATA_DIR, which all workers share on disk — the first process to import
+    this module wins the lock and runs the scheduler; the rest skip it.
+    Windows has no fcntl, so this degrades to "always run" there (fine,
+    since production is Render/Linux with gunicorn).
+    """
+    try:
+        import fcntl
+    except ImportError:
+        return True  # no fcntl (Windows dev machine) — just run it
+
+    global _lock_file
+    lock_path = config.DATA_DIR / "scheduler.lock"
+    try:
+        f = open(lock_path, "w")
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as e:
+        if e.errno in (errno.EACCES, errno.EAGAIN):
+            return False  # another worker already holds it
+        raise
+    _lock_file = f  # keep the fd open/referenced so the lock isn't released
+    return True
 
 
 def get_all_user_ids() -> list[int]:
@@ -423,7 +458,16 @@ def tick() -> None:
             logger.exception("tick_for_user failed for user_id=%s", user_id)
 
 
-def start_scheduler() -> BackgroundScheduler:
+def start_scheduler():
+    if not _acquire_singleton_lock():
+        logger.info(
+            "Scheduler NOT started in this process — another worker already "
+            "holds the singleton lock (%s). This is expected with multiple "
+            "gunicorn workers; only one process should run the scheduler.",
+            config.DATA_DIR / "scheduler.lock",
+        )
+        return None
+
     sched = BackgroundScheduler(timezone=config.TIMEZONE)
     sched.add_job(tick, "interval", minutes=15, id="tick", next_run_time=datetime.now())
     sched.start()
