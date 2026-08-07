@@ -5,6 +5,7 @@ import uuid
 from datetime import date, timedelta
 from functools import wraps
 
+import requests
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
     send_from_directory, make_response, session, g,
@@ -242,12 +243,12 @@ def reset_password(token):
 
 def _start_email_verification(user_id: int, email: str) -> None:
     """Called right after an account is created. Sends a verification email
-    if SMTP is configured; otherwise there's no way for the user to receive
+    if Resend is configured; otherwise there's no way for the user to receive
     a link at all, so — consistent with how this app treats every other
     optional integration (Telegram, B2, Turso) — the requirement quietly
     doesn't apply rather than leaving the account permanently unverifiable.
     """
-    if not config.SMTP_HOST:
+    if not config.RESEND_API_KEY:
         db.mark_email_verified(user_id)
         flash("Welcome to Life Hub!")
         return
@@ -284,9 +285,9 @@ def resend_verification():
         flash("Your email is already verified.")
         return redirect(request.referrer or url_for("settings"))
 
-    if not config.SMTP_HOST:
+    if not config.RESEND_API_KEY:
         # Shouldn't normally be reachable (accounts are auto-verified at
-        # signup when SMTP isn't configured), but covers the case where SMTP
+        # signup when Resend isn't configured), but covers the case where it
         # was removed from the environment after this account registered.
         db.mark_email_verified(g.user_id)
         flash("Email verification isn't configured on this server, so your account has been marked verified.")
@@ -303,58 +304,60 @@ def resend_verification():
     return redirect(request.referrer or url_for("settings"))
 
 
-def _send_reset_email(to_email: str, reset_link: str):
-    if not config.SMTP_HOST:
-        return False, "SMTP not configured"
-
-    import smtplib
-    from email.mime.text import MIMEText
-
-    msg = MIMEText(
-        f"Someone requested a password reset for your Life Hub account.\n\n"
-        f"Reset your password: {reset_link}\n\n"
-        f"If you didn't request this, you can ignore this email."
-    )
-    msg["Subject"] = "Reset your Life Hub password"
-    msg["From"] = config.SMTP_FROM
-    msg["To"] = to_email
-
+def _send_via_resend(to_email: str, subject: str, body: str):
+    """Sends a plain-text email through Resend's HTTPS API. Used instead of
+    smtplib because Render's free tier blocks outbound SMTP ports (25/465/
+    587) entirely — HTTPS to api.resend.com isn't affected."""
     try:
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10) as server:
-            server.starttls()
-            if config.SMTP_USER:
-                server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-            server.sendmail(config.SMTP_FROM, [to_email], msg.as_string())
+        resp = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {config.RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": config.RESEND_FROM,
+                "to": [to_email],
+                "subject": subject,
+                "text": body,
+            },
+            timeout=10,
+        )
+        if resp.status_code >= 400:
+            return False, f"Resend API error {resp.status_code}: {resp.text[:200]}"
         return True, None
     except Exception as e:
         return False, str(e)
+
+
+def _send_reset_email(to_email: str, reset_link: str):
+    if not config.RESEND_API_KEY:
+        return False, "RESEND_API_KEY not configured"
+
+    return _send_via_resend(
+        to_email=to_email,
+        subject="Reset your Life Hub password",
+        body=(
+            f"Someone requested a password reset for your Life Hub account.\n\n"
+            f"Reset your password: {reset_link}\n\n"
+            f"If you didn't request this, you can ignore this email."
+        ),
+    )
 
 
 def _send_verification_email(to_email: str, verify_link: str):
-    if not config.SMTP_HOST:
-        return False, "SMTP not configured"
+    if not config.RESEND_API_KEY:
+        return False, "RESEND_API_KEY not configured"
 
-    import smtplib
-    from email.mime.text import MIMEText
-
-    msg = MIMEText(
-        f"Welcome to Life Hub! Please verify your email address to finish setting up your account.\n\n"
-        f"Verify your email: {verify_link}\n\n"
-        f"This link expires in 48 hours. If you didn't create this account, you can ignore this email."
+    return _send_via_resend(
+        to_email=to_email,
+        subject="Verify your Life Hub email",
+        body=(
+            f"Welcome to Life Hub! Please verify your email address to finish setting up your account.\n\n"
+            f"Verify your email: {verify_link}\n\n"
+            f"This link expires in 48 hours. If you didn't create this account, you can ignore this email."
+        ),
     )
-    msg["Subject"] = "Verify your Life Hub email"
-    msg["From"] = config.SMTP_FROM
-    msg["To"] = to_email
-
-    try:
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10) as server:
-            server.starttls()
-            if config.SMTP_USER:
-                server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-            server.sendmail(config.SMTP_FROM, [to_email], msg.as_string())
-        return True, None
-    except Exception as e:
-        return False, str(e)
 
 
 @app.after_request
