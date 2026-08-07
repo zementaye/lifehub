@@ -4,9 +4,9 @@
 <h1>Digital ID Vault</h1>
 <p class="muted">Photos of your license, national ID, and other documents — for when you forget the physical copy.</p>
 
-<div class="vault-blur-toggle" id="vaultBlurToggle" role="switch" tabindex="0" aria-checked="false" aria-label="Blur document previews">
-  <span class="mode-rocker" id="vaultBlurRocker"></span>
-  <span class="mode-label" id="vaultBlurLabel">Blur previews: OFF</span>
+<div class="vault-blur-toggle" id="vaultBlurToggle" role="switch" tabindex="0" aria-checked="true" aria-label="Blur document previews">
+  <span class="mode-rocker on" id="vaultBlurRocker"></span>
+  <span class="mode-label" id="vaultBlurLabel">Blur previews: ON</span>
 </div>
 
 <div class="card">
@@ -261,7 +261,7 @@ dropzone.addEventListener('drop', (e) => {
   if (!toggle) return;
 
   function apply(on) {
-    document.body.classList.toggle('vault-blur-on', on);
+    document.body.classList.toggle('vault-blur-off', !on);
     rocker.classList.toggle('on', on);
     toggle.setAttribute('aria-checked', String(on));
     label.textContent = `Blur previews: ${on ? 'ON' : 'OFF'}`;
@@ -273,7 +273,10 @@ dropzone.addEventListener('drop', (e) => {
     }
   }
 
-  let on = localStorage.getItem(STORAGE_KEY) === '1';
+  // Blurred by default for privacy — only skip it once the user has
+  // explicitly turned blur off on this device before.
+  let on = localStorage.getItem(STORAGE_KEY) !== '0';
+  apply(on);
   apply(on);
 
   toggle.addEventListener('click', () => {
@@ -299,7 +302,7 @@ dropzone.addEventListener('drop', (e) => {
     // itself reveals it instead of immediately opening the full-size image
     // in a new tab — so a stray tap can't flash an ID document on screen.
     link.addEventListener('click', (e) => {
-      if (document.body.classList.contains('vault-blur-on') && !wrap.classList.contains('doc-revealed')) {
+      if (!document.body.classList.contains('vault-blur-off') && !wrap.classList.contains('doc-revealed')) {
         e.preventDefault();
         wrap.classList.add('doc-revealed');
       }
