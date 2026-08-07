@@ -128,6 +128,17 @@
     {% endif %}
   {% endwith %}
 
+  {% if user and not user.email_verified_at %}
+    <div class="flash" style="margin-bottom:16px;">
+      <div class="flash-msg" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <span>📧 Please verify your email address ({{ user.email }}) — check your inbox for the link.</span>
+        <form method="post" action="{{ url_for('resend_verification') }}" style="margin:0;">
+          <button type="submit" class="secondary" style="white-space:nowrap;">Resend email</button>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+
   {% block content %}{% endblock %}
 </main>
 
