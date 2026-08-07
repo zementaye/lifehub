@@ -320,7 +320,7 @@ def _send_reset_email(to_email: str, reset_link: str):
     msg["To"] = to_email
 
     try:
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT) as server:
+        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10) as server:
             server.starttls()
             if config.SMTP_USER:
                 server.login(config.SMTP_USER, config.SMTP_PASSWORD)
@@ -347,7 +347,7 @@ def _send_verification_email(to_email: str, verify_link: str):
     msg["To"] = to_email
 
     try:
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT) as server:
+        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10) as server:
             server.starttls()
             if config.SMTP_USER:
                 server.login(config.SMTP_USER, config.SMTP_PASSWORD)
