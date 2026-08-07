@@ -89,7 +89,7 @@
         {% for c in categories %}
           <li>
             {{ c.name }}{% if c.monthly_limit %} <span class="muted">— limit {{ c.monthly_limit | round | int }} {{ currency }}</span>{% endif %}
-            <form method="post" action="{{ url_for('delete_budget_category', cat_id=c.id) }}" style="display:inline; float:right;">
+            <form method="post" action="{{ url_for('delete_budget_category', cat_id=c.id) }}" style="display:inline; float:right;" data-confirm="Delete category {{ c.name }}?">
               <button class="btn-icon" title="Delete">🗑️</button>
             </form>
           </li>
@@ -186,7 +186,7 @@
             <form method="post" action="{{ url_for('toggle_recurring_transaction', rid=r.id) }}">
               <button class="btn-icon" title="{{ 'Pause' if r.active else 'Resume' }}">{{ '⏸️' if r.active else '▶️' }}</button>
             </form>
-            <form method="post" action="{{ url_for('delete_recurring_transaction', rid=r.id) }}">
+            <form method="post" action="{{ url_for('delete_recurring_transaction', rid=r.id) }}" data-confirm="Delete recurring entry {{ r.title }}?">
               <button class="btn-icon" title="Delete">🗑️</button>
             </form>
           </td>
@@ -215,7 +215,7 @@
         <div class="card savings-goal-card">
           <div class="budget-bar-label">
             <span><strong>{{ g.name }}</strong></span>
-            <form method="post" action="{{ url_for('delete_savings_goal', goal_id=g.id) }}">
+            <form method="post" action="{{ url_for('delete_savings_goal', goal_id=g.id) }}" data-confirm="Delete savings goal {{ g.name }}?">
               <button class="btn-icon" title="Delete goal">🗑️</button>
             </form>
           </div>
@@ -276,7 +276,7 @@
           <td class="muted">{{ t.description or '' }}</td>
           <td>{{ t.amount | round(2) }} {{ currency }}</td>
           <td>
-            <form method="post" action="{{ url_for('delete_transaction', txn_id=t.id) }}">
+            <form method="post" action="{{ url_for('delete_transaction', txn_id=t.id) }}" data-confirm="Delete this transaction?">
               <input type="hidden" name="month" value="{{ month }}">
               <button class="btn-icon" title="Delete">🗑️</button>
             </form>
