@@ -514,10 +514,6 @@ def nutrition():
 
     goal_cal = db.get_setting(user_id, "nutrition_goal_calories")
     goal_protein = db.get_setting(user_id, "nutrition_goal_protein")
-    goals = {
-        "calories": float(goal_cal) if goal_cal else None,
-        "protein_g": float(goal_protein) if goal_protein else None,
-    }
 
     recommendation = nutrition_calc.compute_recommendation(
         height_cm=profile["height_cm"],
@@ -527,6 +523,15 @@ def nutrition():
         today=date.today(),
         session_count=session_count,
     )
+
+    # A manual target set on the Settings page always wins; otherwise fall
+    # back to the computed recommendation automatically (no more separate
+    # "apply as goal" button/step — the recommendation *is* the goal unless
+    # overridden).
+    goals = {
+        "calories": float(goal_cal) if goal_cal else (recommendation["calories"] if recommendation else None),
+        "protein_g": float(goal_protein) if goal_protein else (recommendation["protein_g"] if recommendation else None),
+    }
 
     return render_template("nutrition.html", totals=totals, meal_summary=meal_summary,
                             view_date=d, goals=goals, recommendation=recommendation)
@@ -558,29 +563,6 @@ def nutrition_meal(meal):
 
     return render_template("nutrition_meal.html", meal=meal, meal_label=MEAL_LABELS[meal],
                             entries=entries, custom_foods=custom_foods, totals=totals, view_date=d)
-
-
-@app.route("/nutrition/use-recommendation", methods=["POST"])
-@login_required
-def use_recommended_nutrition():
-    action = request.form.get("action", "apply")
-    if action == "clear":
-        # Button toggles: once applied, clicking it again removes the goal
-        # instead of doing nothing (previously this button just got
-        # disabled after one click).
-        db.delete_setting(g.user_id, "nutrition_goal_calories")
-        db.delete_setting(g.user_id, "nutrition_goal_protein")
-        flash("Daily goal removed.")
-        return redirect(url_for("nutrition"))
-
-    calories = request.form.get("calories", type=int)
-    protein_g = request.form.get("protein_g", type=int)
-    if calories:
-        db.set_setting(g.user_id, "nutrition_goal_calories", str(calories))
-    if protein_g:
-        db.set_setting(g.user_id, "nutrition_goal_protein", str(protein_g))
-    flash("Recommended intake applied as your daily goal.")
-    return redirect(url_for("nutrition"))
 
 
 @app.route("/nutrition/search")
