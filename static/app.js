@@ -401,3 +401,47 @@
     });
   });
 })();
+
+// HUD ambient starfield. Purely decorative dots scattered behind the
+// content (see #hud-stars in base.html / CSS keyframes in style.css).
+// Skipped entirely under prefers-reduced-motion since it's animation-only.
+(function () {
+  const field = document.getElementById('hud-stars');
+  if (!field) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const COUNT = 70;
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < COUNT; i++) {
+    const s = document.createElement('span');
+    s.style.left = Math.random() * 100 + '%';
+    s.style.top = Math.random() * 100 + '%';
+    s.style.animationDelay = (Math.random() * 4) + 's';
+    const big = Math.random() < 0.15;
+    s.style.width = s.style.height = big ? '3px' : '1.5px';
+    frag.appendChild(s);
+  }
+  field.appendChild(frag);
+})();
+
+// HUD panel tilt. Every .card gets a subtle mouse-tracked 3D tilt toward
+// the cursor, matching the Command Deck mockup. Disabled under
+// prefers-reduced-motion, and skipped on touch-only devices where there's
+// no hover to track.
+(function () {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (window.matchMedia('(hover: none)').matches) return;
+
+  document.querySelectorAll('.card').forEach((card) => {
+    card.addEventListener('mousemove', (e) => {
+      const r = card.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      card.style.transform =
+        `perspective(700px) rotateX(${(-y * 4).toFixed(2)}deg) rotateY(${(x * 4).toFixed(2)}deg) translateY(-2px)`;
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = '';
+    });
+  });
+})();
