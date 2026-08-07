@@ -511,13 +511,29 @@ def create_user(email: str, password: str):
     account ever created, any pre-existing single-user data (rows with
     user_id IS NULL, left over from before multi-user support) is
     automatically claimed by this new account. Returns the new user_id, or
-    None if the email is already taken."""
+    None if the email is already taken by a *verified* account.
+
+    If the email belongs to an existing but never-verified account (e.g. an
+    earlier signup that was abandoned or crashed before verification), that
+    account is reclaimed: the password is reset to the newly submitted one
+    and its user_id is returned as if it were newly created. This avoids
+    permanently locking an email out of signup just because a first attempt
+    never got verified.
+    """
     email = email.strip().lower()
     password_hash = generate_password_hash(password)
     with get_conn() as conn:
-        existing = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+        existing = conn.execute(
+            "SELECT id, email_verified_at FROM users WHERE email = ?", (email,)
+        ).fetchone()
         if existing:
-            return None
+            if existing["email_verified_at"] is not None:
+                return None
+            conn.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (password_hash, existing["id"]),
+            )
+            return existing["id"]
         is_first_user = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"] == 0
         cur = conn.execute(
             "INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, ?)",
