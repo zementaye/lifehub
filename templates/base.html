@@ -129,6 +129,21 @@
   {% block content %}{% endblock %}
 </main>
 
+<!-- Shared delete/destructive-action confirmation modal. Any form with a
+     data-confirm="..." attribute uses this instead of the native browser
+     confirm() popup — see app.js. One instance, used by every page, so the
+     confirmation always looks and behaves the same everywhere. -->
+<div id="confirm-modal-overlay" class="confirm-modal-overlay" style="display:none;">
+  <div class="confirm-modal-box" role="alertdialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+    <p id="confirm-modal-title"></p>
+    <p class="muted confirm-modal-sub">This can't be undone.</p>
+    <div class="confirm-modal-actions">
+      <button type="button" id="confirm-modal-cancel" class="secondary">Cancel</button>
+      <button type="button" id="confirm-modal-ok" class="confirm-modal-danger">Delete</button>
+    </div>
+  </div>
+</div>
+
 <script src="{{ url_for('static', filename='app.js') }}?v={{ asset_version }}"></script>
 {% block scripts %}{% endblock %}
 </body>
