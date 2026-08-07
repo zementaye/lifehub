@@ -1507,6 +1507,21 @@ def delete_note(note_id):
     return redirect(url_for("notes"))
 
 
+@app.route("/notes/bulk-delete", methods=["POST"])
+@login_required
+def bulk_delete_notes():
+    ids = request.form.getlist("note_ids", type=int)
+    if ids:
+        with db.get_conn() as conn:
+            placeholders = ",".join("?" * len(ids))
+            conn.execute(
+                f"DELETE FROM notes WHERE user_id = ? AND id IN ({placeholders})",
+                (g.user_id, *ids),
+            )
+        flash(f"Deleted {len(ids)} note{'s' if len(ids) != 1 else ''}.")
+    return redirect(url_for("notes"))
+
+
 # ── Settings ─────────────────────────────────────────────────────────────
 
 @app.route("/settings")
