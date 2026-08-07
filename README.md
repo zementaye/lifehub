@@ -21,9 +21,9 @@ that needs to reach you (reminders, unfinished habits).
 - **Settings** — Telegram bot connection, timezone, currency, nutrition goals, and notification
   timing, all editable from the app itself — plus a one-click JSON backup of everything
 
-> ⚠️ **No login by default**, as requested — anyone with the URL can see everything,
-> including your ID photos. See "Locking it down" below before you put real documents in
-> if you're deploying it somewhere public.
+> Real per-user login (email + password, with signup at `/register`) protects everything —
+> only you can see your data. `APP_ACCESS_TOKEN` was an old stopgap from before login existed
+> and is no longer needed; see "Locking it down" below if you still want an extra layer.
 
 ## 1. Local setup
 
@@ -60,14 +60,17 @@ Same general pattern as your other bots:
 5. Deploy. Everything else (Telegram bot, USDA key, timezone) can be set from the
    in-app Settings page after it's live — or via env vars if you'd rather set them there.
 
-## Locking it down (recommended before storing real documents)
+## Locking it down (optional extra layer on top of login)
 
-Since there's no login, set `APP_ACCESS_TOKEN` to some long random string in Railway's
-Variables. Then the app requires visiting once with `?key=<that value>` in the URL —
-after that it remembers you via a cookie, no password screen, nothing to type again.
-Bookmark the link with the key included and you'll never see it. Anyone without that
-exact link is blocked. It's not bank-grade security, but it stops search engines,
-guessed URLs, and casual snooping — a meaningful step up from wide open, while staying
+Real per-user login (email + password) already protects your data — this section is
+only for an *additional* gate in front of the whole app (e.g. hiding the login page
+itself from search engines and randomly-guessed URLs). Set `APP_ACCESS_TOKEN` to some
+long random string in Railway's Variables. Then the app requires visiting once with
+`?key=<that value>` in the URL — after that it remembers you via a cookie, no extra
+password screen, nothing to type again. Bookmark the link with the key included and
+you'll never see it. Anyone without that exact link is blocked. It's not bank-grade
+security, but it stops search engines, guessed URLs, and casual snooping — a meaningful
+step up, on top of login, while staying
 
 ## Persisting data on Render's free tier (no paid disk) with Turso
 
@@ -78,9 +81,11 @@ database gets wiped repeatedly. `db.py` supports an alternative: point it at
 local file.
 
 **This only covers the database** (weight logs, budget entries, habits, reminders,
-settings, etc). Uploaded ID vault **photos are still local files** and still reset on
-Render's free tier — Turso doesn't store files. If you need those to persist too,
-you'd still need a paid disk (or separate object storage like Cloudflare R2).
+settings, etc). Uploaded ID vault **photos are separate** — they use local disk by
+default (which still resets on Render's free tier), unless you also configure
+Backblaze B2 object storage (see `B2_KEY_ID`/`B2_APPLICATION_KEY`/`B2_BUCKET_NAME`/
+`B2_ENDPOINT_URL` in `.env.example`), which makes vault uploads persist across
+restarts and redeploys too.
 
 ### Setup
 1. Create a free account at [turso.tech](https://turso.tech) and install their CLI, or
@@ -125,9 +130,9 @@ SQLite/Turso rows never contain plaintext. The encryption key is derived from
   changes (e.g. you regenerate it, or move to a new Railway/Render project without copying
   it over), every stored password becomes undecryptable — back that value up somewhere safe.
 - This is reversible encryption (by design — you need to get the password back), not a
-  one-way hash. It's meant to protect the data at rest in the database, not to replace
-  `APP_ACCESS_TOKEN` as your access control. Set `APP_ACCESS_TOKEN` (see "Locking it down"
-  above) before putting real credentials in here, same as with the ID vault.
+  one-way hash. It's meant to protect the data at rest in the database. Access control
+  is handled by per-user login (only your account can see your entries) — `APP_ACCESS_TOKEN`
+  is an optional extra gate on top of that (see "Locking it down" above), not a substitute.
 
 ## Customizing
 
