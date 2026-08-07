@@ -43,7 +43,7 @@
             <form method="post" action="{{ url_for('toggle_reminder', reminder_id=r.id) }}">
               <button class="btn-icon" title="{{ 'Pause' if r.active else 'Resume' }}">{{ '⏸️' if r.active else '▶️' }}</button>
             </form>
-            <form method="post" action="{{ url_for('delete_reminder', reminder_id=r.id) }}">
+            <form method="post" action="{{ url_for('delete_reminder', reminder_id=r.id) }}" data-confirm="Delete reminder {{ r.title }}?">
               <button class="btn-icon" title="Delete">🗑️</button>
             </form>
           </td>
