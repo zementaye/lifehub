@@ -563,6 +563,16 @@ def nutrition_meal(meal):
 @app.route("/nutrition/use-recommendation", methods=["POST"])
 @login_required
 def use_recommended_nutrition():
+    action = request.form.get("action", "apply")
+    if action == "clear":
+        # Button toggles: once applied, clicking it again removes the goal
+        # instead of doing nothing (previously this button just got
+        # disabled after one click).
+        db.delete_setting(g.user_id, "nutrition_goal_calories")
+        db.delete_setting(g.user_id, "nutrition_goal_protein")
+        flash("Daily goal removed.")
+        return redirect(url_for("nutrition"))
+
     calories = request.form.get("calories", type=int)
     protein_g = request.form.get("protein_g", type=int)
     if calories:
