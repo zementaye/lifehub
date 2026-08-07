@@ -6,7 +6,7 @@
 <title>{% block title %}Life Hub{% endblock %}</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect x='1' y='1' width='26' height='26' rx='7' fill='%231C222A' stroke='%232A323C'/%3E%3Ccircle cx='14' cy='5.4' r='1.1' fill='%233A4351'/%3E%3Crect x='6.4' y='13' width='3.6' height='10' rx='1.8' fill='%234CC9E8'/%3E%3Crect x='12.2' y='7' width='3.6' height='16' rx='1.8' fill='%23F0B23D'/%3E%3Crect x='18' y='16' width='3.6' height='7' rx='1.8' fill='%238FD14F'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version }}">
 <script>
   // Set the theme + color palette before first paint so there's no flash
@@ -24,6 +24,7 @@
   document.body.dataset.theme = document.documentElement.dataset.themePending || 'dark';
   document.body.dataset.palette = document.documentElement.dataset.palettePending || 'amber';
 </script>
+<div id="hud-stars" aria-hidden="true"></div>
 <header class="topbar">
   <button type="button" class="hamburger-btn" id="sidebarToggle" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
     <span></span><span></span><span></span>
