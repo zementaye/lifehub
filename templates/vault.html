@@ -85,25 +85,13 @@
           </form>
         {% endif %}
       {% endif %}
-      <form method="post" action="{{ url_for('vault_delete', doc_id=d.id) }}" class="vault-delete-form" data-label="{{ d.label }}">
+      <form method="post" action="{{ url_for('vault_delete', doc_id=d.id) }}" class="vault-delete-form" data-confirm="Delete {{ d.label }}?">
         <button type="submit" class="btn-icon vault-delete-btn" title="Delete">🗑️ Delete</button>
       </form>
     </div>
   {% else %}
     <p class="muted">No documents saved yet.</p>
   {% endfor %}
-</div>
-
-<!-- Custom delete-confirmation modal (replaces the native browser confirm() popup) -->
-<div id="vault-confirm-overlay" class="vault-modal-overlay" style="display:none;">
-  <div class="vault-modal-box" role="alertdialog" aria-modal="true" aria-labelledby="vault-confirm-title">
-    <p id="vault-confirm-title">Delete <strong id="vault-confirm-label"></strong>?</p>
-    <p class="muted" style="margin:4px 0 0;font-size:13px;">This can't be undone.</p>
-    <div class="vault-modal-actions">
-      <button type="button" id="vault-confirm-cancel" class="secondary">Cancel</button>
-      <button type="button" id="vault-confirm-ok" class="vault-modal-danger">Delete</button>
-    </div>
-  </div>
 </div>
 {% endblock %}
 
@@ -125,59 +113,6 @@
 .date-sep {
   color: #888;
 }
-.vault-modal-overlay,
-#vault-delete-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, .55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-.vault-modal-box {
-  background: #1c1c1c;
-  border: 1px solid #333;
-  border-radius: 12px;
-  padding: 22px 26px;
-  max-width: 320px;
-  width: 90%;
-  color: #eee;
-  font-size: 15px;
-  box-shadow: 0 8px 30px rgba(0,0,0,.5);
-}
-.vault-modal-box p { margin: 0; }
-.vault-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 18px;
-}
-.vault-modal-danger {
-  background: #b3382c;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
-  cursor: pointer;
-}
-.vault-modal-danger:hover { background: #c9432f; }
-#vault-delete-overlay .vault-modal-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  text-align: center;
-}
-.vault-delete-spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid #444;
-  border-top-color: #e0952c;
-  border-radius: 50%;
-  animation: vault-delete-spin .8s linear infinite;
-}
-@keyframes vault-delete-spin { to { transform: rotate(360deg); } }
 </style>
 <script>
 const dropzone = document.getElementById('dropzone');
@@ -363,87 +298,6 @@ dropzone.addEventListener('drop', (e) => {
     xhr.addEventListener('error', () => resetButton('Upload failed — try again'));
 
     xhr.send(new FormData(uploadForm));
-  });
-})();
-
-// Delete flow: custom in-page confirm modal (no native confirm() popup),
-// then a full-page "Deleting…" lock until the redirect lands, so nothing
-// else on the page can be clicked while the request is in flight.
-(function () {
-  const deleteForms = document.querySelectorAll('.vault-delete-form');
-  if (!deleteForms.length) return;
-
-  const confirmOverlay = document.getElementById('vault-confirm-overlay');
-  const confirmLabel = document.getElementById('vault-confirm-label');
-  const confirmOk = document.getElementById('vault-confirm-ok');
-  const confirmCancel = document.getElementById('vault-confirm-cancel');
-  let pendingForm = null;
-
-  function openConfirm(form) {
-    pendingForm = form;
-    confirmLabel.textContent = form.dataset.label || 'this document';
-    confirmOverlay.style.display = 'flex';
-  }
-
-  function closeConfirm() {
-    pendingForm = null;
-    confirmOverlay.style.display = 'none';
-  }
-
-  function lockPage(message) {
-    document.querySelectorAll('button, a, input, select, textarea').forEach((el) => {
-      el.dataset.vaultLockWasDisabled = el.disabled ? '1' : '0';
-      el.disabled = true;
-      if (el.tagName === 'A') {
-        el.dataset.vaultLockHref = el.getAttribute('href') || '';
-        el.removeAttribute('href');
-        el.style.pointerEvents = 'none';
-      }
-    });
-
-    const overlay = document.createElement('div');
-    overlay.id = 'vault-delete-overlay';
-    overlay.innerHTML =
-      '<div class="vault-modal-box">' +
-      '<div class="vault-delete-spinner"></div>' +
-      '<p>' + message + '</p></div>';
-    document.body.appendChild(overlay);
-  }
-
-  deleteForms.forEach((form) => {
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      openConfirm(form);
-    });
-  });
-
-  confirmCancel.addEventListener('click', closeConfirm);
-  confirmOverlay.addEventListener('click', (e) => {
-    if (e.target === confirmOverlay) closeConfirm(); // click outside the box = cancel
-  });
-
-  confirmOk.addEventListener('click', () => {
-    const form = pendingForm;
-    if (!form) return;
-    const label = form.dataset.label || 'this document';
-    closeConfirm();
-    lockPage(`Deleting "${label}"…`);
-    form.submit(); // real submit — doesn't re-fire the 'submit' listener above
-  });
-
-  // Safety net if the page is ever restored from bfcache (e.g. the
-  // request failed and the user hit back) — don't leave it locked.
-  window.addEventListener('pageshow', () => {
-    closeConfirm();
-    const overlay = document.getElementById('vault-delete-overlay');
-    if (overlay) overlay.remove();
-    document.querySelectorAll('[data-vault-lock-was-disabled]').forEach((el) => {
-      el.disabled = el.dataset.vaultLockWasDisabled === '1';
-      if (el.tagName === 'A' && el.dataset.vaultLockHref) {
-        el.setAttribute('href', el.dataset.vaultLockHref);
-        el.style.pointerEvents = '';
-      }
-    });
   });
 })();
 </script>
