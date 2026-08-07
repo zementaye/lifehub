@@ -9,6 +9,11 @@ from flask import (
     Flask, render_template, request, redirect, url_for, flash,
     send_from_directory, make_response, session, g,
 )
+from flask_wtf import CSRFProtect
+from flask_wtf.csrf import CSRFError
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from werkzeug.exceptions import RequestEntityTooLarge
 
 import config
 import crypto
@@ -24,6 +29,27 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
+
+# Cookie hardening + upload size cap — see config.py for rationale on each.
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=config.SESSION_COOKIE_HTTPONLY,
+    SESSION_COOKIE_SAMESITE=config.SESSION_COOKIE_SAMESITE,
+    SESSION_COOKIE_SECURE=config.SESSION_COOKIE_SECURE,
+    PERMANENT_SESSION_LIFETIME=config.PERMANENT_SESSION_LIFETIME,
+    MAX_CONTENT_LENGTH=config.MAX_CONTENT_LENGTH,
+)
+
+# CSRF protection on every POST/PUT/PATCH/DELETE. Forms get their token via
+# the {{ csrf_token() }} auto-injection in static/app.js (reads the meta tag
+# base.html renders); the two raw fetch()/sendBeacon() calls in app.js send
+# it explicitly. See CSRFError handler below for the user-facing failure page.
+csrf = CSRFProtect(app)
+
+# Brute-force protection. In-memory storage is fine for this app's single
+# small deployment (1 gunicorn worker per scheduler.py's own lock — see
+# that file); swap storage_uri for a shared backend (e.g. redis://) first
+# if this is ever run with multiple workers/instances.
+limiter = Limiter(get_remote_address, app=app, storage_uri="memory://", default_limits=[])
 
 # Changes every time the app process starts (i.e. every deploy/restart).
 # Appended as a ?v= query string on static assets in base.html so browsers
@@ -47,6 +73,21 @@ def _hour12(hour):
 app.jinja_env.filters["hour12"] = _hour12
 
 db.init_db()
+
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    # Most commonly hit when a form was left open across a session timeout
+    # (token no longer valid) rather than an actual attack — send them back
+    # to log in rather than showing a raw 400.
+    flash("Your session expired — please log in again and retry.")
+    return redirect(url_for("login"))
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_upload_too_large(e):
+    flash(f"That file is too large — the limit is {config.MAX_UPLOAD_MB} MB.")
+    return redirect(request.referrer or url_for("dashboard"))
 
 
 # ── Auth ─────────────────────────────────────────────────────────────────
@@ -90,6 +131,7 @@ def inject_user():
 
 
 @app.route("/register", methods=["GET", "POST"])
+@limiter.limit("10 per hour", methods=["POST"], key_func=get_remote_address)
 def register():
     if request.method == "GET":
         return render_template("register.html")
@@ -114,11 +156,21 @@ def register():
         return render_template("register.html")
 
     session["user_id"] = user_id
+    session.permanent = True
     flash("Welcome to Life Hub!")
     return redirect(url_for("dashboard"))
 
 
+def _login_rate_key():
+    # Keyed on IP + attempted email, so one bad actor guessing many
+    # passwords against one account is throttled without also locking out
+    # everyone else sharing that IP (e.g. an office/NAT).
+    return f"{get_remote_address()}:{request.form.get('email', '').strip().lower()}"
+
+
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"], key_func=_login_rate_key)
+@limiter.limit("20 per minute", methods=["POST"], key_func=get_remote_address)
 def login():
     if request.method == "GET":
         return render_template("login.html")
@@ -132,6 +184,7 @@ def login():
         return render_template("login.html")
 
     session["user_id"] = user["id"]
+    session.permanent = True
     next_path = request.args.get("next")
     return redirect(next_path or url_for("dashboard"))
 
@@ -143,6 +196,7 @@ def logout():
 
 
 @app.route("/forgot-password", methods=["GET", "POST"])
+@limiter.limit("5 per hour", methods=["POST"], key_func=get_remote_address)
 def forgot_password():
     if request.method == "GET":
         return render_template("forgot_password.html")
