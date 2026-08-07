@@ -43,6 +43,17 @@
   </div>
 
   <div class="card">
+    <h3>Focus</h3>
+    <div class="orbit-wrap">
+      <div class="orbit-ring r3"><span class="orbit-sat"></span></div>
+      <div class="orbit-ring r2"></div>
+      <div class="orbit-ring r1"><span class="orbit-sat"></span></div>
+      <div class="orbit-core"></div>
+    </div>
+    <div class="orbit-cap"><b>{{ (habit_status | rejectattr('done') | list | length) + (upcoming_reminders | length) }}</b> active tracks</div>
+  </div>
+
+  <div class="card">
     <h3>Upcoming Reminders</h3>
     {% if upcoming_reminders %}
       <ul class="plain-list">
