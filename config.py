@@ -52,15 +52,17 @@ WEEK_END_DAY = int(os.environ.get("WEEK_END_DAY", "6"))  # 0=Mon ... 6=Sun (ISO 
 # them. Leave blank for zero-friction access (fine for local/private use only).
 APP_ACCESS_TOKEN = os.environ.get("APP_ACCESS_TOKEN", "")
 
-# ── Email (password reset) ──────────────────────────────────────────────
-# Standard SMTP — works with a Gmail "App Password" (myaccount.google.com/
-# apppasswords) or any other SMTP provider. If unset, password reset emails
-# just can't be sent (registration/login still work fine without this).
-SMTP_HOST = os.environ.get("SMTP_HOST", "")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = os.environ.get("SMTP_USER", "")
-SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
-SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
+# ── Email (password reset / verification) ────────────────────────────────
+# Sent via Resend's HTTPS API (https://resend.com) rather than raw SMTP —
+# Render's free tier blocks outbound traffic on SMTP ports 25/465/587, so
+# smtplib can never connect there no matter how it's configured. Resend
+# sends over normal HTTPS (443), which isn't blocked. Free tier: sign up at
+# resend.com, grab an API key, done. If RESEND_FROM is left as the default
+# "onboarding@resend.dev", Resend only allows delivery to the email address
+# on your own Resend account — verify a domain in the Resend dashboard and
+# set RESEND_FROM to an address on it to send to your actual users.
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM = os.environ.get("RESEND_FROM", "Life Hub <onboarding@resend.dev>")
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "")  # e.g. https://lifehub-g8z9.onrender.com — used to build reset links
 
 
