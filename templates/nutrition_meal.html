@@ -71,7 +71,7 @@
         {% for f in custom_foods %}
           <li style="display:flex; justify-content:space-between; align-items:center;">
             <span>{{ f.name }} — {{ f.calories | round | int }} cal, {{ f.protein_g | round(1) }}g protein <span class="muted">(per 100g)</span></span>
-            <form method="post" action="{{ url_for('delete_custom_food', food_id=f.id) }}">
+            <form method="post" action="{{ url_for('delete_custom_food', food_id=f.id) }}" data-confirm="Delete custom food {{ f.name }}?">
               <input type="hidden" name="meal" value="{{ meal }}">
               <input type="hidden" name="date" value="{{ view_date }}">
               <button class="btn-icon" title="Delete this custom food">🗑️</button>
@@ -113,7 +113,7 @@
           <td>{{ (f.fat_g * f.servings) | round(1) }}</td>
           <td>{{ (f.fiber_g * f.servings) | round(1) }}</td>
           <td>
-            <form method="post" action="{{ url_for('delete_food_log', log_id=f.id) }}">
+            <form method="post" action="{{ url_for('delete_food_log', log_id=f.id) }}" data-confirm="Delete {{ f.name }} from this log?">
               <input type="hidden" name="date" value="{{ view_date }}">
               <button class="btn-icon" title="Delete">🗑️</button>
             </form>
