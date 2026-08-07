@@ -1,10 +1,18 @@
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
 
 BASE_DIR = Path(__file__).parent
+
+# ── Environment ──────────────────────────────────────────────────────────
+# Defaults to "production" on purpose: the safe fallback behaviors below
+# (refusing to start without a secret key, secure cookies, etc.) should be
+# the default posture unless someone deliberately opts into local dev mode.
+FLASK_ENV = os.environ.get("FLASK_ENV", "production").strip().lower()
+IS_PRODUCTION = FLASK_ENV != "development"
 
 # Where the sqlite DB and uploaded files live. Point this at a Railway/Render
 # volume (e.g. /data) in production so it survives redeploys.
@@ -55,7 +63,53 @@ SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "")  # e.g. https://lifehub-g8z9.onrender.com — used to build reset links
 
-SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
+
+# ── Secret key ───────────────────────────────────────────────────────────
+# This isn't just session signing — crypto.py derives the vault password
+# encryption key from it. If it's ever unset in production, session cookies
+# become forgeable and every stored vault password becomes decryptable by
+# anyone who has read the (public) source. So: no silent fallback in
+# production. Only FLASK_ENV=development is allowed to use the placeholder,
+# and even then it prints a loud warning.
+SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "").strip()
+if not SECRET_KEY:
+    if IS_PRODUCTION:
+        sys.exit(
+            "FATAL: FLASK_SECRET_KEY is not set.\n"
+            "This app refuses to start without it in production, because this key\n"
+            "signs session cookies AND derives the vault's password-encryption key\n"
+            "(see crypto.py). Set FLASK_SECRET_KEY to a long random value, e.g.:\n"
+            "    python -c \"import secrets; print(secrets.token_hex(32))\"\n"
+            "and keep it stable/backed-up once you start storing real data — if it\n"
+            "changes, every stored vault password becomes undecryptable.\n"
+            "(To run locally without setting this, export FLASK_ENV=development.)"
+        )
+    print(
+        "WARNING: FLASK_SECRET_KEY is not set — using an insecure placeholder "
+        "key because FLASK_ENV=development. Do NOT do this in production.",
+        file=sys.stderr,
+    )
+    SECRET_KEY = "dev-secret-change-me"
+
+# ── Upload size limit ────────────────────────────────────────────────────
+# Applied as Flask's MAX_CONTENT_LENGTH so an oversized POST (e.g. to
+# /vault/upload) is rejected before it's read into memory/disk.
+MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "20"))
+MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
+
+# ── Session cookie hardening ─────────────────────────────────────────────
+# HTTPONLY blocks JS access (mitigates XSS session theft), SAMESITE=Lax
+# blocks the cookie being sent on most cross-site requests (CSRF defense in
+# depth, on top of CSRFProtect below), SECURE requires HTTPS in production
+# (Render terminates TLS in front of the app, so this is safe to require
+# there; left off in dev so http://localhost still works).
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = IS_PRODUCTION
+# Sessions guard a password vault and ID documents — Flask's 31-day default
+# is too long-lived for that. 7 days, refreshed on activity (default
+# SESSION_REFRESH_EACH_REQUEST=True), configurable via env if needed.
+PERMANENT_SESSION_LIFETIME = int(os.environ.get("SESSION_LIFETIME_DAYS", "7")) * 24 * 60 * 60
 
 # ── Vault file storage (Backblaze B2, S3-compatible) ────────────────────
 # ID vault uploads (photos/PDFs) are stored here instead of local disk, so
