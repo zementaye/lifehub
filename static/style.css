@@ -1,55 +1,59 @@
 :root {
   color-scheme: dark;
-  --bg: #14181D;
-  --bg-glow: #1c232c;
-  --surface: #1C222A;
-  --surface-raised: #232A34;
-  --ink: #E7EAEE;
-  --muted: #6B7480;
-  --border: #2A323C;
-  --track-bg: #12161B;
-  --rivet: #3A4351;
-  --toggle-knob: #0e1216;
-  --shadow: 0 10px 22px rgba(0,0,0,.35);
+  --bg: #070A10;
+  --bg-glow: #0A0F17;
+  --surface: #0D1420;
+  --surface-raised: #101A28;
+  --ink: #E7EEF5;
+  --muted: #5C7086;
+  --border: #1B2635;
+  --border-soft: #141D2A;
+  --track-bg: #0A0F17;
+  --rivet: #2C7A93;
+  --toggle-knob: #050709;
+  --shadow: 0 20px 40px -20px rgba(0,0,0,.65);
 
-  --primary: #F0B23D;       /* amber — budget / primary accent */
-  --primary-dark: #C98F26;
-  --accent: #4CC9E8;        /* cyan — health / links */
+  --primary: #FFB454;       /* amber — budget / primary accent */
+  --primary-dark: #C98A2E;
+  --accent: #5FE0FF;        /* cyan — health / links / HUD signature */
+  --accent-dim: #2C7A93;
   --success: #8FD14F;       /* green — nutrition / on-track */
-  --danger: #F2653C;        /* red-orange — reminders / over-limit */
-  --violet: #B98CE8;        /* vault / passwords / notes */
+  --danger: #FF5C6C;        /* red — reminders / over-limit */
+  --violet: #8C7CFF;        /* vault / passwords / notes */
 
   --gap-sub: 20px;      /* fixed gap between sibling cards within the same section */
   --gap-section: 32px;  /* larger gap between distinct sections (e.g. before/after a grid) */
 
-  --radius: 6px;
-  --font-display: 'Oswald', 'Space Grotesk', system-ui, sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --radius: 10px;
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   --tab-color: var(--accent);
 }
 
 body[data-theme="light"] {
   color-scheme: light;
-  --bg: #EBEDF1;
-  --bg-glow: #f5f6f8;
+  --bg: #EEF2F7;
+  --bg-glow: #F7FAFD;
   --surface: #FFFFFF;
-  --surface-raised: #F3F4F7;
-  --ink: #20242B;
-  --muted: #6B7480;
-  --border: #DCE0E6;
-  --track-bg: #E7E9ED;
-  --rivet: #C7CCD3;
+  --surface-raised: #F2F6FA;
+  --ink: #101823;
+  --muted: #5B6B7E;
+  --border: #D6DFEA;
+  --border-soft: #E4EAF1;
+  --track-bg: #E4EAF1;
+  --rivet: #1C93B4;
   --toggle-knob: #ffffff;
-  --shadow: 0 6px 16px rgba(20,25,30,.10);
+  --shadow: 0 14px 30px -16px rgba(16,24,35,.18);
 
   --primary: #B8781E;
   --primary-dark: #96611A;
-  --accent: #1C93B4;
-  --success: #4C8F2C;
-  --danger: #C24528;
-  --violet: #8452B8;
+  --accent: #0E8FB4;
+  --accent-dim: #7FC4DA;
+  --success: #3F8F2C;
+  --danger: #D13B4C;
+  --violet: #6A4EDB;
 }
 
 /* Color palettes (Settings → Appearance). Each palette defines its four raw
@@ -57,26 +61,28 @@ body[data-theme="light"] {
    darkened/higher-contrast variant via color-mix so every palette works
    in both modes without hand-tuning a second set of hex values. "amber"
    is the built-in default and needs no override — see :root / [data-theme
-   ="light"] above. */
+   ="light"] above. Values are tuned for glow: saturated enough to bloom
+   against the HUD backgrounds in both modes. */
 body[data-palette="ocean"] {
-  --p1: #3D8FF0; --p2: #4CE0C7; --p3: #59C2E8; --p4: #7C9CF0;
+  --p1: #3DA9F0; --p2: #4CE8D4; --p3: #59D3E8; --p4: #7CAEFF;
 }
 body[data-palette="sunset"] {
-  --p1: #F0703D; --p2: #F0B23D; --p3: #E85C8A; --p4: #E8748C;
+  --p1: #FF7A45; --p2: #FFB454; --p3: #FF6E9E; --p4: #FF85A0;
 }
 body[data-palette="forest"] {
-  --p1: #8FD14F; --p2: #4CC98F; --p3: #B0D14F; --p4: #79B84C;
+  --p1: #8FE05B; --p2: #4CE0A0; --p3: #C2E85F; --p4: #7ECC5C;
 }
 body[data-palette="grape"] {
-  --p1: #B98CE8; --p2: #D14FC2; --p3: #8FD14F; --p4: #9D6FE8;
+  --p1: #B98CFF; --p2: #E85FDA; --p3: #A0E85F; --p4: #A57BFF;
 }
 body[data-palette="mono"] {
-  --p1: #C7CCD3; --p2: #8FD9E8; --p3: #A8D18F; --p4: #B0B6C0;
+  --p1: #C7D3E0; --p2: #8FE0F5; --p3: #B4E0A0; --p4: #C2CBDA;
 }
 body[data-palette]:not([data-palette="amber"]) {
   --primary: var(--p1);
   --primary-dark: color-mix(in srgb, var(--p1) 80%, black);
   --accent: var(--p2);
+  --accent-dim: color-mix(in srgb, var(--p2) 55%, black);
   --success: var(--p3);
   --violet: var(--p4);
 }
@@ -84,8 +90,13 @@ body[data-palette][data-theme="light"]:not([data-palette="amber"]) {
   --primary: color-mix(in srgb, var(--p1) 68%, black);
   --primary-dark: color-mix(in srgb, var(--p1) 52%, black);
   --accent: color-mix(in srgb, var(--p2) 58%, black);
+  --accent-dim: color-mix(in srgb, var(--p2) 40%, black);
   --success: color-mix(in srgb, var(--p3) 60%, black);
   --violet: color-mix(in srgb, var(--p4) 62%, black);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; forced-color-adjust: none; }
@@ -106,6 +117,71 @@ body {
   color: var(--ink);
   padding-bottom: 24px;
   transition: background 0.25s ease, color 0.25s ease;
+  position: relative;
+}
+
+/* HUD ambient backdrop: faint schematic grid + twin glow washes, fixed
+   behind all content, masked so it fades out toward the bottom of the
+   page instead of tiling forever. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--border-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-soft) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 35%, transparent 88%);
+          mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 35%, transparent 88%);
+  opacity: 0.8;
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(700px 420px at 12% -6%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
+    radial-gradient(620px 400px at 100% 8%, color-mix(in srgb, var(--violet) 12%, transparent), transparent 60%);
+}
+body[data-theme="light"]::before { opacity: 0.5; }
+body[data-theme="light"]::after {
+  background:
+    radial-gradient(700px 420px at 12% -6%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%),
+    radial-gradient(620px 400px at 100% 8%, color-mix(in srgb, var(--violet) 7%, transparent), transparent 60%);
+}
+
+/* Starfield: absolutely-positioned dots injected by app.js into #hud-stars,
+   a fixed full-viewport container. Purely decorative, disabled entirely
+   under prefers-reduced-motion (see app.js) and dimmed in light mode. */
+#hud-stars {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+#hud-stars span {
+  position: absolute;
+  width: 1.5px;
+  height: 1.5px;
+  background: var(--accent);
+  border-radius: 50%;
+  opacity: 0.2;
+  animation: hud-twinkle 4s ease-in-out infinite;
+}
+body[data-theme="light"] #hud-stars { opacity: 0.35; }
+@keyframes hud-twinkle {
+  0%, 100% { opacity: 0.06; }
+  50% { opacity: 0.5; }
+}
+
+.topbar, .sidebar, main.content, .sidebar-backdrop, .confirm-modal-overlay, body.auth-page .auth-wrap {
+  position: relative;
+  z-index: 1;
 }
 
 body.page-health,
@@ -249,121 +325,117 @@ body.auth-page {
 .auth-card .muted + .muted {
   margin-top: 8px;
 }
-.topnav { display: none; gap: 6px; align-items: center; flex: 1; }
+/* Gelled single-bar top nav: one bordered console with hairline dividers
+   between items, instead of separate floating pills. Rounded corners only
+   on the outer bar. */
+.topnav {
+  display: none;
+  align-items: stretch;
+  background: linear-gradient(165deg, var(--surface), var(--bg-glow));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: visible;
+  font-family: var(--font-mono);
+}
+.topnav > a,
+.topnav > .nav-group { border-right: 1px solid var(--border-soft); }
+.topnav > a:last-child,
+.topnav > .nav-group:last-child { border-right: none; }
+
 .topnav a {
   position: relative;
   display: inline-flex;
   align-items: center;
   color: var(--muted);
-  font-weight: 600;
-  font-size: 0.78rem;
+  font-weight: 500;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 5px 12px;
-  border-radius: 999px;
-  isolation: isolate;
-  transition: color 0.25s ease, transform 0.25s ease;
+  letter-spacing: 0.1em;
+  padding: 11px 16px;
+  transition: color 0.2s ease, background 0.2s ease;
 }
-.topnav a::before {
+.topnav a:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 4%, transparent); text-decoration: none; }
+.topnav a.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.topnav a.active::after {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  z-index: -1;
-  background: color-mix(in srgb, var(--tab-color) 14%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tab-color) 30%, transparent), 0 0 0 rgba(0,0,0,0);
-  opacity: 0;
-  transform: scale(0.85);
-  transition: opacity 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+  left: 14px; right: 14px; bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 70%, transparent);
+  border-radius: 2px 2px 0 0;
 }
-.topnav a:hover { color: var(--ink); text-decoration: none; transform: translateY(-1px); }
-.topnav a:hover::before, .topnav a.active::before {
-  opacity: 1;
-  transform: scale(1);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tab-color) 45%, transparent), 0 0 18px color-mix(in srgb, var(--tab-color) 40%, transparent);
-}
-.topnav a.active { color: var(--ink); transform: translateY(-1px); }
 
-/* Grouped dropdown items in the top nav (Vault, Tasks) */
+/* Grouped dropdown items in the top nav (Health, Vault, Tasks) */
 .nav-group { position: relative; }
 .nav-group-toggle {
   background: transparent;
   border: none;
-  border-radius: 999px;
-  padding: 5px 12px;
+  padding: 11px 16px;
   cursor: pointer;
   color: var(--muted);
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   position: relative;
-  isolation: isolate;
-  transition: color 0.25s ease, transform 0.25s ease;
+  height: 100%;
+  transition: color 0.2s ease, background 0.2s ease;
 }
-.nav-group-toggle::before {
+.nav-group-toggle .caret { font-size: 0.65rem; color: var(--accent-dim); transition: transform 0.2s ease; }
+.nav-group-toggle:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.nav-group-toggle.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.nav-group-toggle.active::after {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  z-index: -1;
-  background: color-mix(in srgb, var(--tab-color) 14%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tab-color) 30%, transparent), 0 0 0 rgba(0,0,0,0);
-  opacity: 0;
-  transform: scale(0.85);
-  transition: opacity 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
-}
-.nav-group-toggle .caret { font-size: 0.7rem; transition: transform 0.2s ease; }
-.nav-group-toggle:hover, .nav-group-toggle.active { color: var(--ink); transform: translateY(-1px); }
-.nav-group-toggle:hover::before, .nav-group-toggle.active::before {
-  opacity: 1;
-  transform: scale(1);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tab-color) 45%, transparent), 0 0 18px color-mix(in srgb, var(--tab-color) 40%, transparent);
+  left: 14px; right: 14px; bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 70%, transparent);
+  border-radius: 2px 2px 0 0;
 }
 .nav-group.open .nav-group-toggle .caret { transform: rotate(180deg); }
 .nav-group-menu {
   position: absolute;
-  top: calc(100% + 10px);
-  left: 50%;
-  transform: translateX(-50%) translateY(-6px);
-  min-width: 160px;
-  background: var(--surface-raised);
+  top: calc(100% + 8px);
+  left: 0;
+  transform: translateY(-6px);
+  min-width: 190px;
+  background: linear-gradient(165deg, var(--surface), var(--bg-glow));
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+  border-radius: 8px;
+  box-shadow: var(--shadow), 0 0 0 1px color-mix(in srgb, var(--accent) 6%, transparent);
   padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease;
   z-index: 20;
 }
-.nav-group.open .nav-group-menu { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+.nav-group.open .nav-group-menu { opacity: 1; pointer-events: auto; transform: translateY(0); }
 .nav-group-menu a {
   color: var(--muted);
-  font-weight: 600;
-  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 8px 10px;
-  border-radius: 4px;
-  border-left: 2px solid transparent;
-  transition: color 0.15s ease, background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  letter-spacing: 0.06em;
+  padding: 9px 10px;
+  border-radius: 5px;
+  transition: color 0.15s ease, background 0.2s ease;
 }
 .nav-group-menu a:hover {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--tab-color) 10%, transparent);
-  border-left-color: var(--tab-color);
-  transform: translateX(2px);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   text-decoration: none;
 }
-.nav-group-menu a.active { color: var(--primary); }
+.nav-group-menu a.active { color: var(--accent); }
 
 /* Light/dark rocker switch, header */
 .mode-switch {
@@ -609,46 +681,53 @@ body.auth-page {
   .grid .wide { grid-column: 1 / -1; }
 }
 
-/* Instrument card: rivets + colored tab flag, on every .card sitewide */
+/* HUD instrument panel, on every .card sitewide: glass gradient, a scan-line
+   sweep that plays on load, and a targeting-frame corner bracket. Hover
+   adds a soft 3D tilt toward the cursor (see app.js) plus a glow lift. */
 .card {
-  background: var(--surface);
+  background: linear-gradient(165deg, var(--surface), var(--bg-glow));
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 26px 18px 18px;
+  padding: 22px 20px 20px;
   box-shadow: var(--shadow);
   animation: card-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   position: relative;
-  transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.35s ease, transform 0.35s ease;
+  overflow: hidden;
+  transition: border-color 0.35s ease, box-shadow 0.35s ease;
+  will-change: transform;
 }
 .card:hover {
   border-color: color-mix(in srgb, var(--tab-color) 45%, var(--border));
   box-shadow: var(--shadow), 0 0 0 1px color-mix(in srgb, var(--tab-color) 18%, transparent), 0 0 26px color-mix(in srgb, var(--tab-color) 20%, transparent);
-  transform: translateY(-2px);
 }
 .card::before {
   content: "";
   position: absolute;
-  top: -6px; left: 16px;
-  width: 30px; height: 8px;
-  background: var(--tab-color);
-  border-radius: 2px 2px 0 0;
+  top: 0; left: 0;
+  width: 100%; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--tab-color), transparent);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: card-scan 3s ease-in-out infinite;
 }
 .card::after {
   content: "";
   position: absolute;
-  top: 10px; left: 50%;
-  width: 56px; height: 7px;
-  transform: translateX(-50%);
-  background-image:
-    radial-gradient(circle, var(--rivet) 3.5px, transparent 3.6px),
-    radial-gradient(circle, var(--rivet) 3.5px, transparent 3.6px);
-  background-position: left center, right center;
-  background-repeat: no-repeat;
-  background-size: 7px 7px;
-  opacity: 0.9;
+  top: -1px; right: -1px;
+  width: 24px; height: 24px;
+  pointer-events: none;
+  border-top: 1px solid color-mix(in srgb, var(--tab-color) 55%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--tab-color) 55%, transparent);
+  border-radius: 0 var(--radius) 0 0;
+  opacity: 0.7;
+}
+@keyframes card-scan {
+  0% { transform: scaleX(0); opacity: 1; }
+  45% { transform: scaleX(1); }
+  100% { transform: scaleX(1); opacity: 0; }
 }
 @keyframes card-in {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .content > h1 { animation: card-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
@@ -665,7 +744,7 @@ body.auth-page {
 
 .stat-row { display: flex; flex-wrap: wrap; gap: 24px; margin: 10px 0; }
 .stat { display: flex; flex-direction: column; border-left: 2px solid var(--tab-color); padding-left: 10px; }
-.stat-value { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
+.stat-value { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; color: var(--accent); letter-spacing: -0.01em; text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent); }
 .stat-value small { font-size: 0.8rem; font-weight: 500; color: var(--muted); margin-left: 2px; }
 .stat-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
 
@@ -1072,13 +1151,23 @@ body[data-theme="light"] .habit-reminder-form input[type="time"]::-webkit-calend
 }
 .status-dot {
   display: inline-block;
-  width: 10px; height: 10px;
-  border-radius: 2px;
-  border: 2px solid var(--border);
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
   vertical-align: middle;
   margin-right: 2px;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.status-dot.done { background: var(--success); border-color: var(--success); }
+.status-dot.done {
+  background: var(--success);
+  border-color: var(--success);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--success) 70%, transparent);
+  animation: hud-pulse 2.4s ease-in-out infinite;
+}
+@keyframes hud-pulse {
+  0%, 100% { box-shadow: 0 0 4px color-mix(in srgb, var(--success) 50%, transparent); }
+  50% { box-shadow: 0 0 12px color-mix(in srgb, var(--success) 75%, transparent); }
+}
 
 .plain-list { list-style: none; padding: 0; margin: 8px 0; }
 .plain-list li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
@@ -1384,3 +1473,25 @@ a.btn-secondary:hover {
 }
 .yearly-chart-legend .swatch.income { background: var(--success); }
 .yearly-chart-legend .swatch.expense { background: var(--danger); }
+
+/* Dashboard signature widget: an orbiting-rings indicator. Deliberately
+   NOT reused on any other page — this is the one place the HUD identity
+   gets a unique flourish rather than a repeated pattern. See
+   templates/dashboard.html (.orbit-card). */
+.orbit-wrap { position: relative; width: 130px; height: 130px; margin: 10px auto 6px; }
+.orbit-core {
+  position: absolute; inset: 0; margin: auto; width: 13px; height: 13px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff, var(--accent));
+  box-shadow: 0 0 22px 4px color-mix(in srgb, var(--accent) 70%, transparent);
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+}
+.orbit-ring { position: absolute; border: 1px solid var(--border); border-radius: 50%; top: 50%; left: 50%; }
+.orbit-ring.r1 { width: 62px; height: 62px; margin: -31px 0 0 -31px; animation: orbit-spin 7s linear infinite; }
+.orbit-ring.r2 { width: 96px; height: 96px; margin: -48px 0 0 -48px; border-style: dashed; animation: orbit-spin 14s linear infinite reverse; }
+.orbit-ring.r3 { width: 130px; height: 130px; margin: -65px 0 0 -65px; animation: orbit-spin 22s linear infinite; }
+.orbit-sat { position: absolute; width: 7px; height: 7px; border-radius: 50%; top: -3.5px; left: 50%; margin-left: -3.5px; }
+.orbit-ring.r1 .orbit-sat { background: var(--primary); box-shadow: 0 0 10px color-mix(in srgb, var(--primary) 80%, transparent); }
+.orbit-ring.r3 .orbit-sat { background: var(--violet); box-shadow: 0 0 10px color-mix(in srgb, var(--violet) 80%, transparent); }
+@keyframes orbit-spin { to { transform: rotate(360deg); } }
+.orbit-cap { text-align: center; font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); margin-top: 6px; letter-spacing: 0.06em; }
+.orbit-cap b { color: var(--ink); font-weight: 600; }
