@@ -5,56 +5,80 @@
   <h1>Audit log</h1>
   <span class="admin-badge">Admin console</span>
 </div>
-<p class="muted">
+<p class="muted" id="admin-audit-count">
   {{ entries | length }} entr{{ 'y' if entries | length == 1 else 'ies' }} shown{% if q %} for "{{ q }}"{% endif %}
   — most recent 300, newest first.
 </p>
 
 <div class="card wide">
-  <form method="get" action="{{ url_for('admin_audit_log') }}" class="inline-form">
-    <label>Search by email (actor or target) <input type="text" name="q" value="{{ q }}" placeholder="e.g. jane@"></label>
+  <form method="get" action="{{ url_for('admin_audit_log') }}" class="inline-form" id="admin-audit-search-form">
+    <label>Search by email (actor or target) <input type="text" name="q" value="{{ q }}" placeholder="e.g. jane@" id="admin-audit-search-input" autocomplete="off"></label>
     <button type="submit">Search</button>
-    {% if q %}<a href="{{ url_for('admin_audit_log') }}"><button type="button" class="secondary">Clear</button></a>{% endif %}
-    <a href="{{ url_for('admin_audit_log_export', q=q) }}"><button type="button" class="secondary">Export CSV</button></a>
+    <a href="{{ url_for('admin_audit_log') }}"><button type="button" class="secondary" id="admin-audit-clear" style="{{ '' if q else 'display:none;' }}">Clear</button></a>
+    <a href="{{ url_for('admin_audit_log_export', q=q) }}" id="admin-audit-export"><button type="button" class="secondary">Export CSV</button></a>
   </form>
 </div>
 
-<div class="card wide">
-  <table class="table">
-    <thead>
-      <tr>
-        <th>When</th>
-        <th>Actor</th>
-        <th>Action</th>
-        <th>Target</th>
-        <th>Details</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for e in entries %}
-        <tr>
-          <td class="muted">{{ e.created_at | fmtdatetime }}</td>
-          <td>{{ e.actor_email }}</td>
-          <td>
-            {% if e.action == 'delete_user' %}<span class="bmi-tag bmi-obese">Deleted user</span>
-            {% elif e.action == 'suspend_user' %}<span class="bmi-tag bmi-overweight">Suspended user</span>
-            {% elif e.action == 'unsuspend_user' %}<span class="bmi-tag bmi-normal">Unsuspended user</span>
-            {% elif e.action == 'promote_admin' %}<span class="bmi-tag bmi-normal">Promoted to admin</span>
-            {% elif e.action == 'demote_admin' %}<span class="bmi-tag bmi-overweight">Removed admin</span>
-            {% elif e.action == 'update_user' %}<span class="muted">Updated user</span>
-            {% elif e.action == 'login_failed' %}<span class="muted">Login failed</span>
-            {% elif e.action == 'login_blocked_suspended' %}<span class="bmi-tag bmi-overweight">Blocked login (suspended)</span>
-            {% elif e.action == 'self_password_reset' %}<span class="muted">Self password reset</span>
-            {% else %}<span class="muted">{{ e.action }}</span>
-            {% endif %}
-          </td>
-          <td>{{ e.target_email or '—' }}</td>
-          <td class="muted">{{ e.details or '—' }}</td>
-        </tr>
-      {% else %}
-        <tr class="muted"><td colspan="5">No audit log entries{% if q %} match "{{ q }}"{% endif %} yet.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="card wide" id="admin-audit-table-wrap">
+  {% include "_admin_audit_log_table.html" %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Live filtering: re-query as the admin types, so results are already
+// filtered by the time they've finished typing — no Search click needed.
+(function () {
+  const input = document.getElementById('admin-audit-search-input');
+  const wrap = document.getElementById('admin-audit-table-wrap');
+  const countEl = document.getElementById('admin-audit-count');
+  const clearBtn = document.getElementById('admin-audit-clear');
+  const exportLink = document.getElementById('admin-audit-export');
+  const form = document.getElementById('admin-audit-search-form');
+  if (!input || !wrap) return;
+
+  const exportBaseUrl = "{{ url_for('admin_audit_log_export') }}";
+
+  let timer = null;
+  let inFlight = null;
+  let requestId = 0;
+
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(runSearch, 250);
+  });
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    clearTimeout(timer);
+    runSearch();
+  });
+
+  async function runSearch() {
+    const q = input.value.trim();
+    const id = ++requestId;
+    const url = `{{ url_for('admin_audit_log') }}?q=${encodeURIComponent(q)}`;
+    history.replaceState(null, '', url);
+    clearBtn.style.display = q ? '' : 'none';
+    exportLink.href = q ? `${exportBaseUrl}?q=${encodeURIComponent(q)}` : exportBaseUrl;
+    if (inFlight) inFlight.abort();
+    const controller = new AbortController();
+    inFlight = controller;
+    try {
+      const resp = await fetch(url, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        signal: controller.signal,
+      });
+      if (id !== requestId) return; // a newer keystroke already superseded this response
+      const data = await resp.json();
+      wrap.innerHTML = data.table_html;
+      countEl.textContent = data.count_text;
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        // Leave the last good results in place rather than clearing them on a transient failure.
+      }
+    }
+  }
+})();
+</script>
 {% endblock %}
