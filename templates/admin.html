@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Admin · Stats — Life Hub{% endblock %}
+{% block content %}
+<h1>Admin</h1>
+<p class="muted">Overview of everyone using this deployment. Manage individual accounts on the <a class="link" href="{{ url_for('admin_users') }}">Users</a> page.</p>
+
+<div class="grid">
+  <div class="card">
+    <h3>Users</h3>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-value" data-countup="{{ stats.total_users }}">0</span><span class="stat-label">total</span></div>
+      <div class="stat"><span class="stat-value" data-countup="{{ stats.admins }}">0</span><span class="stat-label">admins</span></div>
+      <div class="stat"><span class="stat-value" data-countup="{{ stats.verified }}">0</span><span class="stat-label">verified</span></div>
+      <div class="stat"><span class="stat-value" data-countup="{{ stats.unverified }}">0</span><span class="stat-label">unverified</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>New Signups</h3>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-value" data-countup="{{ stats.new_today }}">0</span><span class="stat-label">today</span></div>
+      <div class="stat"><span class="stat-value" data-countup="{{ stats.new_week }}">0</span><span class="stat-label">last 7 days</span></div>
+      <div class="stat"><span class="stat-value" data-countup="{{ stats.new_month }}">0</span><span class="stat-label">last 30 days</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="card wide">
+  <h3>Signups — last 30 days</h3>
+  <canvas id="signupsChart" height="90"></canvas>
+</div>
+
+<div class="card wide">
+  <h3>Records by feature</h3>
+  <p class="muted">Total rows stored across all users, per feature — a rough signal of what people actually use.</p>
+  <canvas id="contentChart" height="110"></canvas>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+(function () {
+  const style = getComputedStyle(document.body);
+  const ink = style.getPropertyValue('--ink').trim();
+  const muted = style.getPropertyValue('--muted').trim();
+  const border = style.getPropertyValue('--border').trim();
+  const accent = style.getPropertyValue('--accent').trim();
+  const primary = style.getPropertyValue('--primary').trim();
+  const success = style.getPropertyValue('--success').trim();
+  const violet = style.getPropertyValue('--violet').trim();
+  const danger = style.getPropertyValue('--danger').trim();
+
+  Chart.defaults.color = muted;
+  Chart.defaults.font.family = getComputedStyle(document.documentElement).getPropertyValue('--font-mono') || 'monospace';
+
+  const signups = {{ signups | tojson }};
+  new Chart(document.getElementById('signupsChart'), {
+    type: 'line',
+    data: {
+      labels: signups.map(d => d.day.slice(5)),
+      datasets: [{
+        label: 'New users',
+        data: signups.map(d => d.count),
+        borderColor: accent,
+        backgroundColor: accent + '33',
+        pointRadius: 0,
+        borderWidth: 2,
+        fill: true,
+        tension: 0.3,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: border }, ticks: { maxTicksLimit: 10, color: muted } },
+        y: { grid: { color: border }, beginAtZero: true, ticks: { precision: 0, color: muted } },
+      },
+    },
+  });
+
+  const content = {{ content_totals | tojson }};
+  const palette = [accent, primary, success, violet, danger, muted, '#5FE0FF', '#FFB454', '#8FD14F'];
+  new Chart(document.getElementById('contentChart'), {
+    type: 'bar',
+    data: {
+      labels: content.map(c => c.label),
+      datasets: [{
+        label: 'Records',
+        data: content.map(c => c.count),
+        backgroundColor: content.map((_, i) => palette[i % palette.length]),
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: muted } },
+        y: { grid: { color: border }, beginAtZero: true, ticks: { precision: 0, color: muted } },
+      },
+    },
+  });
+})();
+</script>
+{% endblock %}

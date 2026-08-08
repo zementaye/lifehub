@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Admin · Users — Life Hub{% endblock %}
+{% block content %}
+<h1>Users</h1>
+<p class="muted">{{ users | length }} account{{ '' if users | length == 1 else 's' }} shown{% if q %} for "{{ q }}"{% endif %} · <a class="link" href="{{ url_for('admin_dashboard') }}">Back to Stats</a></p>
+
+<div class="card wide">
+  <form method="get" action="{{ url_for('admin_users') }}" class="inline-form">
+    <label>Search by email <input type="text" name="q" value="{{ q }}" placeholder="e.g. jane@"></label>
+    <button type="submit">Search</button>
+    {% if q %}<a href="{{ url_for('admin_users') }}"><button type="button" class="secondary">Clear</button></a>{% endif %}
+  </form>
+</div>
+
+<div class="card wide">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Verified</th>
+        <th>Records</th>
+        <th>Joined</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{{ u.email }}{% if u.id == user.id %} <span class="muted">(you)</span>{% endif %}</td>
+          <td>
+            {% if u.is_admin %}<span class="bmi-tag bmi-normal">Admin</span>{% else %}<span class="muted">User</span>{% endif %}
+          </td>
+          <td>{{ '✅' if u.email_verified_at else '—' }}</td>
+          <td>{{ u.record_count }}</td>
+          <td class="muted">{{ u.created_at | fmtdate }}</td>
+          <td>
+            <button type="button" class="secondary admin-edit-toggle" style="white-space:nowrap;">Edit</button>
+          </td>
+        </tr>
+        <tr class="admin-edit-row" style="display:none;">
+          <td colspan="6">
+            <div class="admin-user-actions">
+              <form method="post" action="{{ url_for('admin_update_user', user_id=u.id) }}" class="inline-form">
+                <label>Email <input type="email" name="email" value="{{ u.email }}" required></label>
+                <label>New password <input type="password" name="password" placeholder="leave blank to keep current"></label>
+                <button type="submit">Save</button>
+              </form>
+
+              <form method="post" action="{{ url_for('admin_toggle_admin', user_id=u.id) }}"
+                    data-confirm="{{ 'Remove admin from ' ~ u.email ~ '?' if u.is_admin else 'Make ' ~ u.email ~ ' an admin?' }}">
+                <button type="submit" class="secondary">
+                  {{ 'Remove admin' if u.is_admin else 'Make admin' }}
+                </button>
+              </form>
+
+              {% if u.id != user.id %}
+                <form method="post" action="{{ url_for('admin_delete_user', user_id=u.id) }}"
+                      data-confirm="Permanently delete {{ u.email }} and all of their data?">
+                  <button type="submit" class="confirm-modal-danger">Delete user</button>
+                </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% else %}
+        <tr class="muted"><td colspan="6">No users match.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.admin-edit-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const row = btn.closest('tr').nextElementSibling;
+    if (row && row.classList.contains('admin-edit-row')) {
+      row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+    }
+  });
+});
+</script>
+{% endblock %}
