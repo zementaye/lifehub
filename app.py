@@ -153,7 +153,16 @@ def admin_required(view):
     """Gate for every /admin/* route. Requires login (same as
     login_required) AND that the account has is_admin set — anyone else
     gets bounced to the dashboard with a flash rather than a raw 403, same
-    tone as the rest of this app's error handling."""
+    tone as the rest of this app's error handling.
+
+    On top of that, admin access needs a *recent* password check
+    (session["admin_verified_at"]), separate from the regular week-long
+    login session. Without this, anyone who can get to an already-unlocked
+    browser — hours or days into the same login session, e.g. via browser
+    history — could walk straight into the admin console with no prompt at
+    all. The elevation window is sliding: it refreshes on every admin
+    request, so an admin actively working stays in, but idle time beyond
+    config.ADMIN_ELEVATION_LIFETIME requires re-entering the password."""
     @wraps(view)
     def wrapped(*args, **kwargs):
         if not g.get("user_id"):
@@ -162,8 +171,44 @@ def admin_required(view):
         if not user or not user["is_admin"]:
             flash("That page is admin-only.")
             return redirect(url_for("dashboard"))
+        verified_at = session.get("admin_verified_at")
+        if not verified_at or time.time() - verified_at > config.ADMIN_ELEVATION_LIFETIME:
+            return redirect(url_for("admin_verify", next=request.path))
+        session["admin_verified_at"] = time.time()  # sliding window
         return view(*args, **kwargs)
     return wrapped
+
+
+@app.route("/admin/verify", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"], key_func=get_remote_address)
+def admin_verify():
+    """Step-up re-authentication in front of the admin console. Reached
+    whenever admin_required finds no recent elevation — see there for why
+    this exists. Only confirms the password of the account already logged
+    in; it doesn't grant admin access to anyone who doesn't have it."""
+    if not g.get("user_id"):
+        return redirect(url_for("login", next=request.full_path))
+    user = db.get_user_by_id(g.user_id)
+    if not user or not user["is_admin"]:
+        flash("That page is admin-only.")
+        return redirect(url_for("dashboard"))
+
+    # Only allow redirecting back into /admin/... — never off-site and
+    # never somewhere outside the admin console.
+    next_path = request.values.get("next", "")
+    if not next_path.startswith("/admin"):
+        next_path = url_for("admin_dashboard")
+
+    if request.method == "GET":
+        return render_template("admin_verify.html", next=next_path, email=user["email"])
+
+    password = request.form.get("password", "")
+    if not db.verify_password(user, password):
+        flash("Incorrect password.")
+        return render_template("admin_verify.html", next=next_path, email=user["email"])
+
+    session["admin_verified_at"] = time.time()
+    return redirect(next_path)
 
 
 @app.context_processor
@@ -263,6 +308,10 @@ def login():
 
     session["user_id"] = user["id"]
     session.permanent = True
+    # A fresh login is itself a password check, so it also counts as
+    # admin elevation (see admin_required) — no need to immediately
+    # re-prompt someone who just typed their password 2 seconds ago.
+    session["admin_verified_at"] = time.time()
     next_path = request.args.get("next")
     if next_path:
         return redirect(next_path)
