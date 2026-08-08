@@ -73,6 +73,18 @@ def _hour12(hour):
 
 app.jinja_env.filters["hour12"] = _hour12
 
+
+def _fmt_date(epoch):
+    """Format a stored epoch-seconds timestamp (created_at, etc.) as a
+    plain YYYY-MM-DD for display — used on the admin user list."""
+    if epoch is None:
+        return "—"
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(float(epoch), tz=timezone.utc).strftime("%Y-%m-%d")
+
+
+app.jinja_env.filters["fmtdate"] = _fmt_date
+
 db.init_db()
 
 
@@ -114,6 +126,23 @@ def login_required(view):
     def wrapped(*args, **kwargs):
         if not g.get("user_id"):
             return redirect(url_for("login"))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def admin_required(view):
+    """Gate for every /admin/* route. Requires login (same as
+    login_required) AND that the account has is_admin set — anyone else
+    gets bounced to the dashboard with a flash rather than a raw 403, same
+    tone as the rest of this app's error handling."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not g.get("user_id"):
+            return redirect(url_for("login"))
+        user = db.get_user_by_id(g.user_id)
+        if not user or not user["is_admin"]:
+            flash("That page is admin-only.")
+            return redirect(url_for("dashboard"))
         return view(*args, **kwargs)
     return wrapped
 
@@ -1767,6 +1796,105 @@ def export_data():
     resp.headers["Content-Type"] = "application/json"
     resp.headers["Content-Disposition"] = f"attachment; filename={filename}"
     return resp
+
+
+# ── Admin ────────────────────────────────────────────────────────────────
+# Every route below requires is_admin (see admin_required above). The very
+# first account ever registered on a deployment gets is_admin=1
+# automatically (see db.create_user) — that's the only way in the first
+# time, since there's no one else yet to grant it from this UI.
+
+@app.route("/admin")
+@admin_required
+def admin_dashboard():
+    return render_template(
+        "admin.html",
+        stats=db.admin_overview_stats(),
+        signups=db.admin_signup_counts(30),
+        content_totals=db.admin_content_totals(),
+    )
+
+
+@app.route("/admin/users")
+@admin_required
+def admin_users():
+    q = request.args.get("q", "").strip()
+    return render_template(
+        "admin_users.html",
+        users=db.admin_list_users(q or None),
+        q=q,
+        admin_count=db.admin_count_admins(),
+    )
+
+
+@app.route("/admin/users/<int:user_id>/update", methods=["POST"])
+@admin_required
+def admin_update_user(user_id):
+    email = request.form.get("email", "").strip()
+    password = request.form.get("password", "").strip()
+    if not email:
+        flash("Email can't be blank.")
+        return redirect(url_for("admin_users"))
+    error = db.admin_update_user(user_id, email=email, new_password=password or None)
+    if error:
+        flash(error)
+    else:
+        flash("User updated.")
+    return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/<int:user_id>/toggle-admin", methods=["POST"])
+@admin_required
+def admin_toggle_admin(user_id):
+    target = db.get_user_by_id(user_id)
+    if not target:
+        flash("That user no longer exists.")
+        return redirect(url_for("admin_users"))
+
+    if target["is_admin"]:
+        # Refuse to demote the last remaining admin — otherwise the whole
+        # admin panel becomes permanently unreachable (no one left who can
+        # re-grant it), including to the person doing this action.
+        if db.admin_count_admins() <= 1:
+            flash("Can't remove admin from the last remaining admin.")
+            return redirect(url_for("admin_users"))
+        db.admin_set_admin(user_id, False)
+        flash(f"{target['email']} is no longer an admin.")
+    else:
+        db.admin_set_admin(user_id, True)
+        flash(f"{target['email']} is now an admin.")
+    return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_user(user_id):
+    if user_id == g.user_id:
+        flash("You can't delete your own account from here — use Settings instead.")
+        return redirect(url_for("admin_users"))
+
+    target = db.get_user_by_id(user_id)
+    if not target:
+        flash("That user no longer exists.")
+        return redirect(url_for("admin_users"))
+    if target["is_admin"] and db.admin_count_admins() <= 1:
+        flash("Can't delete the last remaining admin.")
+        return redirect(url_for("admin_users"))
+
+    filenames = db.admin_delete_user(user_id)
+    for filename in filenames:
+        try:
+            if config.USE_B2:
+                storage.delete_file(filename)
+            else:
+                path = config.UPLOAD_DIR / filename
+                if path.exists():
+                    path.unlink()
+        except Exception:
+            logger.exception("Failed to delete vault file %s for removed user %s", filename, user_id)
+
+    flash(f"Deleted {target['email']} and all of their data.")
+    return redirect(url_for("admin_users"))
 
 
 if __name__ == "__main__":
