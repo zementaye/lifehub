@@ -267,6 +267,7 @@ _MIGRATIONS = [
     ("passwords", "user_id", "INTEGER"),
     ("notes", "user_id", "INTEGER"),
     ("users", "email_verified_at", "REAL"),
+    ("users", "is_admin", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 # Tables that carry a user_id column and get scanned for orphaned
@@ -543,6 +544,10 @@ def create_user(email: str, password: str):
         if is_first_user:
             for table in _USER_SCOPED_TABLES:
                 conn.execute(f"UPDATE {table} SET user_id = ? WHERE user_id IS NULL", (user_id,))
+            # The very first account on a deployment is automatically the
+            # admin — there's no one else yet to grant that from a UI, so
+            # someone has to start with it or the admin panel is unreachable.
+            conn.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (user_id,))
     return user_id
 
 
@@ -656,3 +661,165 @@ def set_setting(user_id: int, key: str, value) -> None:
 def delete_setting(user_id: int, key: str) -> None:
     with get_conn() as conn:
         conn.execute("DELETE FROM settings WHERE user_id = ? AND key = ?", (user_id, key))
+
+
+# ── Admin ────────────────────────────────────────────────────────────────
+# Everything below powers /admin (app.py). All of it assumes the caller has
+# already checked the requesting user is an admin — these functions don't
+# gate on that themselves, they're the data layer only.
+
+# (display label, table) — used both for the per-user "records" count on
+# the user list and for the content-totals chart on the stats overview.
+_CONTENT_TABLES = [
+    ("Habits", "habits"),
+    ("To-dos", "todos"),
+    ("Notes", "notes"),
+    ("Vault documents", "documents"),
+    ("Passwords", "passwords"),
+    ("Transactions", "transactions"),
+    ("Food logs", "food_log"),
+    ("Reminders", "reminders"),
+    ("Weight entries", "weight_entries"),
+]
+
+
+def admin_list_users(query: str = None):
+    """All users, newest first, each annotated with a total record count
+    across the main content tables (used for a quick "how much do they
+    have stored" signal on the admin user list). Optionally filtered to
+    emails containing `query`."""
+    count_expr = " + ".join(
+        f"(SELECT COUNT(*) FROM {table} WHERE {table}.user_id = users.id)"
+        for _, table in _CONTENT_TABLES
+    )
+    sql = f"SELECT users.*, ({count_expr}) AS record_count FROM users"
+    params = ()
+    if query:
+        sql += " WHERE users.email LIKE ?"
+        params = (f"%{query.strip().lower()}%",)
+    sql += " ORDER BY users.created_at DESC"
+    with get_conn() as conn:
+        return conn.execute(sql, params).fetchall()
+
+
+def admin_overview_stats():
+    """Headline numbers for the admin stats page."""
+    with get_conn() as conn:
+        total = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
+        admins = conn.execute("SELECT COUNT(*) AS c FROM users WHERE is_admin = 1").fetchone()["c"]
+        verified = conn.execute(
+            "SELECT COUNT(*) AS c FROM users WHERE email_verified_at IS NOT NULL"
+        ).fetchone()["c"]
+        t = now()
+        new_today = conn.execute(
+            "SELECT COUNT(*) AS c FROM users WHERE created_at >= ?", (t - 86400,)
+        ).fetchone()["c"]
+        new_week = conn.execute(
+            "SELECT COUNT(*) AS c FROM users WHERE created_at >= ?", (t - 7 * 86400,)
+        ).fetchone()["c"]
+        new_month = conn.execute(
+            "SELECT COUNT(*) AS c FROM users WHERE created_at >= ?", (t - 30 * 86400,)
+        ).fetchone()["c"]
+    return {
+        "total_users": total,
+        "admins": admins,
+        "verified": verified,
+        "unverified": total - verified,
+        "new_today": new_today,
+        "new_week": new_week,
+        "new_month": new_month,
+    }
+
+
+def admin_signup_counts(days: int = 30):
+    """Daily signup counts for the last `days` days, including zero-count
+    days, so the chart doesn't silently skip gaps."""
+    from datetime import datetime, timedelta, timezone
+
+    cutoff = now() - days * 86400
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT strftime('%Y-%m-%d', created_at, 'unixepoch') AS day, COUNT(*) AS c
+            FROM users
+            WHERE created_at >= ?
+            GROUP BY day
+            """,
+            (cutoff,),
+        ).fetchall()
+    by_day = {r["day"]: r["c"] for r in rows}
+    today = datetime.now(timezone.utc).date()
+    out = []
+    for i in range(days - 1, -1, -1):
+        d = (today - timedelta(days=i)).isoformat()
+        out.append({"day": d, "count": by_day.get(d, 0)})
+    return out
+
+
+def admin_content_totals():
+    """Row counts across the main content tables, for a "what's actually
+    being used" bar chart."""
+    with get_conn() as conn:
+        return [
+            {"label": label, "count": conn.execute(f"SELECT COUNT(*) AS c FROM {table}").fetchone()["c"]}
+            for label, table in _CONTENT_TABLES
+        ]
+
+
+def admin_count_admins() -> int:
+    with get_conn() as conn:
+        return conn.execute("SELECT COUNT(*) AS c FROM users WHERE is_admin = 1").fetchone()["c"]
+
+
+def admin_set_admin(user_id: int, is_admin: bool) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (1 if is_admin else 0, user_id))
+
+
+def admin_update_user(user_id: int, email: str = None, new_password: str = None) -> str | None:
+    """Admin-side edit of a user's email and/or password. Returns an error
+    message string if the email is taken by a *different* account, else
+    None on success. Blank/omitted fields are left unchanged."""
+    with get_conn() as conn:
+        if email:
+            email = email.strip().lower()
+            clash = conn.execute(
+                "SELECT id FROM users WHERE email = ? AND id != ?", (email, user_id)
+            ).fetchone()
+            if clash:
+                return "That email is already used by another account."
+            conn.execute("UPDATE users SET email = ? WHERE id = ?", (email, user_id))
+        if new_password:
+            conn.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (generate_password_hash(new_password), user_id),
+            )
+    return None
+
+
+def admin_delete_user(user_id: int):
+    """Deletes a user and every row of their data across every user-scoped
+    table. Returns the list of vault document filenames the caller should
+    also remove from file storage (local disk or B2) — that part isn't
+    tracked here since db.py doesn't know about storage.py."""
+    with get_conn() as conn:
+        doc_rows = conn.execute(
+            "SELECT filename FROM documents WHERE user_id = ?", (user_id,)
+        ).fetchall()
+        filenames = [r["filename"] for r in doc_rows]
+
+        # savings_contributions hangs off savings_goals (goal_id), not a
+        # direct user_id column, so it needs its own scoped delete before
+        # the goals themselves go — same shape as export_data()'s handling.
+        goal_rows = conn.execute(
+            "SELECT id FROM savings_goals WHERE user_id = ?", (user_id,)
+        ).fetchall()
+        for row in goal_rows:
+            conn.execute("DELETE FROM savings_contributions WHERE goal_id = ?", (row["id"],))
+
+        for table in _USER_SCOPED_TABLES:
+            conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM email_verifications WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    return filenames
