@@ -21,6 +21,7 @@
       <tr>
         <th>Email</th>
         <th>Role</th>
+        <th>Status</th>
         <th>Verified</th>
         <th>Records</th>
         <th>Joined</th>
@@ -34,6 +35,9 @@
           <td>
             {% if u.is_admin %}<span class="bmi-tag bmi-normal">Admin</span>{% else %}<span class="muted">User</span>{% endif %}
           </td>
+          <td>
+            {% if u.disabled_at %}<span class="bmi-tag bmi-obese">Suspended</span>{% else %}<span class="muted">Active</span>{% endif %}
+          </td>
           <td>{{ '✅' if u.email_verified_at else '—' }}</td>
           <td>{{ u.record_count }}</td>
           <td class="muted">{{ u.created_at | fmtdate }}</td>
@@ -42,7 +46,7 @@
           </td>
         </tr>
         <tr class="admin-edit-row" style="display:none;">
-          <td colspan="6">
+          <td colspan="7">
             <div class="admin-user-actions">
               <form method="post" action="{{ url_for('admin_update_user', user_id=u.id) }}" class="inline-form">
                 <label>Email <input type="email" name="email" value="{{ u.email }}" required></label>
@@ -58,8 +62,21 @@
               </form>
 
               {% if u.id != user.id %}
+                {% if u.disabled_at %}
+                  <form method="post" action="{{ url_for('admin_toggle_suspend', user_id=u.id) }}"
+                        data-confirm="Let {{ u.email }} log in again?">
+                    <button type="submit" class="secondary">Unsuspend</button>
+                  </form>
+                {% else %}
+                  <form method="post" action="{{ url_for('admin_toggle_suspend', user_id=u.id) }}"
+                        class="inline-form" data-confirm="Suspend {{ u.email }}? They won't be able to log in, but nothing is deleted.">
+                    <label>Reason <input type="text" name="reason" placeholder="optional, shown in the audit log"></label>
+                    <button type="submit" class="secondary">Suspend</button>
+                  </form>
+                {% endif %}
+
                 <form method="post" action="{{ url_for('admin_delete_user', user_id=u.id) }}"
-                      data-confirm="Permanently delete {{ u.email }} and all of their data?">
+                      data-confirm="Permanently delete {{ u.email }} and all of their data? Consider Suspend instead if you're not sure.">
                   <button type="submit" class="confirm-modal-danger">Delete user</button>
                 </form>
               {% endif %}
@@ -67,7 +84,7 @@
           </td>
         </tr>
       {% else %}
-        <tr class="muted"><td colspan="6">No users match.</td></tr>
+        <tr class="muted"><td colspan="7">No users match.</td></tr>
       {% endfor %}
     </tbody>
   </table>

@@ -1,0 +1,56 @@
+{% extends "admin_base.html" %}
+{% block title %}Admin · Audit log — Life Hub{% endblock %}
+{% block content %}
+<div class="admin-topbar">
+  <h1>Audit log</h1>
+  <span class="admin-badge">Admin console</span>
+</div>
+<p class="muted">
+  {{ entries | length }} entr{{ 'y' if entries | length == 1 else 'ies' }} shown{% if q %} for "{{ q }}"{% endif %}
+  — most recent 300, newest first.
+</p>
+
+<div class="card wide">
+  <form method="get" action="{{ url_for('admin_audit_log') }}" class="inline-form">
+    <label>Search by email (actor or target) <input type="text" name="q" value="{{ q }}" placeholder="e.g. jane@"></label>
+    <button type="submit">Search</button>
+    {% if q %}<a href="{{ url_for('admin_audit_log') }}"><button type="button" class="secondary">Clear</button></a>{% endif %}
+  </form>
+</div>
+
+<div class="card wide">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>When</th>
+        <th>Actor</th>
+        <th>Action</th>
+        <th>Target</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in entries %}
+        <tr>
+          <td class="muted">{{ e.created_at | fmtdatetime }}</td>
+          <td>{{ e.actor_email }}</td>
+          <td>
+            {% if e.action == 'delete_user' %}<span class="bmi-tag bmi-obese">Deleted user</span>
+            {% elif e.action == 'suspend_user' %}<span class="bmi-tag bmi-overweight">Suspended user</span>
+            {% elif e.action == 'unsuspend_user' %}<span class="bmi-tag bmi-normal">Unsuspended user</span>
+            {% elif e.action == 'promote_admin' %}<span class="bmi-tag bmi-normal">Promoted to admin</span>
+            {% elif e.action == 'demote_admin' %}<span class="bmi-tag bmi-overweight">Removed admin</span>
+            {% elif e.action == 'update_user' %}<span class="muted">Updated user</span>
+            {% else %}<span class="muted">{{ e.action }}</span>
+            {% endif %}
+          </td>
+          <td>{{ e.target_email or '—' }}</td>
+          <td class="muted">{{ e.details or '—' }}</td>
+        </tr>
+      {% else %}
+        <tr class="muted"><td colspan="5">No audit log entries{% if q %} match "{{ q }}"{% endif %} yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

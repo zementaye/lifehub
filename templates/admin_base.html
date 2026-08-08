@@ -23,6 +23,7 @@
   <nav class="admin-nav">
     <a href="{{ url_for('admin_dashboard') }}" class="{{ 'active' if request.endpoint=='admin_dashboard' }}">📊 Overview</a>
     <a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint=='admin_users' }}">🛡️ Users</a>
+    <a href="{{ url_for('admin_audit_log') }}" class="{{ 'active' if request.endpoint=='admin_audit_log' }}">📜 Audit log</a>
   </nav>
 
   <div class="admin-sidebar-foot">
