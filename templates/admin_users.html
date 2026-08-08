@@ -1,8 +1,11 @@
-{% extends "base.html" %}
+{% extends "admin_base.html" %}
 {% block title %}Admin · Users — Life Hub{% endblock %}
 {% block content %}
-<h1>Users</h1>
-<p class="muted">{{ users | length }} account{{ '' if users | length == 1 else 's' }} shown{% if q %} for "{{ q }}"{% endif %} · <a class="link" href="{{ url_for('admin_dashboard') }}">Back to Stats</a></p>
+<div class="admin-topbar">
+  <h1>Users</h1>
+  <span class="admin-badge">Admin console</span>
+</div>
+<p class="muted">{{ users | length }} account{{ '' if users | length == 1 else 's' }} shown{% if q %} for "{{ q }}"{% endif %}</p>
 
 <div class="card wide">
   <form method="get" action="{{ url_for('admin_users') }}" class="inline-form">

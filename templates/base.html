@@ -79,15 +79,7 @@
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">Settings</a>
 
     {% if user and user.is_admin %}
-      <div class="nav-group">
-        <button type="button" class="nav-group-toggle {{ 'active' if request.endpoint in ['admin_dashboard','admin_users'] }}">
-          Admin <span class="caret">▾</span>
-        </button>
-        <div class="nav-group-menu">
-          <a href="{{ url_for('admin_dashboard') }}" class="{{ 'active' if request.endpoint=='admin_dashboard' }}">Stats</a>
-          <a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint=='admin_users' }}">Users</a>
-        </div>
-      </div>
+      <a href="{{ url_for('admin_dashboard') }}" class="admin-entry-link" title="Opens the separate admin console">🛡️ Admin</a>
     {% endif %}
   </nav>
 </header>
@@ -130,9 +122,8 @@
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">⚙ Settings</a>
 
     {% if user and user.is_admin %}
-      <div class="sidebar-group-label">Admin</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="{{ 'active' if request.endpoint=='admin_dashboard' }}">📊 Stats</a>
-      <a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint=='admin_users' }}">🛡️ Users</a>
+      <div class="sidebar-group-label">&nbsp;</div>
+      <a href="{{ url_for('admin_dashboard') }}">🛡️ Admin console</a>
     {% endif %}
   </nav>
 </aside>

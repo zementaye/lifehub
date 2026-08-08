@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>{% block title %}Admin — Life Hub{% endblock %}</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect x='1' y='1' width='26' height='26' rx='7' fill='%231C222A' stroke='%232A323C'/%3E%3Ccircle cx='14' cy='14' r='5' fill='%23FF5C6C'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}?v={{ asset_version }}">
+</head>
+<!-- Deliberately no data-theme/data-palette here — the admin console
+     always uses the dark HUD palette (style.css's :root defaults) and
+     ignores the user's light/dark + color preference from Settings. It's
+     a separate "ops console" surface on purpose, not another app page. -->
+<body class="admin-shell page-{{ request.endpoint }}">
+<div class="admin-sidebar">
+  <a href="{{ url_for('admin_dashboard') }}" class="admin-brand"><span class="dot"></span> LIFEHUB ADMIN</a>
+
+  <div class="admin-nav-label">Console</div>
+  <nav class="admin-nav">
+    <a href="{{ url_for('admin_dashboard') }}" class="{{ 'active' if request.endpoint=='admin_dashboard' }}">📊 Overview</a>
+    <a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint=='admin_users' }}">🛡️ Users</a>
+  </nav>
+
+  <div class="admin-sidebar-foot">
+    <div class="admin-user-email">{{ user.email if user }}</div>
+    <a href="{{ url_for('dashboard') }}">← Back to app</a>
+    <form method="post" action="{{ url_for('logout') }}" style="margin:0;">
+      <button type="submit">Log out</button>
+    </form>
+  </div>
+</div>
+
+<div class="admin-main">
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div class="flash">
+        {% for m in messages %}<div class="flash-msg">{{ m }}</div>{% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</div>
+
+<div id="confirm-modal-overlay" class="confirm-modal-overlay" style="display:none;">
+  <div class="confirm-modal-box" role="alertdialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+    <p id="confirm-modal-title"></p>
+    <p class="muted confirm-modal-sub">This can't be undone.</p>
+    <div class="confirm-modal-actions">
+      <button type="button" id="confirm-modal-cancel" class="secondary">Cancel</button>
+      <button type="button" id="confirm-modal-ok" class="confirm-modal-danger">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='app.js') }}?v={{ asset_version }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
