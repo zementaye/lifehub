@@ -244,10 +244,20 @@ def login():
 
     user = db.get_user_by_email(email)
     if not user or not db.verify_password(user, password):
+        db.admin_log(
+            None, "(anonymous)", "login_failed",
+            target_id=user["id"] if user else None, target_email=email,
+            details=f"ip={get_remote_address()}",
+        )
         flash("Incorrect email or password.")
         return render_template("login.html")
 
     if user["disabled_at"]:
+        db.admin_log(
+            None, "(anonymous)", "login_blocked_suspended",
+            target_id=user["id"], target_email=user["email"],
+            details=f"ip={get_remote_address()}",
+        )
         flash("This account has been suspended. Contact an admin if you think that's wrong.")
         return render_template("login.html")
 
@@ -310,6 +320,13 @@ def reset_password(token):
 
     db.set_password(reset["user_id"], password)
     db.use_password_reset(token)
+    target = db.get_user_by_id(reset["user_id"])
+    if target:
+        db.admin_log(
+            reset["user_id"], target["email"], "self_password_reset",
+            target_id=reset["user_id"], target_email=target["email"],
+            details=f"ip={get_remote_address()}",
+        )
     flash("Password updated — log in with your new password.")
     return redirect(url_for("login"))
 
@@ -2021,6 +2038,33 @@ def admin_audit_log():
         entries=db.admin_list_audit_log(limit=300, query=q or None),
         q=q,
     )
+
+
+@app.route("/admin/audit-log/export.csv")
+@admin_required
+def admin_audit_log_export():
+    import csv
+    import io
+
+    q = request.args.get("q", "").strip()
+    entries = db.admin_list_audit_log(limit=10000, query=q or None)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["when_utc", "actor_email", "action", "target_email", "details"])
+    for e in entries:
+        writer.writerow([
+            _fmt_datetime(e["created_at"]),
+            e["actor_email"],
+            e["action"],
+            e["target_email"] or "",
+            e["details"] or "",
+        ])
+
+    resp = make_response(buf.getvalue())
+    resp.headers["Content-Type"] = "text/csv"
+    resp.headers["Content-Disposition"] = f"attachment; filename=lifehub_audit_log_{date.today().isoformat()}.csv"
+    return resp
 
 
 if __name__ == "__main__":

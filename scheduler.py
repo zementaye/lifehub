@@ -458,6 +458,18 @@ def tick() -> None:
             logger.exception("tick_for_user failed for user_id=%s", user_id)
 
 
+def prune_audit_log() -> None:
+    """Daily housekeeping for the admin audit log — see
+    db.admin_prune_audit_log for the retention rule (age cutoff, with a
+    floor on how many recent rows are always kept regardless of age)."""
+    try:
+        deleted = db.admin_prune_audit_log()
+        if deleted:
+            logger.info("Pruned %d old admin_audit_log row(s).", deleted)
+    except Exception:
+        logger.exception("prune_audit_log failed")
+
+
 def start_scheduler():
     if not _acquire_singleton_lock():
         logger.info(
@@ -470,6 +482,7 @@ def start_scheduler():
 
     sched = BackgroundScheduler(timezone=config.TIMEZONE)
     sched.add_job(tick, "interval", minutes=15, id="tick", next_run_time=datetime.now())
+    sched.add_job(prune_audit_log, "cron", hour=3, minute=30, id="prune_audit_log")
     sched.start()
     logger.info("Scheduler started — polling every 15 minutes.")
     return sched

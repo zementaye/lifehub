@@ -280,6 +280,7 @@ _MIGRATIONS = [
     ("users", "email_verified_at", "REAL"),
     ("users", "is_admin", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "disabled_at", "REAL"),
+    ("users", "password_changed_at", "REAL"),
 ]
 
 # Tables that carry a user_id column and get scanned for orphaned
@@ -580,8 +581,8 @@ def verify_password(user_row, password: str) -> bool:
 def set_password(user_id: int, password: str) -> None:
     with get_conn() as conn:
         conn.execute(
-            "UPDATE users SET password_hash = ? WHERE id = ?",
-            (generate_password_hash(password), user_id),
+            "UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?",
+            (generate_password_hash(password), now(), user_id),
         )
 
 
@@ -698,13 +699,20 @@ _CONTENT_TABLES = [
 def admin_list_users(query: str = None):
     """All users, newest first, each annotated with a total record count
     across the main content tables (used for a quick "how much do they
-    have stored" signal on the admin user list). Optionally filtered to
-    emails containing `query`."""
+    have stored" signal on the admin user list), plus the reason given on
+    their most recent suspension, if any (NULL if never suspended or no
+    reason was given). Optionally filtered to emails containing `query`."""
     count_expr = " + ".join(
         f"(SELECT COUNT(*) FROM {table} WHERE {table}.user_id = users.id)"
         for _, table in _CONTENT_TABLES
     )
-    sql = f"SELECT users.*, ({count_expr}) AS record_count FROM users"
+    sql = f"""
+        SELECT users.*, ({count_expr}) AS record_count,
+            (SELECT details FROM admin_audit_log
+             WHERE target_id = users.id AND action = 'suspend_user'
+             ORDER BY created_at DESC LIMIT 1) AS last_suspend_reason
+        FROM users
+    """
     params = ()
     if query:
         sql += " WHERE users.email LIKE ?"
@@ -820,8 +828,8 @@ def admin_update_user(user_id: int, email: str = None, new_password: str = None)
             conn.execute("UPDATE users SET email = ? WHERE id = ?", (email, user_id))
         if new_password:
             conn.execute(
-                "UPDATE users SET password_hash = ? WHERE id = ?",
-                (generate_password_hash(new_password), user_id),
+                "UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?",
+                (generate_password_hash(new_password), now(), user_id),
             )
     return None
 
@@ -865,6 +873,36 @@ def admin_list_audit_log(limit: int = 200, query: str = None):
     params = params + (limit,)
     with get_conn() as conn:
         return conn.execute(sql, params).fetchall()
+
+
+def admin_prune_audit_log(days: int = 180, keep_min: int = 2000) -> int:
+    """Deletes audit log rows older than `days`, but always leaves at
+    least the `keep_min` most recent rows in place regardless of age —
+    so a low-traffic deployment doesn't lose its only handful of entries
+    just because they're old. Returns the number of rows deleted. Meant
+    to be called on a schedule (see scheduler.py's tick()), not per-request."""
+    cutoff = now() - days * 86400
+    with get_conn() as conn:
+        keep_ids = conn.execute(
+            "SELECT id FROM admin_audit_log ORDER BY created_at DESC LIMIT ?", (keep_min,)
+        ).fetchall()
+        keep_id_list = [r["id"] for r in keep_ids]
+        if keep_id_list:
+            placeholders = ",".join("?" * len(keep_id_list))
+            to_delete = conn.execute(
+                f"SELECT COUNT(*) AS c FROM admin_audit_log WHERE created_at < ? AND id NOT IN ({placeholders})",
+                (cutoff, *keep_id_list),
+            ).fetchone()["c"]
+            conn.execute(
+                f"DELETE FROM admin_audit_log WHERE created_at < ? AND id NOT IN ({placeholders})",
+                (cutoff, *keep_id_list),
+            )
+        else:
+            to_delete = conn.execute(
+                "SELECT COUNT(*) AS c FROM admin_audit_log WHERE created_at < ?", (cutoff,)
+            ).fetchone()["c"]
+            conn.execute("DELETE FROM admin_audit_log WHERE created_at < ?", (cutoff,))
+    return to_delete
 
 
 def admin_delete_user(user_id: int):
