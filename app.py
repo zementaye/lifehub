@@ -85,6 +85,18 @@ def _fmt_date(epoch):
 
 app.jinja_env.filters["fmtdate"] = _fmt_date
 
+
+def _fmt_datetime(epoch):
+    """Like fmtdate but with a time component — used on the audit log,
+    where knowing *when* an action happened down to the minute matters."""
+    if epoch is None:
+        return "—"
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(float(epoch), tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+app.jinja_env.filters["fmtdatetime"] = _fmt_datetime
+
 db.init_db()
 
 
@@ -117,6 +129,13 @@ def load_logged_in_user():
         return
     if not g.user_id:
         return redirect(url_for("login", next=request.path))
+    # A suspension applied mid-session shouldn't wait for the cookie to
+    # expire — check on every request and boot them out immediately.
+    user = db.get_user_by_id(g.user_id)
+    if not user or user["disabled_at"]:
+        session.clear()
+        flash("This account has been suspended. Contact an admin if you think that's wrong.")
+        return redirect(url_for("login"))
 
 
 def login_required(view):
@@ -226,6 +245,10 @@ def login():
     user = db.get_user_by_email(email)
     if not user or not db.verify_password(user, password):
         flash("Incorrect email or password.")
+        return render_template("login.html")
+
+    if user["disabled_at"]:
+        flash("This account has been suspended. Contact an admin if you think that's wrong.")
         return render_template("login.html")
 
     session["user_id"] = user["id"]
@@ -1849,6 +1872,12 @@ def admin_users():
     )
 
 
+def _admin_actor():
+    """(id, email) for the admin performing the current request — used to
+    stamp every audit log entry."""
+    return g.user_id, db.get_user_by_id(g.user_id)["email"]
+
+
 @app.route("/admin/users/<int:user_id>/update", methods=["POST"])
 @admin_required
 def admin_update_user(user_id):
@@ -1857,11 +1886,29 @@ def admin_update_user(user_id):
     if not email:
         flash("Email can't be blank.")
         return redirect(url_for("admin_users"))
+
+    target = db.get_user_by_id(user_id)
+    if not target:
+        flash("That user no longer exists.")
+        return redirect(url_for("admin_users"))
+
     error = db.admin_update_user(user_id, email=email, new_password=password or None)
     if error:
         flash(error)
-    else:
-        flash("User updated.")
+        return redirect(url_for("admin_users"))
+
+    actor_id, actor_email = _admin_actor()
+    changes = []
+    if email.lower() != target["email"].lower():
+        changes.append(f"email changed to {email}")
+    if password:
+        changes.append("password reset")
+    db.admin_log(
+        actor_id, actor_email, "update_user",
+        target_id=user_id, target_email=target["email"],
+        details="; ".join(changes) or "no-op save",
+    )
+    flash("User updated.")
     return redirect(url_for("admin_users"))
 
 
@@ -1873,6 +1920,7 @@ def admin_toggle_admin(user_id):
         flash("That user no longer exists.")
         return redirect(url_for("admin_users"))
 
+    actor_id, actor_email = _admin_actor()
     if target["is_admin"]:
         # Refuse to demote the last remaining admin — otherwise the whole
         # admin panel becomes permanently unreachable (no one left who can
@@ -1881,10 +1929,44 @@ def admin_toggle_admin(user_id):
             flash("Can't remove admin from the last remaining admin.")
             return redirect(url_for("admin_users"))
         db.admin_set_admin(user_id, False)
+        db.admin_log(actor_id, actor_email, "demote_admin", target_id=user_id, target_email=target["email"])
         flash(f"{target['email']} is no longer an admin.")
     else:
         db.admin_set_admin(user_id, True)
+        db.admin_log(actor_id, actor_email, "promote_admin", target_id=user_id, target_email=target["email"])
         flash(f"{target['email']} is now an admin.")
+    return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/<int:user_id>/toggle-suspend", methods=["POST"])
+@admin_required
+def admin_toggle_suspend(user_id):
+    if user_id == g.user_id:
+        flash("You can't suspend your own account from here.")
+        return redirect(url_for("admin_users"))
+
+    target = db.get_user_by_id(user_id)
+    if not target:
+        flash("That user no longer exists.")
+        return redirect(url_for("admin_users"))
+    if target["is_admin"] and not target["disabled_at"] and db.admin_count_admins() <= 1:
+        flash("Can't suspend the last remaining admin.")
+        return redirect(url_for("admin_users"))
+
+    actor_id, actor_email = _admin_actor()
+    reason = request.form.get("reason", "").strip()
+    if target["disabled_at"]:
+        db.admin_set_disabled(user_id, False)
+        db.admin_log(actor_id, actor_email, "unsuspend_user", target_id=user_id, target_email=target["email"])
+        flash(f"{target['email']} can log in again.")
+    else:
+        db.admin_set_disabled(user_id, True)
+        db.admin_log(
+            actor_id, actor_email, "suspend_user",
+            target_id=user_id, target_email=target["email"],
+            details=reason or None,
+        )
+        flash(f"{target['email']} has been suspended.")
     return redirect(url_for("admin_users"))
 
 
@@ -1903,6 +1985,12 @@ def admin_delete_user(user_id):
         flash("Can't delete the last remaining admin.")
         return redirect(url_for("admin_users"))
 
+    # Snapshot before the row is gone — admin_log below needs the email,
+    # and the actor is looked up here too since g.user_id won't resolve
+    # to anything once we log out an admin who deletes themself elsewhere.
+    actor_id, actor_email = _admin_actor()
+    target_email = target["email"]
+
     filenames = db.admin_delete_user(user_id)
     for filename in filenames:
         try:
@@ -1915,8 +2003,24 @@ def admin_delete_user(user_id):
         except Exception:
             logger.exception("Failed to delete vault file %s for removed user %s", filename, user_id)
 
-    flash(f"Deleted {target['email']} and all of their data.")
+    db.admin_log(
+        actor_id, actor_email, "delete_user",
+        target_id=user_id, target_email=target_email,
+        details=f"{len(filenames)} vault file(s) removed" if filenames else None,
+    )
+    flash(f"Deleted {target_email} and all of their data.")
     return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/audit-log")
+@admin_required
+def admin_audit_log():
+    q = request.args.get("q", "").strip()
+    return render_template(
+        "admin_audit_log.html",
+        entries=db.admin_list_audit_log(limit=300, query=q or None),
+        q=q,
+    )
 
 
 if __name__ == "__main__":

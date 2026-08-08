@@ -231,6 +231,17 @@ CREATE TABLE IF NOT EXISTS notes (
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_id INTEGER,             -- admin who performed the action; NULL if their account was later deleted
+    actor_email TEXT NOT NULL,    -- snapshotted at the time of the action, survives actor deletion
+    action TEXT NOT NULL,         -- short machine-ish tag, e.g. 'delete_user', 'suspend_user'
+    target_id INTEGER,            -- affected user id, if any; NULL for account-less events
+    target_email TEXT,            -- snapshotted at the time of the action, survives target deletion
+    details TEXT,                 -- optional free-text context (e.g. a suspend reason)
+    created_at REAL NOT NULL
+);
 """
 
 # (table, column, sqlite type) — added after initial release, applied via ALTER TABLE
@@ -268,6 +279,7 @@ _MIGRATIONS = [
     ("notes", "user_id", "INTEGER"),
     ("users", "email_verified_at", "REAL"),
     ("users", "is_admin", "INTEGER NOT NULL DEFAULT 0"),
+    ("users", "disabled_at", "REAL"),
 ]
 
 # Tables that carry a user_id column and get scanned for orphaned
@@ -812,6 +824,47 @@ def admin_update_user(user_id: int, email: str = None, new_password: str = None)
                 (generate_password_hash(new_password), user_id),
             )
     return None
+
+
+def admin_set_disabled(user_id: int, disabled: bool) -> None:
+    """Suspends or reinstates a user. Suspension blocks login (see
+    login() in app.py) without touching any of their data — reversible,
+    unlike admin_delete_user()."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET disabled_at = ? WHERE id = ?",
+            (now() if disabled else None, user_id),
+        )
+
+
+def admin_log(actor_id, actor_email: str, action: str, target_id=None, target_email: str = None, details: str = None) -> None:
+    """Appends one row to the admin audit log. Best-effort context: pass
+    whatever you already have on hand (actor from g/session, target from
+    a prior lookup) rather than re-querying. actor/target email are
+    snapshotted here so the log stays legible even after an account is
+    later renamed or deleted."""
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO admin_audit_log
+               (actor_id, actor_email, action, target_id, target_email, details, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (actor_id, actor_email, action, target_id, target_email, details, now()),
+        )
+
+
+def admin_list_audit_log(limit: int = 200, query: str = None):
+    """Most recent audit log entries first, optionally filtered to rows
+    where the actor or target email contains `query`."""
+    sql = "SELECT * FROM admin_audit_log"
+    params = ()
+    if query:
+        sql += " WHERE actor_email LIKE ? OR target_email LIKE ?"
+        like = f"%{query.strip().lower()}%"
+        params = (like, like)
+    sql += " ORDER BY created_at DESC, id DESC LIMIT ?"
+    params = params + (limit,)
+    with get_conn() as conn:
+        return conn.execute(sql, params).fetchall()
 
 
 def admin_delete_user(user_id: int):
