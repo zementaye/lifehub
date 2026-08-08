@@ -77,10 +77,6 @@
     </div>
 
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">Settings</a>
-
-    {% if user and user.is_admin %}
-      <a href="{{ url_for('admin_dashboard') }}" class="admin-entry-link" title="Opens the separate admin console">🛡️ Admin</a>
-    {% endif %}
   </nav>
 </header>
 
@@ -120,11 +116,6 @@
 
     <div class="sidebar-group-label">&nbsp;</div>
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">⚙ Settings</a>
-
-    {% if user and user.is_admin %}
-      <div class="sidebar-group-label">&nbsp;</div>
-      <a href="{{ url_for('admin_dashboard') }}">🛡️ Admin console</a>
-    {% endif %}
   </nav>
 </aside>
 
