@@ -209,8 +209,6 @@ body.page-passwords { --tab-color: var(--violet); }
 body.page-reminders  { --tab-color: var(--danger); }
 body.page-habits.page-reminders { --tab-color: var(--danger); }
 body.page-settings   { --tab-color: var(--muted); }
-body.page-admin_dashboard,
-body.page-admin_users { --tab-color: var(--danger); }
 
 .admin-user-actions { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; padding: 10px 0; }
 .admin-edit-row td { background: var(--surface-raised); border-radius: var(--radius); }
@@ -361,6 +359,8 @@ body.auth-page {
 }
 .topnav a:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 4%, transparent); text-decoration: none; }
 .topnav a.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.topnav a.admin-entry-link { color: var(--danger); }
+.topnav a.admin-entry-link:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .topnav a.active::after {
   content: "";
   position: absolute;
