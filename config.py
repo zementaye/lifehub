@@ -113,6 +113,15 @@ SESSION_COOKIE_SECURE = IS_PRODUCTION
 # SESSION_REFRESH_EACH_REQUEST=True), configurable via env if needed.
 PERMANENT_SESSION_LIFETIME = int(os.environ.get("SESSION_LIFETIME_DAYS", "7")) * 24 * 60 * 60
 
+# The regular login session above is long-lived on purpose (it's fine for
+# someone to stay logged in to their own dashboard for a week). Admin
+# access is more sensitive, so it gets its own much shorter, sliding
+# window on top: even a logged-in admin has to re-enter their password if
+# they haven't touched the admin console in the last N minutes — e.g.
+# after coming back to a browser-history link hours later on a shared or
+# unlocked machine. See admin_required() in app.py.
+ADMIN_ELEVATION_LIFETIME = int(os.environ.get("ADMIN_ELEVATION_MINUTES", "15")) * 60
+
 # ── Vault file storage (Backblaze B2, S3-compatible) ────────────────────
 # ID vault uploads (photos/PDFs) are stored here instead of local disk, so
 # they survive Render free-tier restarts and redeploys.
