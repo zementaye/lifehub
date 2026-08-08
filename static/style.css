@@ -209,6 +209,11 @@ body.page-passwords { --tab-color: var(--violet); }
 body.page-reminders  { --tab-color: var(--danger); }
 body.page-habits.page-reminders { --tab-color: var(--danger); }
 body.page-settings   { --tab-color: var(--muted); }
+body.page-admin_dashboard,
+body.page-admin_users { --tab-color: var(--danger); }
+
+.admin-user-actions { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; padding: 10px 0; }
+.admin-edit-row td { background: var(--surface-raised); border-radius: var(--radius); }
 
 h1, h2, h3, h4 {
   font-family: var(--font-display);
