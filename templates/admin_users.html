@@ -36,7 +36,7 @@
             {% if u.is_admin %}<span class="bmi-tag bmi-normal">Admin</span>{% else %}<span class="muted">User</span>{% endif %}
           </td>
           <td>
-            {% if u.disabled_at %}<span class="bmi-tag bmi-obese">Suspended</span>{% else %}<span class="muted">Active</span>{% endif %}
+            {% if u.disabled_at %}<span class="bmi-tag bmi-obese" title="{{ u.last_suspend_reason or 'No reason given' }}">Suspended</span>{% else %}<span class="muted">Active</span>{% endif %}
           </td>
           <td>{{ '✅' if u.email_verified_at else '—' }}</td>
           <td>{{ u.record_count }}</td>
@@ -52,6 +52,7 @@
                 <label>Email <input type="email" name="email" value="{{ u.email }}" required></label>
                 <label>New password <input type="password" name="password" placeholder="leave blank to keep current"></label>
                 <button type="submit">Save</button>
+                <span class="muted">Password last changed: {{ u.password_changed_at | fmtdate if u.password_changed_at else 'never (original signup password)' }}</span>
               </form>
 
               <form method="post" action="{{ url_for('admin_toggle_admin', user_id=u.id) }}"
