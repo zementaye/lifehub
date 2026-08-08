@@ -194,8 +194,14 @@ def register():
 def _login_rate_key():
     # Keyed on IP + attempted email, so one bad actor guessing many
     # passwords against one account is throttled without also locking out
-    # everyone else sharing that IP (e.g. an office/NAT).
-    return f"{get_remote_address()}:{request.form.get('email', '').strip().lower()}"
+    # everyone else sharing that IP (e.g. an office/NAT). Strips a
+    # trailing "/admin" (see login() below) so "user@x.com" and
+    # "user@x.com/admin" share the same rate-limit bucket instead of each
+    # getting their own 5-per-minute allowance.
+    raw = request.form.get("email", "").strip().lower()
+    if raw.endswith("/admin"):
+        raw = raw[: -len("/admin")]
+    return f"{get_remote_address()}:{raw}"
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -208,6 +214,15 @@ def login():
     email = request.form.get("email", "").strip()
     password = request.form.get("password", "")
 
+    # A trailing "/admin" on the email field (same password, no separate
+    # credential) is just a routing shortcut straight to the admin panel
+    # on successful login — it grants nothing by itself. Anyone without
+    # is_admin set who tries it just lands on the normal dashboard with a
+    # note, same as if they'd typed their email plain.
+    want_admin = email.lower().endswith("/admin")
+    if want_admin:
+        email = email[: -len("/admin")]
+
     user = db.get_user_by_email(email)
     if not user or not db.verify_password(user, password):
         flash("Incorrect email or password.")
@@ -216,7 +231,13 @@ def login():
     session["user_id"] = user["id"]
     session.permanent = True
     next_path = request.args.get("next")
-    return redirect(next_path or url_for("dashboard"))
+    if next_path:
+        return redirect(next_path)
+    if want_admin:
+        if user["is_admin"]:
+            return redirect(url_for("admin_dashboard"))
+        flash("That account isn't an admin — logged in normally instead.")
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/logout", methods=["POST"])
