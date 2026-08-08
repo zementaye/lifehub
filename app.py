@@ -1833,6 +1833,7 @@ def admin_dashboard():
         stats=db.admin_overview_stats(),
         signups=db.admin_signup_counts(30),
         content_totals=db.admin_content_totals(),
+        top_users=db.admin_top_users(10),
     )
 
 
