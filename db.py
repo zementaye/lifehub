@@ -766,6 +766,23 @@ def admin_content_totals():
         ]
 
 
+def admin_top_users(limit: int = 10):
+    """The most active accounts by total record count across the main
+    content tables — powers the "most active users" chart."""
+    count_expr = " + ".join(
+        f"(SELECT COUNT(*) FROM {table} WHERE {table}.user_id = users.id)"
+        for _, table in _CONTENT_TABLES
+    )
+    sql = f"""
+        SELECT users.email, ({count_expr}) AS record_count
+        FROM users
+        ORDER BY record_count DESC, users.created_at ASC
+        LIMIT ?
+    """
+    with get_conn() as conn:
+        return conn.execute(sql, (limit,)).fetchall()
+
+
 def admin_count_admins() -> int:
     with get_conn() as conn:
         return conn.execute("SELECT COUNT(*) AS c FROM users WHERE is_admin = 1").fetchone()["c"]
