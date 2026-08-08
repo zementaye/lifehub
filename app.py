@@ -8,7 +8,7 @@ from functools import wraps
 import requests
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
-    send_from_directory, make_response, session, g,
+    send_from_directory, make_response, session, g, jsonify,
 )
 from flask_wtf import CSRFProtect
 from flask_wtf.csrf import CSRFError
@@ -1881,9 +1881,22 @@ def admin_dashboard():
 @admin_required
 def admin_users():
     q = request.args.get("q", "").strip()
+    users = db.admin_list_users(q or None)
+
+    # Live-search requests (see admin_users.html) only need the table
+    # fragment + updated count, not a full page render.
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        count_text = f"{len(users)} account{'' if len(users) == 1 else 's'} shown"
+        if q:
+            count_text += f' for "{q}"'
+        return jsonify(
+            table_html=render_template("_admin_users_table.html", users=users),
+            count_text=count_text,
+        )
+
     return render_template(
         "admin_users.html",
-        users=db.admin_list_users(q or None),
+        users=users,
         q=q,
         admin_count=db.admin_count_admins(),
     )
@@ -2033,9 +2046,23 @@ def admin_delete_user(user_id):
 @admin_required
 def admin_audit_log():
     q = request.args.get("q", "").strip()
+    entries = db.admin_list_audit_log(limit=300, query=q or None)
+
+    # Live-search requests (see admin_audit_log.html) only need the table
+    # fragment + updated count, not a full page render.
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        count_text = f"{len(entries)} entr{'y' if len(entries) == 1 else 'ies'} shown"
+        if q:
+            count_text += f' for "{q}"'
+        count_text += " — most recent 300, newest first."
+        return jsonify(
+            table_html=render_template("_admin_audit_log_table.html", entries=entries, q=q),
+            count_text=count_text,
+        )
+
     return render_template(
         "admin_audit_log.html",
-        entries=db.admin_list_audit_log(limit=300, query=q or None),
+        entries=entries,
         q=q,
     )
 
