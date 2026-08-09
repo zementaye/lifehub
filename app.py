@@ -1,10 +1,13 @@
 import logging
 import os
+import secrets
 import time
+import urllib.parse
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 
+import itsdangerous
 import requests
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
@@ -15,6 +18,7 @@ from flask_wtf.csrf import CSRFError
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.security import generate_password_hash
 
 import config
 import crypto
@@ -24,6 +28,7 @@ import nutrition_calc
 import scheduler
 import storage
 import telegram_notify
+import totp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -124,6 +129,12 @@ _PUBLIC_ENDPOINTS = {"home", "login", "register", "forgot_password", "reset_pass
 
 @app.before_request
 def load_logged_in_user():
+    # A fresh nonce per request, used by the CSP's script-src (see
+    # security_headers below) and echoed into every inline <script> tag
+    # via {{ csp_nonce() }}. Generated unconditionally, before the
+    # public-endpoint early-return, since login/register/etc. also have
+    # inline scripts that need it.
+    g.csp_nonce = secrets.token_urlsafe(16)
     g.user_id = session.get("user_id")
     if request.endpoint in _PUBLIC_ENDPOINTS or request.endpoint is None:
         return
@@ -136,6 +147,39 @@ def load_logged_in_user():
         session.clear()
         flash("This account has been suspended. Contact an admin if you think that's wrong.")
         return redirect(url_for("login"))
+    # Sessions are plain signed cookies with no server-side store, so
+    # "Log out everywhere" (and a password change, which does the same
+    # thing) can't delete anyone else's session directly. Instead they
+    # bump users.sessions_invalidated_at, and every request compares that
+    # against when *this* cookie was issued — a cookie older than the
+    # bump is stale and gets logged out here, on its very next request.
+    invalidated_at = user["sessions_invalidated_at"]
+    issued_at = session.get("session_issued_at")
+    if invalidated_at and (not issued_at or issued_at < invalidated_at):
+        session.clear()
+        flash("You were logged out because of a password change or a 'log out everywhere' request.")
+        return redirect(url_for("login"))
+
+
+def _safe_next(path, allowed_prefix="/"):
+    """Validate a ?next=... redirect target before it's ever passed to
+    redirect(). Without this, redirect(request.args.get("next")) is an
+    open redirect: a link like /login?next=https://evil-lookalike.com
+    logs the person in for real and then sends their already-authenticated
+    browser straight to an attacker's site. Only a same-site relative path
+    is allowed — never an absolute URL, a scheme, or a protocol-relative
+    "//host" path (browsers treat a leading "//" as "go to this host").
+    `allowed_prefix` further restricts where within the app it may point
+    (e.g. "/admin" for the admin step-up flow)."""
+    if not path:
+        return None
+    if not path.startswith("/") or path.startswith("//") or path.startswith("/\\"):
+        return None
+    if "://" in path:
+        return None
+    if not path.startswith(allowed_prefix):
+        return None
+    return path
 
 
 def login_required(view):
@@ -195,9 +239,8 @@ def admin_verify():
 
     # Only allow redirecting back into /admin/... — never off-site and
     # never somewhere outside the admin console.
-    next_path = request.values.get("next", "")
-    if not next_path.startswith("/admin"):
-        next_path = url_for("admin_dashboard")
+    next_path = _safe_next(request.values.get("next", ""), allowed_prefix="/admin") \
+        or url_for("admin_dashboard")
 
     if request.method == "GET":
         return render_template("admin_verify.html", next=next_path, email=user["email"])
@@ -222,6 +265,15 @@ def inject_user():
     with db.get_conn() as conn:
         row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     return {"user": row}
+
+
+@app.context_processor
+def inject_csp_nonce():
+    """Makes {{ csp_nonce() }} available in every template. Called as a
+    function (not a bare variable) so Jinja re-evaluates it fresh if a
+    template somehow renders more than once per request, rather than
+    caching a stale value."""
+    return {"csp_nonce": lambda: g.get("csp_nonce", "")}
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -251,8 +303,14 @@ def register():
 
     session["user_id"] = user_id
     session.permanent = True
+    session["session_issued_at"] = time.time()
     _start_email_verification(user_id, email)
-    return redirect(url_for("dashboard"))
+    # Mark this browser as recognized without sending a "new sign-in"
+    # email — they're already getting the verification email below, and
+    # a second "new device" email for the browser they just registered
+    # from would just be redundant noise.
+    resp = make_response(redirect(url_for("dashboard")))
+    return _remember_device(resp, user_id)
 
 
 def _login_rate_key():
@@ -306,20 +364,120 @@ def login():
         flash("This account has been suspended. Contact an admin if you think that's wrong.")
         return render_template("login.html")
 
+    if user["totp_enabled_at"]:
+        # Password was correct, but 2FA is on — don't establish a real
+        # session yet. Everything needed to finish logging in afterwards
+        # (which account, where to send them, the /admin shortcut) rides
+        # along in a "pending" session key instead, checked and cleared by
+        # login_2fa() below.
+        session.clear()
+        session["pending_totp_user_id"] = user["id"]
+        session["pending_totp_started_at"] = time.time()
+        session["pending_totp_want_admin"] = want_admin
+        session["pending_totp_next"] = _safe_next(request.args.get("next")) or ""
+        return redirect(url_for("login_2fa"))
+
+    _finish_login(user)
+    next_path = _safe_next(request.args.get("next"))
+    return _post_login_response(user, next_path, want_admin)
+
+
+# 2FA codes are only valid for a short window around "now" (see
+# totp.verify_totp), so a pending login that's been sitting unfinished for
+# a while is more likely abandoned than genuinely still in progress —
+# require starting over past this point rather than trusting a stale
+# password check indefinitely.
+_PENDING_TOTP_TIMEOUT = 10 * 60
+
+
+@app.route("/login/2fa", methods=["GET", "POST"])
+@limiter.limit("10 per minute", methods=["POST"], key_func=get_remote_address)
+def login_2fa():
+    pending_user_id = session.get("pending_totp_user_id")
+    started_at = session.get("pending_totp_started_at") or 0
+    if not pending_user_id or time.time() - started_at > _PENDING_TOTP_TIMEOUT:
+        session.pop("pending_totp_user_id", None)
+        session.pop("pending_totp_started_at", None)
+        session.pop("pending_totp_want_admin", None)
+        session.pop("pending_totp_next", None)
+        flash("That login attempt expired — log in again.")
+        return redirect(url_for("login"))
+
+    user = db.get_user_by_id(pending_user_id)
+    if not user or not user["totp_enabled_at"]:
+        # Account state changed underneath the pending login (e.g. 2FA
+        # got disabled from another session) — safest is to restart.
+        session.clear()
+        return redirect(url_for("login"))
+
+    if request.method == "GET":
+        return render_template("login_2fa.html")
+
+    code = request.form.get("code", "").strip()
+    secret = crypto.decrypt(user["totp_secret_enc"])
+    used_backup_code = False
+    if totp.verify_totp(secret, code):
+        pass
+    elif db.consume_backup_code(pending_user_id, code):
+        used_backup_code = True
+    else:
+        db.admin_log(
+            None, "(anonymous)", "login_2fa_failed",
+            target_id=user["id"], target_email=user["email"],
+            details=f"ip={get_remote_address()}",
+        )
+        flash("That code wasn't right. Check your authenticator app and try again.")
+        return render_template("login_2fa.html")
+
+    want_admin = session.get("pending_totp_want_admin", False)
+    next_path = session.get("pending_totp_next") or None
+    session.pop("pending_totp_user_id", None)
+    session.pop("pending_totp_started_at", None)
+    session.pop("pending_totp_want_admin", None)
+    session.pop("pending_totp_next", None)
+
+    _finish_login(user)
+    if used_backup_code:
+        remaining = db.count_unused_backup_codes(user["id"])
+        flash(f"Logged in with a backup code — {remaining} left. Generate new ones from Settings when you can.")
+    return _post_login_response(user, next_path, want_admin)
+
+
+def _finish_login(user) -> None:
+    """Establishes the real, logged-in session. Shared by the no-2FA path
+    in login() and the post-code path in login_2fa() so both end up with
+    exactly the same session state."""
     session["user_id"] = user["id"]
     session.permanent = True
     # A fresh login is itself a password check, so it also counts as
     # admin elevation (see admin_required) — no need to immediately
     # re-prompt someone who just typed their password 2 seconds ago.
     session["admin_verified_at"] = time.time()
-    next_path = request.args.get("next")
+    # Stamp when this session cookie was issued, checked against
+    # users.sessions_invalidated_at on every request (see
+    # load_logged_in_user) — this is what lets "Log out everywhere" and a
+    # password change actually invalidate *other* logged-in sessions,
+    # since sessions here are plain signed cookies with no server-side
+    # store to delete from.
+    session["session_issued_at"] = time.time()
+
+
+def _post_login_response(user, next_path, want_admin):
+    """Builds the redirect that follows a successful login (shared by the
+    no-2FA path in login() and the post-code path in login_2fa()) and
+    attaches the new-device notification cookie/email to it — that needs
+    an actual response object to set a cookie on, which a bare
+    redirect(...) return doesn't give a hook for."""
     if next_path:
-        return redirect(next_path)
-    if want_admin:
-        if user["is_admin"]:
-            return redirect(url_for("admin_dashboard"))
-        flash("That account isn't an admin — logged in normally instead.")
-    return redirect(url_for("dashboard"))
+        resp = make_response(redirect(next_path))
+    elif want_admin and user["is_admin"]:
+        resp = make_response(redirect(url_for("admin_dashboard")))
+    else:
+        if want_admin:
+            flash("That account isn't an admin — logged in normally instead.")
+        resp = make_response(redirect(url_for("dashboard")))
+    return _notify_if_new_device(user, resp)
+
 
 
 @app.route("/logout", methods=["POST"])
@@ -499,6 +657,72 @@ def _send_verification_email(to_email: str, verify_link: str):
     )
 
 
+def _send_new_device_login_email(to_email: str, ip: str, when_text: str):
+    if not config.RESEND_API_KEY:
+        return False, "RESEND_API_KEY not configured"
+
+    return _send_via_resend(
+        to_email=to_email,
+        subject="New sign-in to your Life Hub account",
+        body=(
+            f"Your Life Hub account was just signed into from a browser we haven't seen before.\n\n"
+            f"When: {when_text}\n"
+            f"IP address: {ip}\n\n"
+            f"If this was you, there's nothing else to do — you won't be asked again from this "
+            f"browser. If it wasn't you, change your password right away from Settings, or use "
+            f"'Log out everywhere' if you're still signed in somewhere.\n"
+        ),
+    )
+
+
+# Separate from the login session cookie (see load_logged_in_user):
+# long-lived, signed, and holds only "this browser has completed a full
+# login as user N before" — used purely to decide whether a login is from
+# a *recognized* browser, so a new-device notification email only fires
+# the first time, not on every single login. Losing/clearing this cookie
+# just means one extra notification email next time, not a security
+# issue — it grants no access by itself.
+_device_signer = itsdangerous.URLSafeSerializer(config.SECRET_KEY, salt="device-recognition")
+_DEVICE_COOKIE = "lh_device"
+_DEVICE_COOKIE_MAX_AGE = 365 * 24 * 60 * 60
+
+
+def _is_recognized_device(user_id: int) -> bool:
+    token = request.cookies.get(_DEVICE_COOKIE)
+    if not token:
+        return False
+    try:
+        data = _device_signer.loads(token)
+    except itsdangerous.BadSignature:
+        return False
+    return data.get("uid") == user_id
+
+
+def _remember_device(resp, user_id: int):
+    token = _device_signer.dumps({"uid": user_id})
+    resp.set_cookie(
+        _DEVICE_COOKIE, token,
+        max_age=_DEVICE_COOKIE_MAX_AGE,
+        httponly=True, samesite="Lax", secure=config.IS_PRODUCTION,
+    )
+    return resp
+
+
+def _notify_if_new_device(user, resp):
+    """Called right after a successful login. Sends a heads-up email the
+    first time a given browser logs in as this account, then marks the
+    browser recognized so it doesn't fire again. Best-effort — a failed
+    or unconfigured email send never blocks the login itself."""
+    if _is_recognized_device(user["id"]):
+        return resp
+    when_text = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    try:
+        _send_new_device_login_email(user["email"], get_remote_address(), when_text)
+    except Exception:
+        logger.exception("Failed to send new-device login email to user %s", user["id"])
+    return _remember_device(resp, user["id"])
+
+
 @app.after_request
 def no_cache_static(resp):
     # Belt-and-suspenders on top of the ?v= cache-busting: force browsers to
@@ -506,6 +730,60 @@ def no_cache_static(resp):
     # a locally cached copy, no matter how that copy got cached in the past.
     if request.path.startswith("/static/"):
         resp.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return resp
+
+
+# Vault images/downloads are served via a redirect to a presigned URL on
+# whatever B2-compatible endpoint is configured (see vault_file()), so the
+# CSP's img-src needs to allow that specific host — computed once here from
+# config rather than a wildcard, so an image tag pointing anywhere else is
+# still blocked.
+_B2_HOST = urllib.parse.urlparse(config.R2_ENDPOINT_URL).netloc if config.R2_ENDPOINT_URL else ""
+
+_IMG_SRC = "img-src 'self' data:" + (f" https://{_B2_HOST}" if _B2_HOST else "")
+
+
+def _build_csp(nonce: str) -> str:
+    # script-src uses a per-request nonce instead of 'unsafe-inline' — the
+    # nonce is generated fresh in load_logged_in_user() and only appears
+    # in the response actually sent for this request, so a script an
+    # attacker manages to inject (e.g. via a stored-XSS field) has no way
+    # to know it and won't execute. Every legitimate inline <script> tag
+    # in the templates carries {{ csp_nonce() }} so they still run.
+    #
+    # style-src still allows 'unsafe-inline': a lot of templates use
+    # style="..." attributes, and CSP nonces don't cover those (only
+    # <style> blocks) — tightening that means replacing every inline
+    # style attribute with a class, which is separate follow-up work.
+    return "; ".join([
+        "default-src 'self'",
+        f"script-src 'self' https://cdnjs.cloudflare.com 'nonce-{nonce}'",
+        "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'",
+        "font-src 'self' https://fonts.gstatic.com",
+        _IMG_SRC,
+        "connect-src 'self'",   # all fetch()/sendBeacon calls in app.js are same-origin
+        "frame-ancestors 'none'",  # modern equivalent of X-Frame-Options: DENY
+        "base-uri 'self'",
+        "form-action 'self'",
+        "object-src 'none'",
+    ])
+
+
+@app.after_request
+def security_headers(resp):
+    # Baseline hardening headers on every response. None of these are
+    # session- or route-specific, so one blanket after_request covers the
+    # whole app rather than repeating this per-view.
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"  # legacy fallback for browsers that ignore frame-ancestors
+    resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    resp.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    resp.headers["Content-Security-Policy"] = _build_csp(g.get("csp_nonce", ""))
+    if config.IS_PRODUCTION:
+        # Only sent over HTTPS deployments (matches SESSION_COOKIE_SECURE
+        # below) — meaningless, and potentially locks out local http://
+        # dev, if sent when the app isn't actually served over TLS.
+        resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return resp
 
 
@@ -1828,7 +2106,14 @@ def settings():
         "nutrition_goal_calories": db.get_setting(user_id, "nutrition_goal_calories", ""),
         "nutrition_goal_protein": db.get_setting(user_id, "nutrition_goal_protein", ""),
     }
-    return render_template("settings.html", values=values)
+    user = db.get_user_by_id(user_id)
+    totp_enabled = bool(user["totp_enabled_at"])
+    return render_template(
+        "settings.html",
+        values=values,
+        totp_enabled=totp_enabled,
+        backup_codes_remaining=db.count_unused_backup_codes(user_id) if totp_enabled else 0,
+    )
 
 
 @app.route("/settings", methods=["POST"])
@@ -1855,6 +2140,121 @@ def save_settings():
         db.set_setting(user_id, key, val)
     flash("Settings saved.")
     return redirect(url_for("settings"))
+
+
+@app.route("/settings/change-password", methods=["POST"])
+@login_required
+@limiter.limit("5 per minute", key_func=lambda: f"changepw:{g.user_id}")
+def change_password():
+    user = db.get_user_by_id(g.user_id)
+    current_password = request.form.get("current_password", "")
+    new_password = request.form.get("new_password", "")
+    confirm_password = request.form.get("confirm_password", "")
+
+    if not db.verify_password(user, current_password):
+        flash("Current password is incorrect.")
+        return redirect(url_for("settings"))
+    if len(new_password) < 8:
+        flash("New password must be at least 8 characters.")
+        return redirect(url_for("settings"))
+    if new_password != confirm_password:
+        flash("New passwords don't match.")
+        return redirect(url_for("settings"))
+
+    db.set_password(g.user_id, new_password)
+    # A password change is exactly the situation "Log out everywhere"
+    # exists for — if someone else had your old password on another
+    # device, this is what actually kicks them out, rather than leaving
+    # their still-valid session sitting there.
+    db.invalidate_other_sessions(g.user_id)
+    session["session_issued_at"] = time.time()  # keep *this* session logged in
+    flash("Password changed, and you've been logged out everywhere else.")
+    return redirect(url_for("settings"))
+
+
+@app.route("/settings/logout-everywhere", methods=["POST"])
+@login_required
+def logout_everywhere():
+    db.invalidate_other_sessions(g.user_id)
+    session["session_issued_at"] = time.time()  # keep *this* session logged in
+    flash("You've been logged out on all other devices/browsers.")
+    return redirect(url_for("settings"))
+
+
+@app.route("/settings/2fa/setup")
+@login_required
+def totp_setup():
+    """Starts (or restarts) enrollment: generates a fresh secret, stores it
+    as *pending* (not yet trusted for login — see confirm_totp), and shows
+    it for manual entry into an authenticator app. Revisiting this page
+    generates a new secret each time, which is fine — nothing is "spent"
+    until totp_confirm succeeds."""
+    user = db.get_user_by_id(g.user_id)
+    if user["totp_enabled_at"]:
+        flash("2FA is already enabled. Disable it first if you want to re-enroll.")
+        return redirect(url_for("settings"))
+    secret = totp.generate_secret()
+    db.set_totp_pending_secret(g.user_id, crypto.encrypt(secret))
+    uri = totp.provisioning_uri(secret, user["email"])
+    return render_template("totp_setup.html", secret=secret, uri=uri)
+
+
+@app.route("/settings/2fa/confirm", methods=["POST"])
+@login_required
+@limiter.limit("10 per minute", key_func=lambda: f"totpconfirm:{g.user_id}")
+def totp_confirm():
+    user = db.get_user_by_id(g.user_id)
+    pending_enc = user["totp_pending_secret_enc"]
+    if not pending_enc:
+        flash("2FA setup expired or wasn't started — start again.")
+        return redirect(url_for("totp_setup"))
+    secret = crypto.decrypt(pending_enc)
+    code = request.form.get("code", "")
+    if not totp.verify_totp(secret, code):
+        flash("That code didn't match. Check the time on your phone and try again.")
+        return render_template("totp_setup.html", secret=secret, uri=totp.provisioning_uri(secret, user["email"]))
+
+    db.confirm_totp(g.user_id, pending_enc)
+    backup_codes = totp.generate_backup_codes()
+    db.set_totp_backup_codes(g.user_id, [generate_password_hash(c) for c in backup_codes])
+    # Enabling 2FA is itself a security-relevant event worth invalidating
+    # other sessions for, same reasoning as a password change.
+    db.invalidate_other_sessions(g.user_id)
+    session["session_issued_at"] = time.time()
+    return render_template("totp_backup_codes.html", codes=backup_codes, heading="2FA is on")
+
+
+@app.route("/settings/2fa/disable", methods=["POST"])
+@login_required
+@limiter.limit("5 per minute", key_func=lambda: f"totpdisable:{g.user_id}")
+def totp_disable():
+    user = db.get_user_by_id(g.user_id)
+    # Require the password, not just an active session, to turn 2FA off —
+    # otherwise anyone who gets to an unlocked/hijacked session (exactly
+    # what 2FA is meant to add a layer against) could disable it in one
+    # click with nothing else required.
+    if not db.verify_password(user, request.form.get("password", "")):
+        flash("Incorrect password — 2FA was not disabled.")
+        return redirect(url_for("settings"))
+    db.disable_totp(g.user_id)
+    flash("2FA has been disabled on your account.")
+    return redirect(url_for("settings"))
+
+
+@app.route("/settings/2fa/regenerate-codes", methods=["POST"])
+@login_required
+@limiter.limit("5 per minute", key_func=lambda: f"totpregen:{g.user_id}")
+def totp_regenerate_codes():
+    user = db.get_user_by_id(g.user_id)
+    if not user["totp_enabled_at"]:
+        flash("2FA isn't enabled.")
+        return redirect(url_for("settings"))
+    if not db.verify_password(user, request.form.get("password", "")):
+        flash("Incorrect password — backup codes were not regenerated.")
+        return redirect(url_for("settings"))
+    backup_codes = totp.generate_backup_codes()
+    db.set_totp_backup_codes(g.user_id, [generate_password_hash(c) for c in backup_codes])
+    return render_template("totp_backup_codes.html", codes=backup_codes, heading="New backup codes")
 
 
 @app.route("/settings/test-notify", methods=["POST"])
@@ -1906,6 +2306,46 @@ def export_data():
     resp.headers["Content-Type"] = "application/json"
     resp.headers["Content-Disposition"] = f"attachment; filename={filename}"
     return resp
+
+
+@app.route("/settings/delete-account", methods=["POST"])
+@login_required
+@limiter.limit("5 per hour", key_func=lambda: f"selfdelete:{g.user_id}")
+def delete_own_account():
+    """Self-service equivalent of admin_delete_user (which deliberately
+    refuses to delete the currently-logged-in admin — see there). Same
+    underlying db.admin_delete_user() call, so the two paths can't drift
+    apart on what actually gets removed."""
+    user = db.get_user_by_id(g.user_id)
+    if not db.verify_password(user, request.form.get("password", "")):
+        flash("Incorrect password — your account was not deleted.")
+        return redirect(url_for("settings"))
+    if user["is_admin"] and db.admin_count_admins() <= 1:
+        flash("You're the only admin — promote someone else to admin first, or the admin console would be unreachable.")
+        return redirect(url_for("settings"))
+
+    user_id = g.user_id
+    email = user["email"]
+    filenames = db.admin_delete_user(user_id)
+    for filename in filenames:
+        try:
+            if config.USE_B2:
+                storage.delete_file(filename)
+            else:
+                path = config.UPLOAD_DIR / filename
+                if path.exists():
+                    path.unlink()
+        except Exception:
+            logger.exception("Failed to delete vault file %s for self-deleted user %s", filename, user_id)
+
+    db.admin_log(
+        None, email, "self_delete_account",
+        target_id=user_id, target_email=email,
+        details=f"{len(filenames)} vault file(s) removed" if filenames else None,
+    )
+    session.clear()
+    flash("Your account and all of its data have been deleted.")
+    return redirect(url_for("login"))
 
 
 # ── Admin ────────────────────────────────────────────────────────────────
