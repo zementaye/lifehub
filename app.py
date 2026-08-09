@@ -2096,7 +2096,6 @@ def bulk_delete_notes():
 def settings():
     user_id = g.user_id
     values = {
-        "tg_bot_token": db.get_setting(user_id, "tg_bot_token", config.TG_BOT_TOKEN),
         "tg_chat_id": db.get_setting(user_id, "tg_chat_id", config.TG_CHAT_ID),
         "timezone": db.get_setting(user_id, "timezone", config.TIMEZONE),
         "reminder_hour": db.get_setting(user_id, "reminder_hour", config.REMINDER_HOUR),
@@ -2113,6 +2112,7 @@ def settings():
         values=values,
         totp_enabled=totp_enabled,
         backup_codes_remaining=db.count_unused_backup_codes(user_id) if totp_enabled else 0,
+        tg_bot_configured=bool(config.TG_BOT_TOKEN),
     )
 
 
@@ -2122,7 +2122,7 @@ def save_settings():
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
     user_id = g.user_id
-    for key in ("tg_bot_token", "tg_chat_id", "timezone", "reminder_hour", "nudge_hour",
+    for key in ("tg_chat_id", "timezone", "reminder_hour", "nudge_hour",
                 "week_end_day", "currency", "nutrition_goal_calories", "nutrition_goal_protein"):
         val = request.form.get(key)
         if val is None:

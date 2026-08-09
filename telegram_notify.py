@@ -11,7 +11,10 @@ TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
 
 
 def _credentials(user_id: int):
-    token = db.get_setting(user_id, "tg_bot_token", config.TG_BOT_TOKEN)
+    # The bot itself is always the operator's shared bot (config.TG_BOT_TOKEN)
+    # — not something an individual user can point at their own bot. Only
+    # the chat ID (who the bot DMs) is per-user.
+    token = config.TG_BOT_TOKEN
     chat_id = db.get_setting(user_id, "tg_chat_id", config.TG_CHAT_ID)
     return token, chat_id
 
