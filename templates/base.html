@@ -77,6 +77,16 @@
     </div>
 
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">Settings</a>
+
+    <div class="nav-group">
+      <button type="button" class="nav-group-toggle {{ 'active' if request.endpoint in ['ai_chat','ai_quick_add'] }}">
+        AI <span class="caret">▾</span>
+      </button>
+      <div class="nav-group-menu">
+        <a href="{{ url_for('ai_quick_add') }}" class="{{ 'active' if request.endpoint=='ai_quick_add' }}">Quick Add</a>
+        <a href="{{ url_for('ai_chat') }}" class="{{ 'active' if request.endpoint=='ai_chat' }}">Ask</a>
+      </div>
+    </div>
   </nav>
 </header>
 
@@ -116,6 +126,10 @@
 
     <div class="sidebar-group-label">&nbsp;</div>
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">⚙ Settings</a>
+
+    <div class="sidebar-group-label">AI</div>
+    <a href="{{ url_for('ai_quick_add') }}" class="{{ 'active' if request.endpoint=='ai_quick_add' }}">✨ Quick Add</a>
+    <a href="{{ url_for('ai_chat') }}" class="{{ 'active' if request.endpoint=='ai_chat' }}">💬 Ask</a>
   </nav>
 </aside>
 
