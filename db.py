@@ -45,6 +45,15 @@ CREATE TABLE IF NOT EXISTS email_verifications (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS totp_backup_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    code_hash TEXT NOT NULL,
+    used_at REAL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
@@ -281,6 +290,20 @@ _MIGRATIONS = [
     ("users", "is_admin", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "disabled_at", "REAL"),
     ("users", "password_changed_at", "REAL"),
+    # Bumped by "Log out everywhere" (settings) independently of a password
+    # change — any session cookie issued before this timestamp is treated
+    # as stale and force-logged-out on its next request. See
+    # load_logged_in_user() / logout_everywhere() in app.py.
+    ("users", "sessions_invalidated_at", "REAL"),
+    # 2FA (TOTP). totp_secret is only set once setup is confirmed with a
+    # valid code (totp_enabled_at gets stamped at the same time) — a
+    # secret the person never finished confirming shouldn't be able to
+    # lock them out, so the two are only ever set together. Both are
+    # stored encrypted (crypto.encrypt/decrypt, called from app.py) since
+    # a leaked plaintext secret defeats 2FA for that account entirely.
+    ("users", "totp_secret_enc", "TEXT"),
+    ("users", "totp_enabled_at", "REAL"),
+    ("users", "totp_pending_secret_enc", "TEXT"),
 ]
 
 # Tables that carry a user_id column and get scanned for orphaned
@@ -584,6 +607,98 @@ def set_password(user_id: int, password: str) -> None:
             "UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?",
             (generate_password_hash(password), now(), user_id),
         )
+
+
+def invalidate_other_sessions(user_id: int) -> None:
+    """Used by 'Log out everywhere' — any session cookie issued before this
+    moment will fail the check in load_logged_in_user() on its next
+    request and get bounced back to /login. The caller re-stamps their own
+    *current* session immediately after calling this, so they don't log
+    themselves out too."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET sessions_invalidated_at = ? WHERE id = ?",
+            (now(), user_id),
+        )
+
+
+# ── 2FA (TOTP) ───────────────────────────────────────────────────────────
+# All secret/code values passed into these functions are expected to
+# already be encrypted (totp_secret_enc / totp_pending_secret_enc) or
+# hashed (backup codes) by the caller in app.py — this module just stores
+# and retrieves opaque strings, same division of responsibility as
+# password hashing above.
+
+def set_totp_pending_secret(user_id: int, secret_enc: str) -> None:
+    """Stores a secret the person has just been shown (QR/manual entry)
+    but hasn't confirmed with a real code yet. Kept separate from
+    totp_secret_enc so an abandoned setup can never leave 2FA half-on."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET totp_pending_secret_enc = ? WHERE id = ?",
+            (secret_enc, user_id),
+        )
+
+
+def confirm_totp(user_id: int, secret_enc: str) -> None:
+    """Promotes a pending secret to the real, active one — called only
+    after the person has proven they can generate a valid code with it."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET totp_secret_enc = ?, totp_enabled_at = ?, totp_pending_secret_enc = NULL WHERE id = ?",
+            (secret_enc, now(), user_id),
+        )
+
+
+def disable_totp(user_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET totp_secret_enc = NULL, totp_enabled_at = NULL, totp_pending_secret_enc = NULL WHERE id = ?",
+            (user_id,),
+        )
+        conn.execute("DELETE FROM totp_backup_codes WHERE user_id = ?", (user_id,))
+
+
+def set_totp_backup_codes(user_id: int, code_hashes: list[str]) -> None:
+    """Replaces the person's whole set of backup codes (used on initial
+    2FA enrollment and on 'regenerate codes') — old codes, used or not,
+    stop working once new ones are issued."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM totp_backup_codes WHERE user_id = ?", (user_id,))
+        conn.executemany(
+            "INSERT INTO totp_backup_codes (user_id, code_hash, created_at) VALUES (?, ?, ?)",
+            [(user_id, h, now()) for h in code_hashes],
+        )
+
+
+def count_unused_backup_codes(user_id: int) -> int:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM totp_backup_codes WHERE user_id = ? AND used_at IS NULL",
+            (user_id,),
+        ).fetchone()
+    return row["n"] if row else 0
+
+
+def consume_backup_code(user_id: int, code: str) -> bool:
+    """Checks `code` against this user's unused backup codes and marks the
+    matching one used (one-time use) if found. Returns whether it
+    matched. Codes are hashed at rest, so this has to check-and-hash each
+    unused row rather than a single indexed lookup — fine in practice,
+    since a person only ever has ~10 of these."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, code_hash FROM totp_backup_codes WHERE user_id = ? AND used_at IS NULL",
+            (user_id,),
+        ).fetchall()
+        for row in rows:
+            if check_password_hash(row["code_hash"], code):
+                conn.execute(
+                    "UPDATE totp_backup_codes SET used_at = ? WHERE id = ?",
+                    (now(), row["id"]),
+                )
+                return True
+    return False
 
 
 def create_password_reset(user_id: int, ttl_seconds: int = 3600) -> str:
@@ -927,6 +1042,12 @@ def admin_delete_user(user_id: int):
 
         for table in _USER_SCOPED_TABLES:
             conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
+        # Not in _USER_SCOPED_TABLES since it predates it slightly and has
+        # its own cascade — deleted explicitly here anyway rather than
+        # relying on ON DELETE CASCADE firing, since that depends on
+        # PRAGMA foreign_keys being honored the same way on every backend
+        # this runs against (local sqlite vs. Turso's HTTP API).
+        conn.execute("DELETE FROM totp_backup_codes WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM email_verifications WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
