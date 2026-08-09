@@ -943,8 +943,8 @@ def admin_update_user(user_id: int, email: str = None, new_password: str = None)
             conn.execute("UPDATE users SET email = ? WHERE id = ?", (email, user_id))
         if new_password:
             conn.execute(
-                "UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?",
-                (generate_password_hash(new_password), now(), user_id),
+                "UPDATE users SET password_hash = ?, password_changed_at = ?, sessions_invalidated_at = ? WHERE id = ?",
+                (generate_password_hash(new_password), now(), now(), user_id),
             )
     return None
 

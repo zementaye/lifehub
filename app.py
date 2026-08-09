@@ -124,7 +124,7 @@ def handle_upload_too_large(e):
 # Public routes: no session required. Everything else demands a logged-in
 # user, since the app is now open for anyone to sign up and use — there's
 # no longer a shared APP_ACCESS_TOKEN gate in front of it.
-_PUBLIC_ENDPOINTS = {"home", "login", "register", "forgot_password", "reset_password", "verify_email", "static"}
+_PUBLIC_ENDPOINTS = {"home", "login", "login_2fa", "register", "forgot_password", "reset_password", "verify_email", "static"}
 
 
 @app.before_request
@@ -2237,6 +2237,12 @@ def totp_disable():
         flash("Incorrect password — 2FA was not disabled.")
         return redirect(url_for("settings"))
     db.disable_totp(g.user_id)
+    # Same reasoning as turning 2FA on (see totp_confirm): this changes the
+    # account's security posture, so any other lingering session should have
+    # to re-authenticate under the new state rather than ride out its
+    # existing cookie for up to a week.
+    db.invalidate_other_sessions(g.user_id)
+    session["session_issued_at"] = time.time()
     flash("2FA has been disabled on your account.")
     return redirect(url_for("settings"))
 
