@@ -20,6 +20,7 @@ from flask_limiter.util import get_remote_address
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.security import generate_password_hash
 
+import ai
 import config
 import crypto
 import db
@@ -1723,6 +1724,23 @@ def add_transaction():
     description = request.form.get("description", "").strip()
     category_id = request.form.get("category_id", type=int) or None
 
+    # If the person left the category blank on an expense, take one best-
+    # effort shot at guessing it from the description before saving —
+    # never blocks the save, and only ever picks from their own existing
+    # categories (see ai.suggest_category), so a bad/unavailable AI call
+    # just leaves the transaction uncategorized exactly as before.
+    auto_categorized = False
+    if ttype == "expense" and category_id is None and description and ai.available():
+        with db.get_conn() as conn:
+            cats = conn.execute(
+                "SELECT id, name FROM budget_categories WHERE user_id = ?", (user_id,)
+            ).fetchall()
+        if cats:
+            guess, _err = ai.suggest_category(description, [c["name"] for c in cats])
+            if guess:
+                category_id = next((c["id"] for c in cats if c["name"] == guess), None)
+                auto_categorized = category_id is not None
+
     if amount:
         with db.get_conn() as conn:
             conn.execute(
@@ -1730,7 +1748,8 @@ def add_transaction():
                 "VALUES (?,?,?,?,?,?,?)",
                 (user_id, d, ttype, category_id if ttype == "expense" else None, description, abs(amount), db.now()),
             )
-        flash(f"Logged {'income' if ttype == 'income' else 'expense'}: {amount}")
+        suffix = " (category auto-filled by AI)" if auto_categorized else ""
+        flash(f"Logged {'income' if ttype == 'income' else 'expense'}: {amount}{suffix}")
     return redirect(url_for("budget", month=month))
 
 
@@ -2087,6 +2106,242 @@ def bulk_delete_notes():
             )
         flash(f"Deleted {len(ids)} note{'s' if len(ids) != 1 else ''}.")
     return redirect(url_for("notes"))
+
+
+# ── AI ────────────────────────────────────────────────────────────────────
+# Two user-facing features (chat assistant, natural-language quick-add) on
+# top of the ai.py module. Both are best-effort and read config.py's
+# GEMINI_API_KEY — with nothing set, the pages just show a "not configured"
+# state rather than erroring (same pattern as Telegram/Resend/B2 elsewhere
+# in this app). See ai.py for the actual Gemini calls and why Gemini.
+
+def _build_chat_context(user_id: int) -> str:
+    """Plain-text digest of the user's own data for the chat assistant to
+    answer from. Deliberately excludes vault documents, saved passwords,
+    and notes — those are the most sensitive things in this app, and the
+    assistant has no need to see them to answer budget/health/habit
+    questions. This is the *only* thing the model sees about the account;
+    it never gets direct DB or tool access (see ai.ask)."""
+    today = scheduler.today_local(user_id)
+    month = today.strftime("%Y-%m")
+    lines = [f"Today's date: {today.isoformat()}"]
+
+    with db.get_conn() as conn:
+        income = conn.execute(
+            "SELECT COALESCE(SUM(amount),0) AS t FROM transactions "
+            "WHERE user_id = ? AND type='income' AND strftime('%Y-%m', date)=?",
+            (user_id, month),
+        ).fetchone()["t"]
+        expense = conn.execute(
+            "SELECT COALESCE(SUM(amount),0) AS t FROM transactions "
+            "WHERE user_id = ? AND type='expense' AND strftime('%Y-%m', date)=?",
+            (user_id, month),
+        ).fetchone()["t"]
+        by_cat = conn.execute(
+            "SELECT c.name, COALESCE(SUM(t.amount),0) AS spent, c.monthly_limit FROM budget_categories c "
+            "LEFT JOIN transactions t ON t.category_id = c.id AND t.type='expense' AND strftime('%Y-%m', t.date)=? "
+            "WHERE c.user_id = ? GROUP BY c.id ORDER BY spent DESC",
+            (month, user_id),
+        ).fetchall()
+        currency = db.get_setting(user_id, "currency", "ETB") or "ETB"
+        lines.append(f"This month ({month}) so far: income {income:.0f} {currency}, expenses {expense:.0f} {currency}.")
+        if by_cat:
+            lines.append("Spending by category this month:")
+            for c in by_cat:
+                limit_txt = f" (limit {c['monthly_limit']:.0f})" if c["monthly_limit"] else ""
+                lines.append(f"  - {c['name']}: {c['spent']:.0f} {currency}{limit_txt}")
+
+        reminders = conn.execute(
+            "SELECT title, next_due FROM reminders WHERE user_id = ? AND active = 1 ORDER BY date(next_due) LIMIT 8",
+            (user_id,),
+        ).fetchall()
+        if reminders:
+            lines.append("Upcoming reminders:")
+            for r in reminders:
+                lines.append(f"  - {r['title']} due {r['next_due']}")
+
+        habits_rows = conn.execute(
+            "SELECT * FROM habits WHERE user_id = ? AND active = 1", (user_id,)
+        ).fetchall()
+        todos_open = conn.execute(
+            "SELECT COUNT(*) AS n FROM todos WHERE user_id = ? AND done = 0", (user_id,)
+        ).fetchone()["n"]
+
+        today_food = conn.execute(
+            "SELECT * FROM food_log WHERE user_id = ? AND date = ?", (user_id, today.isoformat())
+        ).fetchall()
+        latest_weight = conn.execute(
+            "SELECT weight_kg, date FROM weight_entries WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT 1",
+            (user_id,),
+        ).fetchone()
+
+    if habits_rows:
+        status_by_id = scheduler.get_habit_status_batch(habits_rows)
+        lines.append("Habits:")
+        for h in habits_rows:
+            s = status_by_id[h["id"]]
+            lines.append(f"  - {h['title']} ({h['frequency']}): {'done' if s['done'] else 'not done'} this period, streak {s['streak']}")
+    lines.append(f"Open to-dos: {todos_open}")
+
+    if today_food:
+        cals = sum(f["calories"] * f["servings"] for f in today_food)
+        protein = sum(f["protein_g"] * f["servings"] for f in today_food)
+        lines.append(f"Logged today so far: {cals:.0f} kcal, {protein:.0f}g protein, across {len(today_food)} food entries.")
+    else:
+        lines.append("Nothing logged in Nutrition today yet.")
+
+    if latest_weight:
+        lines.append(f"Most recent weight entry: {latest_weight['weight_kg']} kg on {latest_weight['date']}.")
+
+    return "\n".join(lines)
+
+
+@app.route("/ai/chat", methods=["GET", "POST"])
+@login_required
+def ai_chat():
+    if request.method == "GET":
+        return render_template("ai_chat.html", ai_available=ai.available(), answer=None, question=None)
+
+    question = request.form.get("question", "").strip()
+    if not question:
+        return render_template("ai_chat.html", ai_available=ai.available(), answer=None, question=None)
+    if not ai.available():
+        flash("AI isn't configured on this server.")
+        return render_template("ai_chat.html", ai_available=False, answer=None, question=question)
+
+    context = _build_chat_context(g.user_id)
+    answer, err = ai.ask(question, context)
+    if err:
+        flash(err)
+    return render_template("ai_chat.html", ai_available=True, answer=answer, question=question)
+
+
+@app.route("/ai/quick-add", methods=["GET", "POST"])
+@login_required
+def ai_quick_add():
+    if request.method == "GET":
+        return render_template("ai_quick_add.html", ai_available=ai.available())
+
+    text = request.form.get("text", "").strip()
+    if not text:
+        flash("Type something to add first.")
+        return redirect(url_for("ai_quick_add"))
+    if not ai.available():
+        flash("AI isn't configured on this server.")
+        return redirect(url_for("ai_quick_add"))
+
+    user_id = g.user_id
+    today = scheduler.today_local(user_id).isoformat()
+    with db.get_conn() as conn:
+        categories = conn.execute(
+            "SELECT id, name FROM budget_categories WHERE user_id = ? ORDER BY name", (user_id,)
+        ).fetchall()
+
+    result, err = ai.parse_quick_add(text, [c["name"] for c in categories], today)
+    if err or not isinstance(result, dict):
+        flash(f"Couldn't parse that: {err or 'unexpected response'}")
+        return redirect(url_for("ai_quick_add"))
+
+    kind = result.get("type")
+
+    if kind == "transaction":
+        ttype = result.get("txn_type") if result.get("txn_type") in ("income", "expense") else "expense"
+        amount = result.get("amount")
+        try:
+            amount = abs(float(amount))
+        except (TypeError, ValueError):
+            amount = None
+        if not amount:
+            flash("Couldn't tell how much that was for — try including an amount.")
+            return redirect(url_for("ai_quick_add"))
+        description = str(result.get("description") or text)[:200]
+        cat_name = result.get("category")
+        category_id = next((c["id"] for c in categories if c["name"] == cat_name), None)
+        d = result.get("date") or today
+        try:
+            date.fromisoformat(d)
+        except ValueError:
+            d = today
+        with db.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO transactions (user_id, date, type, category_id, description, amount, created_at) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (user_id, d, ttype, category_id if ttype == "expense" else None, description, amount, db.now()),
+            )
+        flash(f"Added {ttype}: {amount:.0f} — {description}")
+        return redirect(url_for("budget"))
+
+    if kind == "food":
+        name = str(result.get("name") or "").strip()[:200]
+        if not name:
+            flash("Couldn't tell what food that was — try naming it.")
+            return redirect(url_for("ai_quick_add"))
+        meal = result.get("meal") if result.get("meal") in ("breakfast", "lunch", "dinner", "snack") else "snack"
+        grams = result.get("grams")
+        try:
+            servings = max(float(grams), 1) / 100.0
+        except (TypeError, ValueError):
+            servings = 1.0
+        macros = {}
+        for k in ("calories", "protein_g", "carbs_g", "fat_g", "fiber_g"):
+            try:
+                macros[k] = max(float(result.get(k) or 0), 0)
+            except (TypeError, ValueError):
+                macros[k] = 0.0
+        d = result.get("date") or today
+        try:
+            date.fromisoformat(d)
+        except ValueError:
+            d = today
+        with db.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO food_log (user_id, date, source, custom_food_id, name, meal, servings, "
+                "calories, protein_g, carbs_g, fat_g, fiber_g, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (user_id, d, "ai", None, name, meal, servings,
+                 macros["calories"], macros["protein_g"], macros["carbs_g"], macros["fat_g"],
+                 macros["fiber_g"], db.now()),
+            )
+        flash(f"Logged {name} ({meal}) — nutrition estimated by AI, edit it on the Nutrition page if it's off.")
+        return redirect(url_for("nutrition_meal", meal=meal, date=d))
+
+    if kind == "reminder":
+        title = str(result.get("title") or "").strip()[:200]
+        next_due = result.get("next_due")
+        try:
+            date.fromisoformat(next_due)
+        except (TypeError, ValueError):
+            flash("Couldn't tell what date that reminder was for — try including one.")
+            return redirect(url_for("ai_quick_add"))
+        recurrence = result.get("recurrence") if result.get("recurrence") in ("once", "daily", "weekly", "monthly") else "once"
+        if not title:
+            flash("Couldn't tell what to remind you about.")
+            return redirect(url_for("ai_quick_add"))
+        with db.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO reminders (user_id, title, next_due, recurrence, active, created_at) VALUES (?,?,?,?,1,?)",
+                (user_id, title, next_due, recurrence, db.now()),
+            )
+        flash(f"Reminder set: {title} ({next_due})")
+        return redirect(url_for("reminders"))
+
+    if kind == "todo":
+        title = str(result.get("title") or "").strip()[:200]
+        if not title:
+            flash("Couldn't tell what the task was.")
+            return redirect(url_for("ai_quick_add"))
+        with db.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO todos (user_id, title, done, created_at) VALUES (?,?,0,?)",
+                (user_id, title, db.now()),
+            )
+        flash(f"Added to-do: {title}")
+        return redirect(url_for("habits"))
+
+    # "unclear" or any other/unexpected value — nothing gets written.
+    reason = result.get("reason") if isinstance(result.get("reason"), str) else None
+    flash(f"Wasn't sure what you meant{': ' + reason if reason else ''} — try rephrasing with more detail.")
+    return redirect(url_for("ai_quick_add"))
 
 
 # ── Settings ─────────────────────────────────────────────────────────────

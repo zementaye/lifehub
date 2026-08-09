@@ -41,6 +41,16 @@ TG_CHAT_ID = os.environ.get("TG_CHAT_ID", "")
 # Free key: https://api.data.gov/signup/  (DEMO_KEY works but is rate-limited)
 USDA_API_KEY = os.environ.get("USDA_API_KEY", "DEMO_KEY")
 
+# ── AI (Gemini) ──────────────────────────────────────────────────────────
+# Optional, same pattern as every other integration here (Telegram, Resend,
+# B2): if it's not set, the AI chat assistant / quick-add / auto-categorize
+# features just don't show up rather than erroring. Get a free key (no
+# credit card required) at https://aistudio.google.com/apikey — chosen over
+# Anthropic/OpenAI specifically because Gemini's free tier has no expiring
+# trial credit and is generous enough for a single small personal app.
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+
 # ── Habit nudge / reminder scheduling ───────────────────────────────────
 TIMEZONE = os.environ.get("TIMEZONE", "Africa/Addis_Ababa")
 NUDGE_HOUR = int(os.environ.get("NUDGE_HOUR", "20"))   # 24h, local TZ — daily check time
