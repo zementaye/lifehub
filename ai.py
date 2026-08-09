@@ -109,24 +109,29 @@ def ask(question: str, context: str):
 
 
 # ── Natural-language quick add ──────────────────────────────────────────
-# Turns one typed sentence into exactly one structured action. Deliberately
-# narrow: it only ever proposes inserting a row shaped like what the normal
+# Turns one typed sentence into one OR MORE structured actions (e.g. "ate
+# pancakes, cost me 450" is both a food log AND an expense). Deliberately
+# narrow: it only ever proposes inserting rows shaped like what the normal
 # manual forms already produce (see add_transaction/log_food/add_reminder/
 # add_todo in app.py) — the caller re-validates every field before writing
 # anything, so a bad or hallucinated response can't put garbage in the DB,
 # only fail to add anything.
 
 _QUICK_ADD_SYSTEM = """\
-Turn the user's short note into ONE structured action for a personal budget/
-health/habit app. Reply with ONLY a single JSON object, no prose, no markdown
-fences, matching exactly one of these shapes:
+Turn the user's short note into a JSON array of structured actions for a
+personal budget/health/habit app. Reply with ONLY a JSON array, no prose, no
+markdown fences — even if there's just one action, wrap it in an array with
+one element. If the note describes more than one thing (e.g. eating a food
+that also cost money), output a separate array element for each — for
+example one "food" element AND one "transaction" element from the same
+sentence. Each element must match exactly one of these shapes:
 
 Expense or income:
 {{"type": "transaction", "txn_type": "expense" or "income", "amount": <number>, "description": <short string>, "category": <one of the existing categories below, or null>, "date": "YYYY-MM-DD" or null}}
 
 Something eaten:
-{{"type": "food", "name": <short string>, "meal": "breakfast"|"lunch"|"dinner"|"snack", "grams": <number, your best estimate of a typical portion if not stated>, "calories": <number>, "protein_g": <number>, "carbs_g": <number>, "fat_g": <number>, "fiber_g": <number>, "date": "YYYY-MM-DD" or null}}
-(Estimate reasonable nutrition values for the food and portion described.)
+{{"type": "food", "name": <short string>, "portion_description": <short human-readable string describing quantity, e.g. "2 pancakes" or "1 bowl (~300g)">, "meal": "breakfast"|"lunch"|"dinner"|"snack", "grams": <number, your best estimate of total weight if not stated>, "calories": <number>, "protein_g": <number>, "carbs_g": <number>, "fat_g": <number>, "fiber_g": <number>, "date": "YYYY-MM-DD" or null}}
+(Estimate reasonable quantity, portion, and nutrition values for the food described — if no quantity is stated, assume a typical single serving and say so in portion_description, e.g. "pancakes" -> "2 pancakes (~150g, estimated)".)
 
 A reminder for a future date:
 {{"type": "reminder", "title": <short string>, "next_due": "YYYY-MM-DD", "recurrence": "once"|"daily"|"weekly"|"monthly"}}
@@ -134,7 +139,8 @@ A reminder for a future date:
 A simple task with no date:
 {{"type": "todo", "title": <short string>}}
 
-If the note is too vague to confidently produce one of the above, reply:
+If nothing in the note can confidently produce any of the above, reply with
+a single-element array containing:
 {{"type": "unclear", "reason": <short string explaining what's missing>}}
 
 Today's date is {today}. Existing expense categories for this user: {categories}.

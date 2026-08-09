@@ -2238,109 +2238,143 @@ def ai_quick_add():
         ).fetchall()
 
     result, err = ai.parse_quick_add(text, [c["name"] for c in categories], today)
-    if err or not isinstance(result, dict):
+    if err or result is None:
         flash(f"Couldn't parse that: {err or 'unexpected response'}")
         return redirect(url_for("ai_quick_add"))
 
-    kind = result.get("type")
+    # The model is asked for a JSON array (one note can imply more than one
+    # action, e.g. "ate pancakes, cost me 450" = food + transaction). Stay
+    # tolerant if it ever replies with a bare object instead.
+    actions = result if isinstance(result, list) else [result]
+    actions = [a for a in actions if isinstance(a, dict)]
+    if not actions:
+        flash("Couldn't parse that: unexpected response")
+        return redirect(url_for("ai_quick_add"))
 
-    if kind == "transaction":
-        ttype = result.get("txn_type") if result.get("txn_type") in ("income", "expense") else "expense"
-        amount = result.get("amount")
-        try:
-            amount = abs(float(amount))
-        except (TypeError, ValueError):
-            amount = None
-        if not amount:
-            flash("Couldn't tell how much that was for — try including an amount.")
-            return redirect(url_for("ai_quick_add"))
-        description = str(result.get("description") or text)[:200]
-        cat_name = result.get("category")
-        category_id = next((c["id"] for c in categories if c["name"] == cat_name), None)
-        d = result.get("date") or today
-        try:
-            date.fromisoformat(d)
-        except ValueError:
-            d = today
-        with db.get_conn() as conn:
-            conn.execute(
-                "INSERT INTO transactions (user_id, date, type, category_id, description, amount, created_at) "
-                "VALUES (?,?,?,?,?,?,?)",
-                (user_id, d, ttype, category_id if ttype == "expense" else None, description, amount, db.now()),
-            )
-        flash(f"Added {ttype}: {amount:.0f} — {description}")
-        return redirect(url_for("budget"))
+    messages = []
+    redirect_target = None  # only used when exactly one action was applied
 
-    if kind == "food":
-        name = str(result.get("name") or "").strip()[:200]
-        if not name:
-            flash("Couldn't tell what food that was — try naming it.")
-            return redirect(url_for("ai_quick_add"))
-        meal = result.get("meal") if result.get("meal") in ("breakfast", "lunch", "dinner", "snack") else "snack"
-        grams = result.get("grams")
-        try:
-            servings = max(float(grams), 1) / 100.0
-        except (TypeError, ValueError):
-            servings = 1.0
-        macros = {}
-        for k in ("calories", "protein_g", "carbs_g", "fat_g", "fiber_g"):
+    for result in actions:
+        kind = result.get("type")
+
+        if kind == "transaction":
+            ttype = result.get("txn_type") if result.get("txn_type") in ("income", "expense") else "expense"
+            amount = result.get("amount")
             try:
-                macros[k] = max(float(result.get(k) or 0), 0)
+                amount = abs(float(amount))
             except (TypeError, ValueError):
-                macros[k] = 0.0
-        d = result.get("date") or today
-        try:
-            date.fromisoformat(d)
-        except ValueError:
-            d = today
-        with db.get_conn() as conn:
-            conn.execute(
-                "INSERT INTO food_log (user_id, date, source, custom_food_id, name, meal, servings, "
-                "calories, protein_g, carbs_g, fat_g, fiber_g, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (user_id, d, "ai", None, name, meal, servings,
-                 macros["calories"], macros["protein_g"], macros["carbs_g"], macros["fat_g"],
-                 macros["fiber_g"], db.now()),
-            )
-        flash(f"Logged {name} ({meal}) — nutrition estimated by AI, edit it on the Nutrition page if it's off.")
-        return redirect(url_for("nutrition_meal", meal=meal, date=d))
+                amount = None
+            if not amount:
+                messages.append("Couldn't tell how much that cost — try including an amount.")
+                continue
+            description = str(result.get("description") or text)[:200]
+            cat_name = result.get("category")
+            category_id = next((c["id"] for c in categories if c["name"] == cat_name), None)
+            d = result.get("date") or today
+            try:
+                date.fromisoformat(d)
+            except ValueError:
+                d = today
+            with db.get_conn() as conn:
+                conn.execute(
+                    "INSERT INTO transactions (user_id, date, type, category_id, description, amount, created_at) "
+                    "VALUES (?,?,?,?,?,?,?)",
+                    (user_id, d, ttype, category_id if ttype == "expense" else None, description, amount, db.now()),
+                )
+            cat_suffix = f" ({cat_name})" if cat_name else ""
+            messages.append(f"Added {ttype}: {amount:.0f} — {description}{cat_suffix}")
+            redirect_target = url_for("budget")
+            continue
 
-    if kind == "reminder":
-        title = str(result.get("title") or "").strip()[:200]
-        next_due = result.get("next_due")
-        try:
-            date.fromisoformat(next_due)
-        except (TypeError, ValueError):
-            flash("Couldn't tell what date that reminder was for — try including one.")
-            return redirect(url_for("ai_quick_add"))
-        recurrence = result.get("recurrence") if result.get("recurrence") in ("once", "daily", "weekly", "monthly") else "once"
-        if not title:
-            flash("Couldn't tell what to remind you about.")
-            return redirect(url_for("ai_quick_add"))
-        with db.get_conn() as conn:
-            conn.execute(
-                "INSERT INTO reminders (user_id, title, next_due, recurrence, active, created_at) VALUES (?,?,?,?,1,?)",
-                (user_id, title, next_due, recurrence, db.now()),
+        if kind == "food":
+            name = str(result.get("name") or "").strip()[:200]
+            if not name:
+                messages.append("Couldn't tell what food that was — try naming it.")
+                continue
+            meal = result.get("meal") if result.get("meal") in ("breakfast", "lunch", "dinner", "snack") else "snack"
+            grams = result.get("grams")
+            try:
+                grams_val = max(float(grams), 1)
+            except (TypeError, ValueError):
+                grams_val = 100.0
+            servings = grams_val / 100.0
+            macros = {}
+            for k in ("calories", "protein_g", "carbs_g", "fat_g", "fiber_g"):
+                try:
+                    macros[k] = max(float(result.get(k) or 0), 0)
+                except (TypeError, ValueError):
+                    macros[k] = 0.0
+            d = result.get("date") or today
+            try:
+                date.fromisoformat(d)
+            except ValueError:
+                d = today
+            with db.get_conn() as conn:
+                conn.execute(
+                    "INSERT INTO food_log (user_id, date, source, custom_food_id, name, meal, servings, "
+                    "calories, protein_g, carbs_g, fat_g, fiber_g, created_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (user_id, d, "ai", None, name, meal, servings,
+                     macros["calories"], macros["protein_g"], macros["carbs_g"], macros["fat_g"],
+                     macros["fiber_g"], db.now()),
+                )
+            portion = str(result.get("portion_description") or "").strip()
+            descriptor = portion if portion else f"{name} (~{grams_val:.0f}g)"
+            messages.append(
+                f"Logged {descriptor} — {meal}, ~{macros['calories']:.0f} kcal "
+                f"({macros['protein_g']:.0f}g protein, {macros['carbs_g']:.0f}g carbs, {macros['fat_g']:.0f}g fat). "
+                f"Estimated by AI — edit on the Nutrition page if it's off."
             )
-        flash(f"Reminder set: {title} ({next_due})")
-        return redirect(url_for("reminders"))
+            redirect_target = url_for("nutrition_meal", meal=meal, date=d)
+            continue
 
-    if kind == "todo":
-        title = str(result.get("title") or "").strip()[:200]
-        if not title:
-            flash("Couldn't tell what the task was.")
-            return redirect(url_for("ai_quick_add"))
-        with db.get_conn() as conn:
-            conn.execute(
-                "INSERT INTO todos (user_id, title, done, created_at) VALUES (?,?,0,?)",
-                (user_id, title, db.now()),
-            )
-        flash(f"Added to-do: {title}")
-        return redirect(url_for("habits"))
+        if kind == "reminder":
+            title = str(result.get("title") or "").strip()[:200]
+            next_due = result.get("next_due")
+            try:
+                date.fromisoformat(next_due)
+            except (TypeError, ValueError):
+                messages.append("Couldn't tell what date that reminder was for — try including one.")
+                continue
+            recurrence = result.get("recurrence") if result.get("recurrence") in ("once", "daily", "weekly", "monthly") else "once"
+            if not title:
+                messages.append("Couldn't tell what to remind you about.")
+                continue
+            with db.get_conn() as conn:
+                conn.execute(
+                    "INSERT INTO reminders (user_id, title, next_due, recurrence, active, created_at) VALUES (?,?,?,?,1,?)",
+                    (user_id, title, next_due, recurrence, db.now()),
+                )
+            messages.append(f"Reminder set: {title} ({next_due})")
+            redirect_target = url_for("reminders")
+            continue
 
-    # "unclear" or any other/unexpected value — nothing gets written.
-    reason = result.get("reason") if isinstance(result.get("reason"), str) else None
-    flash(f"Wasn't sure what you meant{': ' + reason if reason else ''} — try rephrasing with more detail.")
+        if kind == "todo":
+            title = str(result.get("title") or "").strip()[:200]
+            if not title:
+                messages.append("Couldn't tell what the task was.")
+                continue
+            with db.get_conn() as conn:
+                conn.execute(
+                    "INSERT INTO todos (user_id, title, done, created_at) VALUES (?,?,0,?)",
+                    (user_id, title, db.now()),
+                )
+            messages.append(f"Added to-do: {title}")
+            redirect_target = url_for("habits")
+            continue
+
+        # "unclear" or any other/unexpected value — nothing gets written.
+        reason = result.get("reason") if isinstance(result.get("reason"), str) else None
+        messages.append(f"Wasn't sure what you meant{': ' + reason if reason else ''} — try rephrasing with more detail.")
+
+    for m in messages:
+        flash(m)
+
+    # If the note produced exactly one action, jump straight to the page it
+    # affects, same as before. With multiple actions (e.g. food + expense)
+    # there's no single "right" page, so stay put and show both confirmations.
+    if redirect_target and len(actions) == 1:
+        return redirect(redirect_target)
     return redirect(url_for("ai_quick_add"))
 
 
