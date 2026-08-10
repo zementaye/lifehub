@@ -15,9 +15,12 @@
       </select>
     </label>
     <label>Remind me at (optional)
-      <input type="time" step="3600" placeholder="--:--"
-             onchange="this.nextElementSibling.value = this.value ? this.value.split(':')[0] : ''">
-      <input type="hidden" name="reminder_hour">
+      <select name="reminder_hour">
+        <option value="">No reminder</option>
+        {% for h in range(24) %}
+          <option value="{{ h }}">{{ h | hour12 }}</option>
+        {% endfor %}
+      </select>
     </label>
     <button type="submit">Add</button>
   </form>
@@ -76,12 +79,14 @@
                 ⏰ {{ hs.habit.reminder_hour | hour12 if hs.habit.reminder_hour is not none else 'No reminder' }}
               </span>
               <form method="post" action="{{ url_for('set_habit_reminder', habit_id=hs.habit.id) }}" class="habit-reminder-form">
-                <input type="time" step="3600"
-                       value="{{ '%02d:00' % hs.habit.reminder_hour if hs.habit.reminder_hour is not none else '' }}"
-                       aria-label="Reminder time for {{ hs.habit.title }}"
-                       title="Time to remind you if not done, blank = use the general evening check-in"
-                       onchange="this.nextElementSibling.value = this.value ? this.value.split(':')[0] : ''">
-                <input type="hidden" name="reminder_hour" value="{{ hs.habit.reminder_hour if hs.habit.reminder_hour is not none else '' }}">
+                <select name="reminder_hour"
+                        aria-label="Reminder time for {{ hs.habit.title }}"
+                        title="Time to remind you if not done, blank = use the general evening check-in">
+                  <option value="" {{ 'selected' if hs.habit.reminder_hour is none }}>No reminder</option>
+                  {% for h in range(24) %}
+                    <option value="{{ h }}" {{ 'selected' if hs.habit.reminder_hour == h }}>{{ h | hour12 }}</option>
+                  {% endfor %}
+                </select>
                 <button type="submit" class="btn-icon" title="Save reminder time">💾</button>
               </form>
               <form method="post" action="{{ url_for('delete_habit', habit_id=hs.habit.id) }}" class="delete-form" data-confirm="Delete {{ hs.habit.title }}? Its streak history will be lost.">
