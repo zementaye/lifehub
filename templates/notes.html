@@ -58,7 +58,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce() }}">
 document.querySelectorAll('.note-card').forEach(card => {
   const editToggle = card.querySelector('.note-edit-toggle');
   const editForm = card.querySelector('.note-edit-form');

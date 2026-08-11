@@ -308,7 +308,7 @@
   Life Hub — built for one person's actual daily life.
 </footer>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
   // Starfield background, matching the rest of the app's HUD aesthetic.
   (function () {
     var container = document.getElementById('hud-stars');

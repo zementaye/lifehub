@@ -25,7 +25,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce() }}">
 // Live filtering: re-query as the admin types, so results are already
 // filtered by the time they've finished typing — no Search click needed.
 (function () {

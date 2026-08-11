@@ -68,7 +68,7 @@
 
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
-<script>
+<script nonce="{{ csp_nonce() }}">
 (function () {
   const style = getComputedStyle(document.body);
   const v = (name) => style.getPropertyValue(name).trim();

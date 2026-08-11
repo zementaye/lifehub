@@ -122,7 +122,7 @@
   color: #888;
 }
 </style>
-<script>
+<script nonce="{{ csp_nonce() }}">
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('vault-file');
 const emptyState = document.getElementById('dropzone-empty');

@@ -132,7 +132,7 @@
   pointer-events: none;
 }
 </style>
-<script>
+<script nonce="{{ csp_nonce() }}">
 // Same Save→Edit lock as the Settings page: a form that already has saved
 // values renders read-only with an "Edit" button instead of a permanent
 // "Save" button. Clicking Edit unlocks the fields; submitting reloads the

@@ -129,7 +129,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce() }}">
 function fillCustomFood(sel) {
   const opt = sel.selectedOptions[0];
   document.getElementById('cf-id').value = opt.value;
