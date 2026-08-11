@@ -9,7 +9,7 @@
     <form method="post" action="{{ url_for('set_height') }}" class="inline-form settings-form">
       <div class="settings-fields">
         <label>Height (cm)
-          <input type="number" step="0.1" name="height_cm" value="{{ profile.height_cm or '' }}" required>
+          <input type="number" step="0.1" name="height_cm" min="30" max="300" value="{{ profile.height_cm or '' }}" required>
         </label>
         <label>Birth date
           <input type="date" name="birth_date" value="{{ profile.birth_date or '' }}">
@@ -34,7 +34,7 @@
     <h3>Log Weight</h3>
     <form method="post" action="{{ url_for('add_weight') }}" class="inline-form">
       <label>Date <input type="date" name="date" value="{{ today }}"></label>
-      <label>Weight (kg) <input type="number" step="0.1" name="weight_kg" required></label>
+      <label>Weight (kg) <input type="number" step="0.1" name="weight_kg" min="1" max="500" required></label>
       <button type="submit">Add</button>
     </form>
   </div>
@@ -52,7 +52,7 @@
           <option>Other</option>
         </select>
       </label>
-      <label>Duration (min) <input type="number" name="duration_minutes"></label>
+      <label>Duration (min) <input type="number" name="duration_minutes" min="0" max="1440"></label>
       <label>Notes <input type="text" name="notes" placeholder="optional"></label>
       <button type="submit">Add</button>
     </form>

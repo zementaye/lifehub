@@ -64,7 +64,7 @@
           <option value="income">Income</option>
         </select>
       </label>
-      <label>Amount ({{ currency }}) <input type="number" step="0.01" name="amount" required></label>
+      <label>Amount ({{ currency }}) <input type="number" step="0.01" name="amount" min="0.01" max="1000000000" required></label>
       <label id="cat-field">Category
         <select name="category_id">
           <option value="">— none —</option>
@@ -80,7 +80,7 @@
     <h3>New Category</h3>
     <form method="post" action="{{ url_for('add_budget_category') }}" class="inline-form">
       <label>Name <input type="text" name="name" placeholder="e.g. Food" required></label>
-      <label>Monthly limit ({{ currency }}) <input type="number" step="0.01" name="monthly_limit" placeholder="optional"></label>
+      <label>Monthly limit ({{ currency }}) <input type="number" step="0.01" name="monthly_limit" min="0" max="1000000000" placeholder="optional"></label>
       <button type="submit">Add</button>
     </form>
 
@@ -129,7 +129,7 @@
         <option value="expense">Expense (bill)</option>
       </select>
     </label>
-    <label>Amount ({{ currency }}) <input type="number" step="0.01" name="amount" required></label>
+    <label>Amount ({{ currency }}) <input type="number" step="0.01" name="amount" min="0.01" max="1000000000" required></label>
     <label id="rec-cat-field" style="display:none;">Category
       <select name="category_id">
         <option value="">— none —</option>
@@ -204,7 +204,7 @@
   <p class="muted">Set up separate jars to save toward — adding money logs it as an expense (moved out of what's available to spend); withdrawing logs it back as income.</p>
   <form method="post" action="{{ url_for('add_savings_goal') }}" class="inline-form">
     <label>Name <input type="text" name="name" placeholder="e.g. Emergency fund, New laptop" required></label>
-    <label>Goal amount ({{ currency }}) <input type="number" step="0.01" name="target_amount" placeholder="optional"></label>
+    <label>Goal amount ({{ currency }}) <input type="number" step="0.01" name="target_amount" min="0" max="1000000000" placeholder="optional"></label>
     <label>Target date <input type="date" name="target_date"></label>
     <button type="submit">Add goal</button>
   </form>
@@ -246,11 +246,11 @@
 
           <div class="savings-actions">
             <form method="post" action="{{ url_for('contribute_savings_goal', goal_id=g.id) }}">
-              <input type="number" step="0.01" name="amount" placeholder="Add {{ currency }}" required>
+              <input type="number" step="0.01" name="amount" min="0.01" max="1000000000" placeholder="Add {{ currency }}" required>
               <button type="submit">Add</button>
             </form>
             <form method="post" action="{{ url_for('withdraw_savings_goal', goal_id=g.id) }}">
-              <input type="number" step="0.01" name="amount" placeholder="Withdraw {{ currency }}" required>
+              <input type="number" step="0.01" name="amount" min="0.01" max="1000000000" placeholder="Withdraw {{ currency }}" required>
               <button type="submit" class="secondary">Withdraw</button>
             </form>
           </div>
