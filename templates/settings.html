@@ -73,11 +73,19 @@
     <div class="settings-fields">
       <label>Timezone <input type="text" name="timezone" value="{{ values.timezone }}" placeholder="Africa/Addis_Ababa"></label>
       <label>Currency <input type="text" name="currency" value="{{ values.currency }}" placeholder="ETB"></label>
-      <label>Reminder send hour (0-23)
-        <input type="number" name="reminder_hour" min="0" max="23" value="{{ values.reminder_hour }}">
+      <label>Reminder send hour
+        <select name="reminder_hour">
+          {% for h in range(24) %}
+            <option value="{{ h }}" {{ 'selected' if h|string == values.reminder_hour|string }}>{{ h | hour12 }}</option>
+          {% endfor %}
+        </select>
       </label>
-      <label>Habit nudge hour (0-23)
-        <input type="number" name="nudge_hour" min="0" max="23" value="{{ values.nudge_hour }}">
+      <label>Habit nudge hour
+        <select name="nudge_hour">
+          {% for h in range(24) %}
+            <option value="{{ h }}" {{ 'selected' if h|string == values.nudge_hour|string }}>{{ h | hour12 }}</option>
+          {% endfor %}
+        </select>
       </label>
       <label>Week ends on
         <select name="week_end_day">
