@@ -1,0 +1,36 @@
+<table class="table">
+  <thead>
+    <tr>
+      <th>When</th>
+      <th>Actor</th>
+      <th>Action</th>
+      <th>Target</th>
+      <th>Details</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in entries %}
+      <tr>
+        <td class="muted">{{ e.created_at | fmtdatetime }}</td>
+        <td>{{ e.actor_email }}</td>
+        <td>
+          {% if e.action == 'delete_user' %}<span class="bmi-tag bmi-obese">Deleted user</span>
+          {% elif e.action == 'suspend_user' %}<span class="bmi-tag bmi-overweight">Suspended user</span>
+          {% elif e.action == 'unsuspend_user' %}<span class="bmi-tag bmi-normal">Unsuspended user</span>
+          {% elif e.action == 'promote_admin' %}<span class="bmi-tag bmi-normal">Promoted to admin</span>
+          {% elif e.action == 'demote_admin' %}<span class="bmi-tag bmi-overweight">Removed admin</span>
+          {% elif e.action == 'update_user' %}<span class="muted">Updated user</span>
+          {% elif e.action == 'login_failed' %}<span class="muted">Login failed</span>
+          {% elif e.action == 'login_blocked_suspended' %}<span class="bmi-tag bmi-overweight">Blocked login (suspended)</span>
+          {% elif e.action == 'self_password_reset' %}<span class="muted">Self password reset</span>
+          {% else %}<span class="muted">{{ e.action }}</span>
+          {% endif %}
+        </td>
+        <td>{{ e.target_email or '—' }}</td>
+        <td class="muted">{{ e.details or '—' }}</td>
+      </tr>
+    {% else %}
+      <tr class="muted"><td colspan="5">No audit log entries{% if q %} match "{{ q }}"{% endif %} yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>

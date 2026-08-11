@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Ask — Life Hub{% endblock %}
+{% block content %}
+<h1>Ask about your data</h1>
+
+<div class="card wide">
+  {% if not ai_available %}
+    <p class="muted">⚠️ AI isn't set up on this server yet — an admin needs to configure it.</p>
+  {% else %}
+    <p class="muted">
+      Answers using your budget, habits, reminders, nutrition, and weight
+      data — nothing from Notes, Passwords, or the ID Vault is shared with it.
+    </p>
+    <form method="post" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <textarea name="question" rows="2" style="width:100%; resize:vertical;" placeholder="e.g. how much have I spent on food this month?" required autofocus>{{ question or '' }}</textarea>
+      <button type="submit">Ask</button>
+    </form>
+
+    {% if question %}
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+        <p class="muted" style="margin-bottom:4px;"><strong>You asked:</strong> {{ question }}</p>
+        {% if answer %}
+          <p style="white-space: pre-wrap;">{{ answer }}</p>
+        {% else %}
+          <p class="muted">No answer came back — see the message above, or try again.</p>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

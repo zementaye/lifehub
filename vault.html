@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+{% block title %}Vault — Life Hub{% endblock %}
+{% block content %}
+<h1>Digital ID Vault</h1>
+<p class="muted">Photos of your license, national ID, and other documents — for when you forget the physical copy.</p>
+
+<div class="vault-blur-toggle" id="vaultBlurToggle" role="switch" tabindex="0" aria-checked="true" aria-label="Blur document previews">
+  <span class="mode-rocker on" id="vaultBlurRocker"></span>
+  <span class="mode-label" id="vaultBlurLabel">Blur previews: ON</span>
+</div>
+
+<div class="card">
+  <h3>Add a Document</h3>
+  <form method="post" action="{{ url_for('vault_upload') }}" enctype="multipart/form-data" class="inline-form" id="vault-upload-form">
+    <input type="hidden" name="upload_token" value="{{ upload_token }}">
+    <label>Label <input type="text" name="label" placeholder="e.g. Driver's License" required></label>
+    <label>Notes <input type="text" name="notes" placeholder="optional"></label>
+    <label>Expiry date
+      <span class="date-parts" data-date-parts>
+        <input type="text" inputmode="numeric" maxlength="2" placeholder="MM" class="date-part" data-part="mm" autocomplete="off">
+        <span class="date-sep">/</span>
+        <input type="text" inputmode="numeric" maxlength="2" placeholder="DD" class="date-part" data-part="dd" autocomplete="off">
+        <span class="date-sep">/</span>
+        <input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY" class="date-part date-part-yyyy" data-part="yyyy" autocomplete="off">
+      </span>
+      <input type="hidden" name="expiry_date" data-date-hidden>
+    </label>
+    <p class="muted" style="flex-basis:100%;margin:0;">If set, you'll automatically get reminders at 1 month out, 2 weeks out, then daily for the final week.</p>
+  </form>
+
+  <div id="dropzone" class="dropzone">
+    <input type="file" name="file" accept="image/*,.pdf" required id="vault-file" form="vault-upload-form">
+    <div id="dropzone-empty">
+      <div class="dropzone-icon">📎</div>
+      <p><strong>Drag &amp; drop</strong> a photo or PDF here<br>or click to browse</p>
+    </div>
+    <div id="dropzone-filled" style="display:none;">
+      <img id="vault-preview" style="display:none;">
+      <div id="vault-file-info"></div>
+      <button type="button" id="dropzone-clear" class="btn-icon">✕ Remove</button>
+    </div>
+  </div>
+
+  <button type="submit" form="vault-upload-form" id="vault-save-btn" style="margin-top:12px;">Save</button>
+  <progress id="vault-upload-progress" max="100" value="0" style="display:none;width:100%;margin-top:8px;"></progress>
+</div>
+
+<div class="grid">
+  {% for d in docs %}
+    <div class="card doc-card">
+      <h4>{{ d.label }}</h4>
+      {% if d.filename.rsplit('.',1)[-1].lower() == 'pdf' %}
+        <a href="{{ url_for('vault_file', filename=d.filename) }}" target="_blank" class="link">📄 View PDF</a>
+      {% else %}
+        <div class="doc-thumb-wrap">
+          <a href="{{ url_for('vault_file', filename=d.filename) }}" target="_blank" class="doc-thumb-link">
+            <img src="{{ url_for('vault_file', filename=d.filename) }}" class="doc-thumb" alt="{{ d.label }}">
+          </a>
+          <button type="button" class="doc-reveal-btn" title="Show/hide preview" aria-label="Show or hide this preview">👁️</button>
+        </div>
+      {% endif %}
+      <p><a href="{{ url_for('vault_download', doc_id=d.id) }}" class="link">⬇️ Download</a></p>
+      {% if d.notes %}<p class="muted">{{ d.notes }}</p>{% endif %}
+      {% if d.expiry_date %}
+        {% set expiry_parts = d.expiry_date.split('-') %}
+        <p class="muted">
+          📅 Expires {{ d.expiry_date }}
+          {% if d.days_left is not none %}
+            {% if d.days_left < 0 %}
+              <span class="expiry-badge expired">Expired</span>
+            {% elif d.days_left <= 7 %}
+              <span class="expiry-badge urgent">{{ d.days_left }}d left</span>
+            {% elif d.days_left <= 30 %}
+              <span class="expiry-badge soon">{{ d.days_left }}d left</span>
+            {% endif %}
+          {% endif %}
+          {% if d.acknowledged %}<span class="expiry-badge muted-badge">Acknowledged</span>{% endif %}
+        </p>
+        <form method="post" action="{{ url_for('vault_renew', doc_id=d.id) }}" class="doc-expiry-actions">
+          <span class="date-parts" data-date-parts>
+            <input type="text" inputmode="numeric" maxlength="2" placeholder="MM" class="date-part" data-part="mm" autocomplete="off" value="{{ expiry_parts[1] }}">
+            <span class="date-sep">/</span>
+            <input type="text" inputmode="numeric" maxlength="2" placeholder="DD" class="date-part" data-part="dd" autocomplete="off" value="{{ expiry_parts[2] }}">
+            <span class="date-sep">/</span>
+            <input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY" class="date-part date-part-yyyy" data-part="yyyy" autocomplete="off" value="{{ expiry_parts[0] }}">
+          </span>
+          <input type="hidden" name="expiry_date" data-date-hidden value="{{ d.expiry_date }}">
+          <button type="submit" class="btn-icon" title="Renew / update expiry date">🔄</button>
+        </form>
+        {% if not d.acknowledged %}
+          <form method="post" action="{{ url_for('vault_acknowledge', doc_id=d.id) }}">
+            <button type="submit" class="secondary" style="margin-top:6px;">Got it, stop reminding me</button>
+          </form>
+        {% endif %}
+      {% endif %}
+      <form method="post" action="{{ url_for('vault_delete', doc_id=d.id) }}" class="vault-delete-form" data-confirm="Delete {{ d.label }}?">
+        <button type="submit" class="btn-icon vault-delete-btn" title="Delete">🗑️ Delete</button>
+      </form>
+    </div>
+  {% else %}
+    <p class="muted">No documents saved yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.date-parts {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.date-parts .date-part {
+  width: 2.6em;
+  text-align: center;
+  padding: 8px 4px;
+}
+.date-parts .date-part-yyyy {
+  width: 3.8em;
+}
+.date-sep {
+  color: #888;
+}
+</style>
+<script nonce="{{ csp_nonce() }}">
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('vault-file');
+const emptyState = document.getElementById('dropzone-empty');
+const filledState = document.getElementById('dropzone-filled');
+const preview = document.getElementById('vault-preview');
+const fileInfo = document.getElementById('vault-file-info');
+
+// Custom MM/DD/YYYY date entry (replaces native <input type="date">, whose
+// year segment slides digits in from the right once full, e.g. "2001" + "3"
+// becomes "0013"). Each segment here fully resets to the new digit once
+// it's already full, matching how the month/day segments normally behave —
+// so "2001" + "3" becomes "3", growing to "0003" once you tab away. On
+// blur each segment zero-pads and clamps to a sane range, then the three
+// are combined into the hidden "expiry_date" field the server reads.
+(function () {
+  function syncHidden(group) {
+    const hidden = group.parentElement.querySelector('[data-date-hidden]');
+    if (!hidden) return;
+    const mm = group.querySelector('[data-part="mm"]').value;
+    const dd = group.querySelector('[data-part="dd"]').value;
+    const yyyy = group.querySelector('[data-part="yyyy"]').value;
+    if (mm.length === 2 && dd.length === 2 && yyyy.length === 4) {
+      hidden.value = `${yyyy}-${mm}-${dd}`;
+    } else if (!mm && !dd && !yyyy) {
+      hidden.value = ''; // fully cleared — expiry date is optional
+    } else {
+      hidden.value = ''; // incomplete — don't submit a half-typed date
+    }
+  }
+
+  function wirePart(input, group, maxLen, min, max, next) {
+    input.addEventListener('keydown', (e) => {
+      if (!/^[0-9]$/.test(e.key)) return; // let backspace/tab/arrows behave natively
+      e.preventDefault();
+      let val = input.value;
+      if (val.length >= maxLen) val = ''; // segment was already full — start fresh
+      val += e.key;
+      input.value = val;
+      if (val.length >= maxLen) {
+        syncHidden(group);
+        if (next) next.focus();
+      }
+    });
+
+    input.addEventListener('input', () => {
+      // Safety net for mobile/autofill paths that bypass keydown above.
+      input.value = input.value.replace(/\D/g, '').slice(0, maxLen);
+      syncHidden(group);
+    });
+
+    input.addEventListener('blur', () => {
+      if (!input.value) { syncHidden(group); return; }
+      let num = parseInt(input.value, 10);
+      if (isNaN(num)) num = min;
+      num = Math.min(Math.max(num, min), max);
+      input.value = String(num).padStart(maxLen, '0');
+      syncHidden(group);
+    });
+  }
+
+  document.querySelectorAll('[data-date-parts]').forEach((group) => {
+    const mm = group.querySelector('[data-part="mm"]');
+    const dd = group.querySelector('[data-part="dd"]');
+    const yyyy = group.querySelector('[data-part="yyyy"]');
+    wirePart(mm, group, 2, 1, 12, dd);
+    wirePart(dd, group, 2, 1, 31, yyyy);
+    wirePart(yyyy, group, 4, 1900, 2099, null);
+    syncHidden(group); // pick up any server-rendered prefill (renew form)
+  });
+})();
+
+function showFile(file) {
+  if (!file) return;
+  emptyState.style.display = 'none';
+  filledState.style.display = 'flex';
+  if (file.type.startsWith('image/')) {
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+  const sizeKb = Math.round(file.size / 1024);
+  fileInfo.textContent = `${file.name} (${sizeKb} KB)`;
+}
+
+function clearFile() {
+  fileInput.value = '';
+  emptyState.style.display = 'block';
+  filledState.style.display = 'none';
+  preview.src = '';
+}
+
+fileInput.addEventListener('change', () => showFile(fileInput.files[0]));
+
+document.getElementById('dropzone-clear').addEventListener('click', (e) => {
+  e.stopPropagation();
+  clearFile();
+});
+
+dropzone.addEventListener('click', (e) => {
+  if (e.target.id !== 'dropzone-clear') fileInput.click();
+});
+
+['dragenter', 'dragover'].forEach(evt =>
+  dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropzone.classList.add('drag-active');
+  })
+);
+
+['dragleave', 'drop'].forEach(evt =>
+  dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropzone.classList.remove('drag-active');
+  })
+);
+
+dropzone.addEventListener('drop', (e) => {
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    fileInput.files = files;
+    showFile(files[0]);
+  }
+});
+
+// Blur previews toggle — hides document photos behind a blur by default
+// once turned on (persisted per-device), with a per-card eye button and a
+// tap-to-reveal fallback so a shoulder-surfer can't see IDs at a glance.
+(function () {
+  const STORAGE_KEY = 'vault-blur-previews';
+  const toggle = document.getElementById('vaultBlurToggle');
+  const rocker = document.getElementById('vaultBlurRocker');
+  const label = document.getElementById('vaultBlurLabel');
+  if (!toggle) return;
+
+  function apply(on) {
+    document.body.classList.toggle('vault-blur-off', !on);
+    rocker.classList.toggle('on', on);
+    toggle.setAttribute('aria-checked', String(on));
+    label.textContent = `Blur previews: ${on ? 'ON' : 'OFF'}`;
+    if (!on) {
+      // Turning global blur off should also clear any individual reveals
+      // so state doesn't carry over confusingly next time it's switched on.
+      document.querySelectorAll('.doc-thumb-wrap.doc-revealed')
+        .forEach(w => w.classList.remove('doc-revealed'));
+    }
+  }
+
+  // Blurred by default for privacy — only skip it once the user has
+  // explicitly turned blur off on this device before.
+  let on = localStorage.getItem(STORAGE_KEY) !== '0';
+  apply(on);
+  apply(on);
+
+  toggle.addEventListener('click', () => {
+    on = !on;
+    localStorage.setItem(STORAGE_KEY, on ? '1' : '0');
+    apply(on);
+  });
+  toggle.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle.click(); }
+  });
+
+  document.querySelectorAll('.doc-thumb-wrap').forEach((wrap) => {
+    const revealBtn = wrap.querySelector('.doc-reveal-btn');
+    const link = wrap.querySelector('.doc-thumb-link');
+
+    revealBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      wrap.classList.toggle('doc-revealed');
+    });
+
+    // While blurred and not yet revealed, the first click/tap on the photo
+    // itself reveals it instead of immediately opening the full-size image
+    // in a new tab — so a stray tap can't flash an ID document on screen.
+    link.addEventListener('click', (e) => {
+      if (!document.body.classList.contains('vault-blur-off') && !wrap.classList.contains('doc-revealed')) {
+        e.preventDefault();
+        wrap.classList.add('doc-revealed');
+      }
+    });
+  });
+})();
+
+// upload progress instead of the form just sitting there with no feedback.
+// We take over the submit with XHR so we can read upload.progress events,
+// which a plain <form method=post> can never give us.
+(function () {
+  const uploadForm = document.getElementById('vault-upload-form');
+  const saveBtn = document.getElementById('vault-save-btn');
+  const progressBar = document.getElementById('vault-upload-progress');
+  if (!uploadForm || !saveBtn) return;
+
+  let submitting = false;
+
+  function resetButton(label) {
+    submitting = false;
+    saveBtn.disabled = false;
+    saveBtn.textContent = label;
+    if (progressBar) progressBar.style.display = 'none';
+  }
+
+  uploadForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (submitting) return; // a second click/Enter while one is in flight is a no-op
+    submitting = true;
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Uploading…';
+    if (progressBar) {
+      progressBar.style.display = 'block';
+      progressBar.value = 0;
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', uploadForm.action);
+
+    xhr.upload.addEventListener('progress', (ev) => {
+      if (ev.lengthComputable && progressBar) {
+        const pct = Math.round((ev.loaded / ev.total) * 100);
+        progressBar.value = pct;
+        saveBtn.textContent = `Uploading… ${pct}%`;
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 400) {
+        // The Flask route flashes a message then redirects back to /vault;
+        // XHR already followed that redirect, so just land on the final
+        // URL to render the fresh page (flash message included).
+        window.location.href = xhr.responseURL || uploadForm.action;
+      } else {
+        resetButton('Upload failed — try again');
+      }
+    });
+
+    xhr.addEventListener('error', () => resetButton('Upload failed — try again'));
+
+    xhr.send(new FormData(uploadForm));
+  });
+})();
+</script>
+{% endblock %}

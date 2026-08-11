@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Habits — Life Hub{% endblock %}
+{% block content %}
+<h1>Habits &amp; To-Dos</h1>
+
+<div class="card">
+  <h3>New Habit</h3>
+  <form method="post" action="{{ url_for('add_habit') }}" class="inline-form">
+    <label>Title <input type="text" name="title" placeholder="e.g. Learn French for 50 min" required></label>
+    <label>Frequency
+      <select name="frequency">
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+      </select>
+    </label>
+    <label>Remind me at (optional)
+      <select name="reminder_hour">
+        <option value="">No reminder</option>
+        {% for h in range(24) %}
+          <option value="{{ h }}">{{ h | hour12 }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Add</button>
+  </form>
+  <p class="muted" style="margin-top:8px;">Leave blank to just get lumped into the general evening check-in instead, set in Settings.</p>
+</div>
+
+<div class="card">
+  <h3>New To-Do</h3>
+  <p class="muted">A one-time task — not recurring like a habit. Check it off once and you're done with it.</p>
+  <form method="post" action="{{ url_for('add_todo') }}" class="inline-form">
+    <label>Title <input type="text" name="title" placeholder="e.g. Renew car insurance" required></label>
+    <button type="submit">Add</button>
+  </form>
+</div>
+
+<div class="grid">
+  <div class="card wide">
+    <h3>To-Dos</h3>
+    {% if todos %}
+      <ul class="checklist interactive">
+        {% for t in todos %}
+          <li class="{{ 'done' if t.done }}" data-item-id="todo-{{ t.id }}">
+            <form method="post" action="{{ url_for('uncheck_todo' if t.done else 'check_todo', todo_id=t.id) }}" class="checkbox-form"
+                  data-check-url="{{ url_for('check_todo', todo_id=t.id) }}" data-uncheck-url="{{ url_for('uncheck_todo', todo_id=t.id) }}">
+              <button type="submit" class="checkbox-btn {{ 'checked' if t.done }}" aria-label="{{ 'Mark not done' if t.done else 'Mark done' }}"></button>
+            </form>
+            <span>{{ t.title }}</span>
+            <form method="post" action="{{ url_for('delete_todo', todo_id=t.id) }}" class="delete-form" data-confirm="Delete {{ t.title }}?">
+              <button class="btn-icon" title="Remove to-do">🗑️</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">No to-dos yet — add one above.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid">
+  {% for group_name, group_freq in [('Daily', 'daily'), ('Weekly', 'weekly'), ('Monthly', 'monthly')] %}
+    {% set items = status | selectattr('habit.frequency', 'equalto', group_freq) | list %}
+    {% if items %}
+      <div class="card wide">
+        <h3>{{ group_name }}</h3>
+        <ul class="checklist interactive">
+          {% for hs in items %}
+            <li class="{{ 'done' if hs.done }}" data-item-id="habit-{{ hs.habit.id }}">
+              <form method="post" action="{{ url_for('uncheck_habit' if hs.done else 'checkin_habit', habit_id=hs.habit.id) }}" class="checkbox-form"
+                    data-check-url="{{ url_for('checkin_habit', habit_id=hs.habit.id) }}" data-uncheck-url="{{ url_for('uncheck_habit', habit_id=hs.habit.id) }}">
+                <button type="submit" class="checkbox-btn {{ 'checked' if hs.done }}" aria-label="{{ 'Mark not done' if hs.done else 'Mark done' }}"></button>
+              </form>
+              <span>{{ hs.habit.title }}</span>
+              {% if hs.streak > 0 %}<span class="streak-badge">🔥 {{ hs.streak }}</span>{% endif %}
+              <span class="reminder-time-label {{ 'unset' if hs.habit.reminder_hour is none }}">
+                ⏰ {{ hs.habit.reminder_hour | hour12 if hs.habit.reminder_hour is not none else 'No reminder' }}
+              </span>
+              <form method="post" action="{{ url_for('set_habit_reminder', habit_id=hs.habit.id) }}" class="habit-reminder-form">
+                <select name="reminder_hour"
+                        aria-label="Reminder time for {{ hs.habit.title }}"
+                        title="Time to remind you if not done, blank = use the general evening check-in">
+                  <option value="" {{ 'selected' if hs.habit.reminder_hour is none }}>No reminder</option>
+                  {% for h in range(24) %}
+                    <option value="{{ h }}" {{ 'selected' if hs.habit.reminder_hour == h }}>{{ h | hour12 }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn-icon" title="Save reminder time">💾</button>
+              </form>
+              <form method="post" action="{{ url_for('delete_habit', habit_id=hs.habit.id) }}" class="delete-form" data-confirm="Delete {{ hs.habit.title }}? Its streak history will be lost.">
+                <button class="btn-icon" title="Remove habit">🗑️</button>
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  {% endfor %}
+  {% if not status %}
+    <p class="muted">No habits yet — add one above.</p>
+  {% endif %}
+</div>
+{% endblock %}

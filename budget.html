@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+{% block title %}Budget — Life Hub{% endblock %}
+{% block content %}
+<h1>Budget</h1>
+
+<div class="grid">
+  <div class="card">
+    <h3>Monthly — {{ month }}</h3>
+    <form method="get" class="inline-form">
+      <label>Month <input type="month" name="month" value="{{ month }}" onchange="this.form.submit()"></label>
+      <input type="hidden" name="year" value="{{ year }}">
+    </form>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-value" data-countup="{{ income_total | round | int }}">0</span><span class="stat-label">Income ({{ currency }})</span></div>
+      <div class="stat"><span class="stat-value" data-countup="{{ expense_total | round | int }}">0</span><span class="stat-label">Expenses ({{ currency }})</span></div>
+      <div class="stat"><span class="stat-value {{ 'net-negative' if net < 0 else 'net-positive' }}" data-countup="{{ net | round | int }}">0</span><span class="stat-label">Net</span></div>
+    </div>
+  </div>
+
+  <div class="card" id="yearly-summary">
+    <h3>Yearly — {{ year }}</h3>
+    <form method="get" class="inline-form">
+      <input type="hidden" name="month" value="{{ month }}">
+      <label>Year
+        <select name="year" onchange="this.form.submit()">
+          {% for y in available_years %}
+            <option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-value" data-countup="{{ yearly_income_total | round | int }}">0</span><span class="stat-label">Income ({{ currency }})</span></div>
+      <div class="stat"><span class="stat-value" data-countup="{{ yearly_expense_total | round | int }}">0</span><span class="stat-label">Expenses ({{ currency }})</span></div>
+      <div class="stat"><span class="stat-value {{ 'net-negative' if yearly_net < 0 else 'net-positive' }}" data-countup="{{ yearly_net | round | int }}">0</span><span class="stat-label">Net</span></div>
+    </div>
+    <div class="yearly-chart">
+      {% for m in yearly_months %}
+        <div class="yearly-chart-col" title="{{ m.label }} {{ year }}: {{ m.income | round | int }} income, {{ m.expense | round | int }} {{ currency }} expenses">
+          <div class="yearly-chart-bars">
+            <div class="yearly-bar income" style="height: {{ m.income_pct }}%;"></div>
+            <div class="yearly-bar expense" style="height: {{ m.expense_pct }}%;"></div>
+          </div>
+          <span class="yearly-chart-label">{{ m.label }}</span>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="yearly-chart-legend">
+      <span><span class="swatch income"></span> Income</span>
+      <span><span class="swatch expense"></span> Expenses</span>
+    </div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>Log a Transaction</h3>
+    <form method="post" action="{{ url_for('add_transaction') }}" class="inline-form">
+      <input type="hidden" name="month" value="{{ month }}">
+      <label>Date <input type="date" name="date" value="{{ month }}-01"></label>
+      <label>Type
+        <select name="type" id="txn-type" onchange="document.getElementById('cat-field').style.display = this.value==='expense' ? 'flex' : 'none';">
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+        </select>
+      </label>
+      <label>Amount ({{ currency }}) <input type="number" step="0.01" name="amount" min="0.01" max="1000000000" required></label>
+      <label id="cat-field">Category
+        <select name="category_id">
+          <option value="">— none —</option>
+          {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Description <input type="text" name="description" placeholder="optional"></label>
+      <button type="submit">Add</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>New Category</h3>
+    <form method="post" action="{{ url_for('add_budget_category') }}" class="inline-form">
+      <label>Name <input type="text" name="name" placeholder="e.g. Food" required></label>
+      <label>Monthly limit ({{ currency }}) <input type="number" step="0.01" name="monthly_limit" min="0" max="1000000000" placeholder="optional"></label>
+      <button type="submit">Add</button>
+    </form>
+
+    {% if categories %}
+      <ul class="plain-list" style="margin-top:12px;">
+        {% for c in categories %}
+          <li>
+            {{ c.name }}{% if c.monthly_limit %} <span class="muted">— limit {{ c.monthly_limit | round | int }} {{ currency }}</span>{% endif %}
+            <form method="post" action="{{ url_for('delete_budget_category', cat_id=c.id) }}" style="display:inline; float:right;" data-confirm="Delete category {{ c.name }}?">
+              <button class="btn-icon" title="Delete">🗑️</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</div>
+
+{% if category_spend %}
+<div class="card wide">
+  <h3>Spend vs. Limit ({{ month }})</h3>
+  {% for cs in category_spend %}
+    {% if cs.limit %}
+      <div class="budget-bar-row">
+        <div class="budget-bar-label">
+          <span>{{ cs.category.name }}</span>
+          <span class="{{ 'over' if cs.over }}">{{ cs.spent | round | int }} / {{ cs.limit | round | int }} {{ currency }}</span>
+        </div>
+        <div class="budget-bar-track">
+          <div class="budget-bar-fill animated-fill {{ 'over' if cs.over }}" data-target-pct="{{ cs.pct }}"></div>
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="card wide">
+  <h3>Recurring — Jobs, Salary &amp; Bills</h3>
+  <p class="muted">Auto-logs itself as a transaction on a schedule you set — monthly (e.g. payday, rent due date) or weekly (e.g. a job that pays every Tuesday).</p>
+  <form method="post" action="{{ url_for('add_recurring_transaction') }}" class="inline-form">
+    <label>Title <input type="text" name="title" placeholder="e.g. Design job salary, Rent" required></label>
+    <label>Type
+      <select name="type" id="rec-type" onchange="document.getElementById('rec-cat-field').style.display = this.value==='expense' ? 'flex' : 'none';">
+        <option value="income">Income (job/salary)</option>
+        <option value="expense">Expense (bill)</option>
+      </select>
+    </label>
+    <label>Amount ({{ currency }}) <input type="number" step="0.01" name="amount" min="0.01" max="1000000000" required></label>
+    <label id="rec-cat-field" style="display:none;">Category
+      <select name="category_id">
+        <option value="">— none —</option>
+        {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Frequency
+      <select name="frequency" id="rec-freq" onchange="
+        var isWeekly = this.value === 'weekly';
+        document.getElementById('rec-dom-field').style.display = isWeekly ? 'none' : 'flex';
+        document.getElementById('rec-dow-field').style.display = isWeekly ? 'flex' : 'none';
+        document.getElementById('rec-start').type = isWeekly ? 'date' : 'month';
+        document.getElementById('rec-start-label').textContent = isWeekly ? 'Starting date' : 'Starting month';
+      ">
+        <option value="monthly">Monthly</option>
+        <option value="weekly">Weekly</option>
+      </select>
+    </label>
+    <label id="rec-dom-field">Day of month <input type="number" name="day_of_month" min="1" max="28" value="1"></label>
+    <label id="rec-dow-field" style="display:none;">Day of week
+      <select name="day_of_week">
+        <option value="0">Monday</option>
+        <option value="1">Tuesday</option>
+        <option value="2">Wednesday</option>
+        <option value="3">Thursday</option>
+        <option value="4">Friday</option>
+        <option value="5">Saturday</option>
+        <option value="6">Sunday</option>
+      </select>
+    </label>
+    <label><span id="rec-start-label">Starting month</span> <input type="month" name="start_date" id="rec-start" value="{{ month }}"></label>
+    <button type="submit">Add</button>
+  </form>
+
+  {% if recurring %}
+    <table class="table" style="margin-top:14px;">
+      <thead><tr><th>Title</th><th>Type</th><th>Amount</th><th>Frequency</th><th>Next run</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for r in recurring %}
+        <tr class="{{ '' if r.active else 'muted' }}">
+          <td>{{ r.title }}</td>
+          <td>{{ '💰 Income' if r.type == 'income' else '💸 Expense' }}{% if r.category_name %} · {{ r.category_name }}{% endif %}</td>
+          <td>{{ r.amount | round | int }} {{ currency }}</td>
+          <td>
+            {% if r.frequency == 'weekly' %}
+              Weekly · {{ ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][r.day_of_week] }}
+            {% else %}
+              Monthly · day {{ r.day_of_month }}
+            {% endif %}
+          </td>
+          <td>{{ r.next_run }}</td>
+          <td>{{ 'Active' if r.active else 'Paused' }}</td>
+          <td class="row-actions">
+            <form method="post" action="{{ url_for('toggle_recurring_transaction', rid=r.id) }}">
+              <button class="btn-icon" title="{{ 'Pause' if r.active else 'Resume' }}">{{ '⏸️' if r.active else '▶️' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('delete_recurring_transaction', rid=r.id) }}" data-confirm="Delete recurring entry {{ r.title }}?">
+              <button class="btn-icon" title="Delete">🗑️</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No recurring jobs/bills set up yet.</p>
+  {% endif %}
+</div>
+
+<div class="card wide savings-card">
+  <h3>Savings Goals</h3>
+  <p class="muted">Set up separate jars to save toward — adding money logs it as an expense (moved out of what's available to spend); withdrawing logs it back as income.</p>
+  <form method="post" action="{{ url_for('add_savings_goal') }}" class="inline-form">
+    <label>Name <input type="text" name="name" placeholder="e.g. Emergency fund, New laptop" required></label>
+    <label>Goal amount ({{ currency }}) <input type="number" step="0.01" name="target_amount" min="0" max="1000000000" placeholder="optional"></label>
+    <label>Target date <input type="date" name="target_date"></label>
+    <button type="submit">Add goal</button>
+  </form>
+
+  {% if savings_goals %}
+    <div class="savings-grid">
+      {% for g in savings_goals %}
+        <div class="card savings-goal-card">
+          <div class="budget-bar-label">
+            <span><strong>{{ g.name }}</strong></span>
+            <form method="post" action="{{ url_for('delete_savings_goal', goal_id=g.id) }}" data-confirm="Delete savings goal {{ g.name }}?">
+              <button class="btn-icon" title="Delete goal">🗑️</button>
+            </form>
+          </div>
+          <div class="budget-bar-label">
+            <span class="money-readout">{{ g.current_amount | round | int }}{% if g.target_amount %} / {{ g.target_amount | round | int }}{% endif %} {{ currency }}</span>
+            {% if g.pct is not none %}<span>{{ g.pct | round | int }}%</span>{% endif %}
+          </div>
+          {% if g.pct is not none %}
+            <div class="budget-bar-track">
+              <div class="budget-bar-fill animated-fill" data-target-pct="{{ [g.pct, 100] | min }}"></div>
+            </div>
+          {% endif %}
+
+          {% if g.status == 'reached' %}
+            <p class="savings-plan reached">🎉 Goal reached!</p>
+          {% elif g.status == 'overdue' %}
+            <p class="savings-plan overdue">⚠️ Target date passed — still {{ g.remaining | round | int }} {{ currency }} to go.</p>
+          {% elif g.status == 'on_track' %}
+            <p class="savings-plan on-track">Save ~<strong>{{ g.weekly_needed | round | int }} {{ currency }}/week</strong> to hit it by {{ g.target_date }} ({{ g.days_left }}d left).</p>
+          {% elif g.target_date %}
+            <p class="muted">Target date: {{ g.target_date }} ({{ g.days_left }}d left) — set a goal amount to see the weekly plan.</p>
+          {% endif %}
+
+          <form method="post" action="{{ url_for('set_savings_target', goal_id=g.id) }}" class="doc-expiry-actions">
+            <input type="date" name="target_date" value="{{ g.target_date or '' }}">
+            <button type="submit" class="btn-icon" title="Set/update target date">🎯</button>
+          </form>
+
+          <div class="savings-actions">
+            <form method="post" action="{{ url_for('contribute_savings_goal', goal_id=g.id) }}">
+              <input type="number" step="0.01" name="amount" min="0.01" max="1000000000" placeholder="Add {{ currency }}" required>
+              <button type="submit">Add</button>
+            </form>
+            <form method="post" action="{{ url_for('withdraw_savings_goal', goal_id=g.id) }}">
+              <input type="number" step="0.01" name="amount" min="0.01" max="1000000000" placeholder="Withdraw {{ currency }}" required>
+              <button type="submit" class="secondary">Withdraw</button>
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">No savings goals set up yet.</p>
+  {% endif %}
+</div>
+
+<div class="card wide">
+  <h3>Transactions — {{ month }}</h3>
+  {% if txns %}
+    <table class="table">
+      <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Amount</th><th></th></tr></thead>
+      <tbody>
+      {% for t in txns %}
+        <tr>
+          <td>{{ t.date }}</td>
+          <td>{{ '💰 Income' if t.type == 'income' else '💸 Expense' }}</td>
+          <td>{{ t.category_name or '—' }}</td>
+          <td class="muted">{{ t.description or '' }}</td>
+          <td>{{ t.amount | round(2) }} {{ currency }}</td>
+          <td>
+            <form method="post" action="{{ url_for('delete_transaction', txn_id=t.id) }}" data-confirm="Delete this transaction?">
+              <input type="hidden" name="month" value="{{ month }}">
+              <button class="btn-icon" title="Delete">🗑️</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No transactions for this month yet.</p>
+  {% endif %}
+</div>
+
+<div class="card wide">
+  <h3>Yearly Detail — {{ year }}</h3>
+  <table class="table">
+    <thead><tr><th>Month</th><th>Income</th><th>Expenses</th><th>Net</th></tr></thead>
+    <tbody>
+      {% for m in yearly_months %}
+        <tr>
+          <td>{{ m.label }}</td>
+          <td>{{ m.income | round | int }} {{ currency }}</td>
+          <td>{{ m.expense | round | int }} {{ currency }}</td>
+          <td class="{{ 'net-negative' if m.net < 0 else 'net-positive' }}">{{ m.net | round | int }} {{ currency }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if yearly_category_totals %}
+    <h4 style="margin-top:20px;">Spend by Category — {{ year }}</h4>
+    {% for cs in yearly_category_totals %}
+      <div class="budget-bar-row">
+        <div class="budget-bar-label">
+          <span>{{ cs.category.name }}</span>
+          <span class="{{ 'over' if cs.over }}">
+            {{ cs.spent | round | int }}{% if cs.annual_limit %} / {{ cs.annual_limit | round | int }}{% endif %} {{ currency }}
+          </span>
+        </div>
+        {% if cs.pct is not none %}
+          <div class="budget-bar-track">
+            <div class="budget-bar-fill animated-fill {{ 'over' if cs.over }}" data-target-pct="{{ cs.pct }}"></div>
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

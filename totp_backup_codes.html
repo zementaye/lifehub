@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }} — Life Hub{% endblock %}
+{% block content %}
+<h1>{{ heading }}</h1>
+
+<div class="card wide">
+  <p class="muted">
+    ⚠️ Save these backup codes somewhere safe — each one can be used once,
+    instead of your authenticator app, to log in if you lose access to it.
+    <strong>This is the only time they're shown.</strong> Any older backup
+    codes have been replaced and no longer work.
+  </p>
+  <div style="font-family: var(--font-mono); font-size: 1.05rem; line-height: 2; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; margin: 14px 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 4px;">
+    {% for code in codes %}<span>{{ code }}</span>{% endfor %}
+  </div>
+  <a href="{{ url_for('settings') }}"><button type="button">Done — back to Settings</button></a>
+</div>
+{% endblock %}

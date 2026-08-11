@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Set up 2FA — Life Hub{% endblock %}
+{% block content %}
+<h1>Set up two-factor authentication</h1>
+
+<div class="card wide">
+  <h3>1. Add this to your authenticator app</h3>
+  <p class="muted">
+    In Google Authenticator, Authy, 1Password, or similar, add a new account
+    and enter this key manually (or open the link below on the same device
+    as your authenticator app).
+  </p>
+  <p style="font-family: var(--font-mono); font-size: 1.1rem; letter-spacing: 0.06em; word-break: break-all; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin: 12px 0;">
+    {{ secret }}
+  </p>
+  <p class="muted">
+    <a href="{{ uri }}">Open in authenticator app</a>
+  </p>
+
+  <h3 style="margin-top:22px;">2. Enter the 6-digit code it shows</h3>
+  <p class="muted">This confirms the app is set up correctly before 2FA is turned on.</p>
+  <form method="post" action="{{ url_for('totp_confirm') }}" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Code
+      <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code"
+             placeholder="123456" required autofocus>
+    </label>
+    <button type="submit">Turn on 2FA</button>
+  </form>
+  <p class="muted" style="margin-top:16px;">
+    <a href="{{ url_for('settings') }}">Cancel and go back to Settings</a>
+  </p>
+</div>
+{% endblock %}

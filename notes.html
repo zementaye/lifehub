@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Notes — Life Hub{% endblock %}
+{% block content %}
+<h1>Notes</h1>
+
+<div class="card">
+  <h3>New Note</h3>
+  <form method="post" action="{{ url_for('add_note') }}" class="inline-form">
+    <label>Title <input type="text" name="title" placeholder="e.g. Wifi password, packing list" required></label>
+    <label style="flex:1 1 100%;">Note
+      <textarea name="body" rows="3" style="width:100%; resize:vertical;"></textarea>
+    </label>
+    <button type="submit">Save</button>
+  </form>
+</div>
+
+{% if items %}
+  <div class="list-toolbar">
+    <button type="button" id="notes-select-toggle" class="secondary">Select</button>
+    <div id="notes-bulk-bar" class="bulk-bar" style="display:none;">
+      <span id="notes-bulk-count" class="muted">0 selected</span>
+      <form method="post" action="{{ url_for('bulk_delete_notes') }}" id="notes-bulk-form">
+        <button type="submit" class="confirm-modal-danger" id="notes-bulk-delete-btn" disabled>Delete Selected</button>
+      </form>
+      <button type="button" id="notes-select-cancel" class="btn-icon" title="Cancel selection">✕ Cancel</button>
+    </div>
+  </div>
+{% endif %}
+
+<div class="grid" id="notes-grid">
+  {% for n in items %}
+    <div class="card note-card" data-note-id="{{ n.id }}">
+      <div class="pw-header">
+        <div class="pw-header-left">
+          <label class="note-select-check">
+            <input type="checkbox" class="note-select-box">
+          </label>
+          <h4>{{ n.title }}</h4>
+        </div>
+        <form method="post" action="{{ url_for('delete_note', note_id=n.id) }}" data-confirm="Delete {{ n.title }}?" class="note-delete-form">
+          <button class="btn-icon" title="Delete">🗑️</button>
+        </form>
+      </div>
+      {% if n.body %}<p class="note-body">{{ n.body }}</p>{% endif %}
+      <button type="button" class="secondary note-edit-toggle">Edit</button>
+      <form method="post" action="{{ url_for('edit_note', note_id=n.id) }}" class="inline-form note-edit-form" style="display:none; margin-top:10px;">
+        <label style="flex:1 1 100%;">Title <input type="text" name="title" value="{{ n.title }}" required></label>
+        <label style="flex:1 1 100%;">Note
+          <textarea name="body" rows="4" style="width:100%; resize:vertical;">{{ n.body or '' }}</textarea>
+        </label>
+        <button type="submit">Save</button>
+      </form>
+    </div>
+  {% else %}
+    <p class="muted">No notes yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce() }}">
+document.querySelectorAll('.note-card').forEach(card => {
+  const editToggle = card.querySelector('.note-edit-toggle');
+  const editForm = card.querySelector('.note-edit-form');
+  editToggle.addEventListener('click', () => {
+    editForm.style.display = editForm.style.display === 'none' ? 'flex' : 'none';
+  });
+});
+
+// Select mode: pick several notes and delete them in one go instead of
+// one-by-one. Checkboxes stay hidden until "Select" is clicked; the bulk
+// delete button reuses the same shared confirm modal as every other
+// delete action (see app.js), with the count filled in dynamically.
+(function () {
+  const grid = document.getElementById('notes-grid');
+  const selectToggle = document.getElementById('notes-select-toggle');
+  if (!grid || !selectToggle) return;
+
+  const bulkBar = document.getElementById('notes-bulk-bar');
+  const bulkForm = document.getElementById('notes-bulk-form');
+  const bulkBtn = document.getElementById('notes-bulk-delete-btn');
+  const bulkCount = document.getElementById('notes-bulk-count');
+  const cancelBtn = document.getElementById('notes-select-cancel');
+  const boxes = () => Array.from(grid.querySelectorAll('.note-select-box'));
+
+  function setSelecting(on) {
+    grid.classList.toggle('selecting', on);
+    selectToggle.style.display = on ? 'none' : '';
+    bulkBar.style.display = on ? 'flex' : 'none';
+    if (!on) boxes().forEach((b) => { b.checked = false; });
+    updateCount();
+  }
+
+  function updateCount() {
+    const n = boxes().filter((b) => b.checked).length;
+    bulkCount.textContent = n === 1 ? '1 selected' : `${n} selected`;
+    bulkBtn.disabled = n === 0;
+    bulkForm.dataset.confirm = n === 1
+      ? 'Delete 1 selected note?'
+      : `Delete ${n} selected notes?`;
+  }
+
+  selectToggle.addEventListener('click', () => setSelecting(true));
+  cancelBtn.addEventListener('click', () => setSelecting(false));
+  grid.addEventListener('change', (e) => {
+    if (e.target.classList.contains('note-select-box')) updateCount();
+  });
+
+  bulkForm.addEventListener('submit', (e) => {
+    // Bake the currently-checked note ids into the form right before it
+    // submits (they live on cards elsewhere on the page, not inside this
+    // form itself).
+    bulkForm.querySelectorAll('input[name="note_ids"]').forEach((el) => el.remove());
+    boxes().filter((b) => b.checked).forEach((b) => {
+      const id = b.closest('.note-card').dataset.noteId;
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'note_ids';
+      input.value = id;
+      bulkForm.appendChild(input);
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Confirm it's you — Life Hub Admin</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect x='1' y='1' width='26' height='26' rx='7' fill='%231C222A' stroke='%232A323C'/%3E%3Ccircle cx='14' cy='5.4' r='1.1' fill='%233A4351'/%3E%3Crect x='6.4' y='13' width='3.6' height='10' rx='1.8' fill='%234CC9E8'/%3E%3Crect x='12.2' y='7' width='3.6' height='16' rx='1.8' fill='%23F0B23D'/%3E%3Crect x='18' y='16' width='3.6' height='7' rx='1.8' fill='%238FD14F'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version }}">
+</head>
+<body class="auth-page" data-theme="light">
+<div class="auth-wrap">
+  <div class="auth-brand">
+    <svg class="brand-mark" viewBox="0 0 28 28" width="26" height="26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x="1" y="1" width="26" height="26" rx="7" fill="var(--surface-raised)" stroke="var(--border)"/>
+      <circle cx="14" cy="5.4" r="1.1" fill="var(--rivet)"/>
+      <rect x="6.4" y="13" width="3.6" height="10" rx="1.8" fill="var(--accent)"/>
+      <rect x="12.2" y="7" width="3.6" height="16" rx="1.8" fill="var(--primary)"/>
+      <rect x="18" y="16" width="3.6" height="7" rx="1.8" fill="var(--success)"/>
+    </svg>
+    LIFEHUB
+  </div>
+  <div class="card auth-card">
+    <h1>🛡️ Confirm it's you</h1>
+    <p class="muted">
+      You're logged in as <strong>{{ email }}</strong>, but the admin console needs a fresh
+      password check before it opens — this resets after a few minutes away, even within
+      the same login session.
+    </p>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="flash">{% for m in messages %}<div class="flash-msg">{{ m }}</div>{% endfor %}</div>
+      {% endif %}
+    {% endwith %}
+    <form method="post" class="inline-form auth-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ next }}">
+      <label>Password <input type="password" name="password" required autofocus autocomplete="current-password"></label>
+      <button type="submit">Continue to admin</button>
+    </form>
+    <p class="muted">
+      <a href="{{ url_for('dashboard') }}">Back to dashboard</a>
+    </p>
+  </div>
+</div>
+<script nonce="{{ csp_nonce() }}">
+  document.querySelector('.auth-form').addEventListener('submit', function (e) {
+    if (!e.target.checkValidity()) return;
+    var btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+  });
+</script>
+</body>
+</html>
