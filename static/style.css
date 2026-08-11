@@ -777,7 +777,8 @@ body.auth-page {
   line-height: 1.4;
 }
 .inline-form textarea::placeholder { color: var(--muted); }
-.inline-form select[name="reminder_hour"] {
+.inline-form select[name="reminder_hour"],
+.inline-form select[name="nudge_hour"] {
   color-scheme: dark;
   font-family: var(--font-mono);
   padding: 9px 10px;
@@ -787,7 +788,8 @@ body.auth-page {
   color: var(--ink);
   cursor: pointer;
 }
-body[data-theme="light"] .inline-form select[name="reminder_hour"] { color-scheme: light; }
+body[data-theme="light"] .inline-form select[name="reminder_hour"],
+body[data-theme="light"] .inline-form select[name="nudge_hour"] { color-scheme: light; }
 #food-search {
   width: 100%;
   padding: 10px 12px;
