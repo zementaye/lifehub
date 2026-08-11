@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import secrets
 import time
 import urllib.parse
@@ -14,7 +15,7 @@ from flask import (
     send_from_directory, make_response, session, g, jsonify,
 )
 from flask_wtf import CSRFProtect
-from flask_wtf.csrf import CSRFError
+from flask_wtf.csrf import CSRFError, generate_csrf
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -770,6 +771,56 @@ def _build_csp(nonce: str) -> str:
     ])
 
 
+# Matches each <form ...>...</form> block whose opening tag declares
+# method="post" (any attribute order/quoting), capturing the opening tag,
+# body, and closing tag separately so the body can be checked for an
+# existing csrf_token field before anything is inserted.
+_POST_FORM_RE = re.compile(
+    r'(<form\b[^>]*\bmethod\s*=\s*["\']post["\'][^>]*>)(.*?)(</form\s*>)',
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _ensure_csrf_tokens(html):
+    """Guarantee every POST form carries a real, server-rendered
+    csrf_token field — not just the one static/app.js injects on
+    DOMContentLoaded. Most templates in this app rely entirely on that JS
+    (only the auth templates render the hidden input directly), so if a
+    script gets blocked, errors, or simply hasn't run yet, every action
+    in the app silently bounces an already-logged-in person back to
+    /login with a "session expired" message. This runs on every HTML
+    response as a safety net — forms that already carry the field
+    (login.html etc.) are left untouched, so nothing is ever duplicated."""
+    token_holder = []
+
+    def _inject(match):
+        open_tag, body, close_tag = match.group(1), match.group(2), match.group(3)
+        if "csrf_token" in body:
+            return match.group(0)
+        if not token_holder:
+            token_holder.append(generate_csrf())
+        hidden = f'<input type="hidden" name="csrf_token" value="{token_holder[0]}">'
+        return open_tag + hidden + body + close_tag
+
+    return _POST_FORM_RE.sub(_inject, html)
+
+
+@app.after_request
+def inject_csrf_tokens(resp):
+    if resp.content_type and resp.content_type.startswith("text/html"):
+        try:
+            html = resp.get_data(as_text=True)
+            patched = _ensure_csrf_tokens(html)
+            if patched != html:
+                resp.set_data(patched)
+        except Exception:
+            # Never let a formatting quirk in some page break the response
+            # entirely — worst case, that one page falls back to the
+            # existing JS-injection behavior.
+            logger.exception("CSRF token injection failed")
+    return resp
+
+
 @app.after_request
 def security_headers(resp):
     # Baseline hardening headers on every response. None of these are
@@ -789,6 +840,15 @@ def security_headers(resp):
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
+
+def _clamped(value, lo, hi):
+    """Clamp a possibly-None float into [lo, hi]. None passes through
+    unchanged (means "not provided"), so callers can still distinguish a
+    blank field from a real zero."""
+    if value is None:
+        return None
+    return max(lo, min(value, hi))
+
 
 def bmi_of(weight_kg: float, height_cm: float) -> float | None:
     if not weight_kg or not height_cm:
@@ -939,7 +999,7 @@ def health():
 @app.route("/health/height", methods=["POST"])
 @login_required
 def set_height():
-    height = request.form.get("height_cm", type=float)
+    height = _clamped(request.form.get("height_cm", type=float), 30, 300)
     birth_date = request.form.get("birth_date", "").strip() or None
     sex = request.form.get("sex", "").strip() or None
     with db.get_conn() as conn:
@@ -956,7 +1016,7 @@ def set_height():
 @login_required
 def add_weight():
     d = request.form.get("date") or date.today().isoformat()
-    w = request.form.get("weight_kg", type=float)
+    w = _clamped(request.form.get("weight_kg", type=float), 1, 500)
     if w:
         with db.get_conn() as conn:
             conn.execute(
@@ -1100,7 +1160,7 @@ def nutrition_search():
 def log_food():
     user_id = g.user_id
     d = request.form.get("date") or date.today().isoformat()
-    grams = request.form.get("grams", type=float)
+    grams = _clamped(request.form.get("grams", type=float), 1, 10000)
     if grams is not None:
         servings = grams / 100.0
     else:
@@ -1113,8 +1173,10 @@ def log_food():
         meal = "snack"
 
     fields = {}
-    for k in ("calories", "protein_g", "carbs_g", "fat_g", "fiber_g"):
-        fields[k] = request.form.get(k, type=float) or 0.0
+    # Same per-100g convention (and bounds) as custom_foods.
+    bounds = {"calories": 2000, "protein_g": 100, "carbs_g": 100, "fat_g": 100, "fiber_g": 100}
+    for k, hi in bounds.items():
+        fields[k] = _clamped(request.form.get(k, type=float), 0, hi) or 0.0
 
     if name:
         with db.get_conn() as conn:
@@ -1157,11 +1219,13 @@ def add_custom_food():
                 "INSERT INTO custom_foods (user_id, name, calories, protein_g, carbs_g, fat_g, fiber_g, created_at) "
                 "VALUES (?,?,?,?,?,?,?,?)",
                 (user_id, name,
-                 request.form.get("calories", type=float) or 0,
-                 request.form.get("protein_g", type=float) or 0,
-                 request.form.get("carbs_g", type=float) or 0,
-                 request.form.get("fat_g", type=float) or 0,
-                 request.form.get("fiber_g", type=float) or 0,
+                 # Per 100g: calories capped generously above pure fat/oil
+                 # (~900 kcal/100g); a macro can't exceed 100g per 100g of food.
+                 _clamped(request.form.get("calories", type=float), 0, 2000) or 0,
+                 _clamped(request.form.get("protein_g", type=float), 0, 100) or 0,
+                 _clamped(request.form.get("carbs_g", type=float), 0, 100) or 0,
+                 _clamped(request.form.get("fat_g", type=float), 0, 100) or 0,
+                 _clamped(request.form.get("fiber_g", type=float), 0, 100) or 0,
                  db.now()),
             )
         flash(f"Added custom food: {name}")
@@ -1444,6 +1508,12 @@ def habits():
 def add_habit():
     title = request.form.get("title", "").strip()
     frequency = request.form.get("frequency", "daily")
+    # Only "daily" and "weekly" are ever offered in the form, and the
+    # habits page groups habits by exactly those two values — anything
+    # else would silently vanish from both sections with no way to see or
+    # delete it, so fall back to "daily" rather than trust the raw value.
+    if frequency not in ("daily", "weekly"):
+        frequency = "daily"
     reminder_hour = request.form.get("reminder_hour", type=int)
     if reminder_hour is not None:
         reminder_hour = max(0, min(reminder_hour, 23))
@@ -1721,6 +1791,12 @@ def add_transaction():
     d = request.form.get("date") or date.today().isoformat()
     ttype = request.form.get("type", "expense")
     amount = request.form.get("amount", type=float)
+    # Sign is normalized below via abs() at insert time (a stray "-" just
+    # means the same expense/income, not a different transaction type), so
+    # only the upper bound needs enforcing here — a typo'd extra zero
+    # shouldn't be able to blow out the yearly totals/charts.
+    if amount is not None:
+        amount = min(abs(amount), 1_000_000_000)
     description = request.form.get("description", "").strip()
     category_id = request.form.get("category_id", type=int) or None
 
@@ -1767,7 +1843,7 @@ def delete_transaction(txn_id):
 def add_budget_category():
     user_id = g.user_id
     name = request.form.get("name", "").strip()
-    limit = request.form.get("monthly_limit", type=float)
+    limit = _clamped(request.form.get("monthly_limit", type=float), 0, 1_000_000_000)
     if name:
         with db.get_conn() as conn:
             existing = conn.execute(
@@ -1803,6 +1879,8 @@ def add_recurring_transaction():
     title = request.form.get("title", "").strip()
     ttype = request.form.get("type", "expense")
     amount = request.form.get("amount", type=float)
+    if amount is not None:
+        amount = min(abs(amount), 1_000_000_000)
     category_id = request.form.get("category_id", type=int) or None
     frequency = request.form.get("frequency", "monthly")
     if frequency not in ("monthly", "weekly"):
@@ -1873,7 +1951,7 @@ def delete_recurring_transaction(rid):
 def add_savings_goal():
     user_id = g.user_id
     name = request.form.get("name", "").strip()
-    target_amount = request.form.get("target_amount", type=float)
+    target_amount = _clamped(request.form.get("target_amount", type=float), 0, 1_000_000_000)
     target_date = request.form.get("target_date", "").strip() or None
     if name:
         with db.get_conn() as conn:
@@ -1902,7 +1980,7 @@ def set_savings_target(goal_id):
 @login_required
 def contribute_savings_goal(goal_id):
     user_id = g.user_id
-    amount = request.form.get("amount", type=float)
+    amount = _clamped(request.form.get("amount", type=float), 0, 1_000_000_000)
     today = scheduler.today_local(user_id).isoformat()
     if amount and amount > 0:
         with db.get_conn() as conn:
@@ -1935,7 +2013,7 @@ def contribute_savings_goal(goal_id):
 @login_required
 def withdraw_savings_goal(goal_id):
     user_id = g.user_id
-    amount = request.form.get("amount", type=float)
+    amount = _clamped(request.form.get("amount", type=float), 0, 1_000_000_000)
     today = scheduler.today_local(user_id).isoformat()
     if amount and amount > 0:
         with db.get_conn() as conn:
