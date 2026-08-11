@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version }}">
-<script>
+<script nonce="{{ csp_nonce() }}">
   // Set the theme + color palette before first paint so there's no flash
   // of the wrong mode/colors.
   (function () {
@@ -21,7 +21,7 @@
 </script>
 </head>
 <body class="page-{{ request.endpoint }}" data-theme="light" data-palette="amber">
-<script>
+<script nonce="{{ csp_nonce() }}">
   document.body.dataset.theme = document.documentElement.dataset.themePending || 'light';
   document.body.dataset.palette = document.documentElement.dataset.palettePending || 'amber';
 </script>
