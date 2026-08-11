@@ -21,7 +21,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce() }}">
 // Edit-toggle uses delegation (not a per-row listener) so it keeps working
 // on rows swapped in by the live search below.
 document.addEventListener('click', (e) => {
