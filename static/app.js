@@ -184,6 +184,73 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
   window.addEventListener('pagehide', () => flushAll(true));
 })();
 
+// Habit reminder selects: no submit button — changing a select queues a
+// save (debounced, so flipping through day + hour only costs one request),
+// and anything still pending is flushed immediately if the user navigates
+// away or closes the tab before the debounce timer fires. Mirrors the
+// checkbox autosave pattern above.
+(function () {
+  const forms = document.querySelectorAll('.habit-reminder-form[data-autosave]');
+  if (!forms.length) return;
+
+  const SAVE_DELAY = 700; // ms of inactivity before we save
+  const pending = new Map(); // form -> timer
+
+  function flush(form, useBeacon) {
+    const entry = pending.get(form);
+    if (!entry) return;
+    clearTimeout(entry);
+    pending.delete(form);
+
+    const params = new URLSearchParams();
+    form.querySelectorAll('select[name]').forEach((sel) => params.set(sel.name, sel.value));
+
+    const indicator = form.querySelector('.save-indicator');
+    const showSaved = () => {
+      if (!indicator) return;
+      indicator.textContent = 'Saved';
+      indicator.classList.add('show');
+      setTimeout(() => indicator.classList.remove('show'), 1400);
+    };
+
+    if (useBeacon && navigator.sendBeacon) {
+      params.set('csrf_token', window.LIFEHUB_CSRF_TOKEN || '');
+      navigator.sendBeacon(form.action, new Blob([params.toString()], { type: 'application/x-www-form-urlencoded' }));
+    } else {
+      fetch(form.action, {
+        method: 'POST',
+        keepalive: true,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': window.LIFEHUB_CSRF_TOKEN || '',
+        },
+        body: params.toString(),
+      }).then(showSaved).catch(() => {
+        // Best-effort — if this fails the select just reverts on next reload.
+      });
+    }
+  }
+
+  function flushAll(useBeacon) {
+    Array.from(pending.keys()).forEach((form) => flush(form, useBeacon));
+  }
+
+  forms.forEach((form) => {
+    form.addEventListener('submit', (e) => e.preventDefault());
+    form.querySelectorAll('select[name]').forEach((sel) => {
+      sel.addEventListener('change', () => {
+        clearTimeout(pending.get(form));
+        pending.set(form, setTimeout(() => flush(form, false), SAVE_DELAY));
+      });
+    });
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushAll(true);
+  });
+  window.addEventListener('pagehide', () => flushAll(true));
+})();
+
 // Debounced food search against /nutrition/search, only runs on the nutrition page.
 (function () {
   const input = document.getElementById('food-search');
