@@ -1074,22 +1074,18 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .checklist.interactive li:last-child { border-bottom: none; }
 .checklist.interactive li > span:first-of-type { flex: 1; text-decoration: inherit; min-width: 0; }
 .checkbox-form, .delete-form, .habit-reminder-form { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.reminder-time-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.save-indicator {
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--tab-color) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--tab-color) 30%, transparent);
-  padding: 3px 8px;
-  border-radius: 999px;
+  color: var(--success);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  pointer-events: none;
   white-space: nowrap;
-  flex-shrink: 0;
 }
-.reminder-time-label.unset { color: var(--muted); background: var(--surface-raised); border-color: var(--border); }
+.save-indicator.show { opacity: 1; transform: translateY(0); }
 .habit-reminder-form select[name="reminder_hour"],
 .habit-reminder-form select[name="reminder_day"] {
   width: auto;
