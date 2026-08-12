@@ -8,7 +8,7 @@
   <form method="post" action="{{ url_for('add_habit') }}" class="inline-form">
     <label>Title <input type="text" name="title" placeholder="e.g. Learn French for 50 min" required></label>
     <label>Frequency
-      <select name="frequency">
+      <select name="frequency" onchange="document.getElementById('new-habit-day-field').style.display = this.value==='weekly' ? 'flex' : 'none';">
         <option value="daily">Daily</option>
         <option value="weekly">Weekly</option>
         <option value="monthly">Monthly</option>
@@ -19,6 +19,13 @@
         <option value="">No reminder</option>
         {% for h in range(24) %}
           <option value="{{ h }}">{{ h | hour12 }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label id="new-habit-day-field" style="display:none;">On day
+      <select name="reminder_day">
+        {% for d in range(7) %}
+          <option value="{{ d }}">{{ d | weekday_name }}</option>
         {% endfor %}
       </select>
     </label>
@@ -76,9 +83,25 @@
               <span>{{ hs.habit.title }}</span>
               {% if hs.streak > 0 %}<span class="streak-badge">🔥 {{ hs.streak }}</span>{% endif %}
               <span class="reminder-time-label {{ 'unset' if hs.habit.reminder_hour is none }}">
-                ⏰ {{ hs.habit.reminder_hour | hour12 if hs.habit.reminder_hour is not none else 'No reminder' }}
+                {% if hs.habit.reminder_hour is none %}
+                  ⏰ No reminder
+                {% elif group_freq == 'weekly' and hs.habit.reminder_day is not none %}
+                  ⏰ {{ hs.habit.reminder_day | weekday_name }} {{ hs.habit.reminder_hour | hour12 }}
+                {% else %}
+                  ⏰ {{ hs.habit.reminder_hour | hour12 }}
+                {% endif %}
               </span>
               <form method="post" action="{{ url_for('set_habit_reminder', habit_id=hs.habit.id) }}" class="habit-reminder-form">
+                {% if group_freq == 'weekly' %}
+                  <select name="reminder_day"
+                          aria-label="Reminder day for {{ hs.habit.title }}"
+                          title="Which day of the week to remind you, if not done — blank uses the shared week-end-day setting">
+                    <option value="" {{ 'selected' if hs.habit.reminder_day is none }}>(week-end day)</option>
+                    {% for d in range(7) %}
+                      <option value="{{ d }}" {{ 'selected' if hs.habit.reminder_day == d }}>{{ d | weekday_name }}</option>
+                    {% endfor %}
+                  </select>
+                {% endif %}
                 <select name="reminder_hour"
                         aria-label="Reminder time for {{ hs.habit.title }}"
                         title="Time to remind you if not done, blank = use the general evening check-in">
