@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS habits (
     title TEXT NOT NULL,
     frequency TEXT NOT NULL DEFAULT 'daily',
     reminder_hour INTEGER,        -- optional per-habit reminder time (0-23); NULL = covered by the shared evening digest instead
+    reminder_day INTEGER,         -- optional day-of-week for weekly habits (0=Mon..6=Sun); NULL = use the shared week-end-day setting
     active INTEGER NOT NULL DEFAULT 1,
     created_at REAL NOT NULL
 );
@@ -266,6 +267,7 @@ _MIGRATIONS = [
     ("recurring_transactions", "frequency", "TEXT NOT NULL DEFAULT 'monthly'"),
     ("recurring_transactions", "day_of_week", "INTEGER"),
     ("habits", "reminder_hour", "INTEGER"),
+    ("habits", "reminder_day", "INTEGER"),  # 0=Monday..6=Sunday; only meaningful for weekly habits
     ("savings_goals", "target_date", "TEXT"),
     ("profile", "birth_date", "TEXT"),
     ("profile", "sex", "TEXT"),
