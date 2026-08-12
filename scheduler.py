@@ -269,7 +269,8 @@ def check_individual_habit_reminders(user_id: int) -> None:
     15-minute tick rather than needing its own top-level hour gate."""
     today = today_local(user_id)
     now_hour = datetime.now(get_tz(user_id)).hour
-    weekly_day = today.weekday() == get_week_end_day(user_id)
+    today_weekday = today.weekday()
+    default_weekly_day = today_weekday == get_week_end_day(user_id)
     monthly_day = is_last_day_of_month(today)
 
     with db.get_conn() as conn:
@@ -279,8 +280,16 @@ def check_individual_habit_reminders(user_id: int) -> None:
 
         for h in habits:
             freq = h["frequency"]
-            if freq == "weekly" and not weekly_day:
-                continue
+            if freq == "weekly":
+                # A habit with its own reminder_day fires on that day
+                # specifically; one without falls back to the shared
+                # week-end-day setting, same as before this existed.
+                reminder_day = h["reminder_day"] if "reminder_day" in h.keys() else None
+                is_reminder_day = (
+                    today_weekday == reminder_day if reminder_day is not None else default_weekly_day
+                )
+                if not is_reminder_day:
+                    continue
             if freq == "monthly" and not monthly_day:
                 continue
 
