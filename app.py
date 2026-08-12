@@ -81,6 +81,20 @@ def _hour12(hour):
 app.jinja_env.filters["hour12"] = _hour12
 
 
+_WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+def _weekday_name(day):
+    """Format an integer weekday (0=Monday..6=Sunday, Python's date.weekday()
+    convention) as a short label, e.g. 5 -> 'Sat'."""
+    if day is None:
+        return None
+    return _WEEKDAY_NAMES[int(day) % 7]
+
+
+app.jinja_env.filters["weekday_name"] = _weekday_name
+
+
 def _fmt_date(epoch):
     """Format a stored epoch-seconds timestamp (created_at, etc.) as a
     plain YYYY-MM-DD for display — used on the admin user list."""
@@ -1508,20 +1522,30 @@ def habits():
 def add_habit():
     title = request.form.get("title", "").strip()
     frequency = request.form.get("frequency", "daily")
-    # Only "daily" and "weekly" are ever offered in the form, and the
-    # habits page groups habits by exactly those two values — anything
-    # else would silently vanish from both sections with no way to see or
-    # delete it, so fall back to "daily" rather than trust the raw value.
-    if frequency not in ("daily", "weekly"):
+    # "daily", "weekly", and "monthly" are the only options ever offered in
+    # the form, and the habits page groups habits by exactly those three
+    # values — anything else would silently vanish from every section with
+    # no way to see or delete it, so fall back to "daily" rather than trust
+    # the raw value.
+    if frequency not in ("daily", "weekly", "monthly"):
         frequency = "daily"
     reminder_hour = request.form.get("reminder_hour", type=int)
     if reminder_hour is not None:
         reminder_hour = max(0, min(reminder_hour, 23))
+    # A day only makes sense for a weekly habit's reminder (a daily habit
+    # fires every day by definition) — ignore it otherwise so a leftover
+    # form value can't quietly attach a day to a daily habit.
+    reminder_day = request.form.get("reminder_day", type=int)
+    if frequency != "weekly" or reminder_day is None:
+        reminder_day = None
+    else:
+        reminder_day = max(0, min(reminder_day, 6))
     if title:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO habits (user_id, title, frequency, reminder_hour, active, created_at) VALUES (?,?,?,?,1,?)",
-                (g.user_id, title, frequency, reminder_hour, db.now()),
+                "INSERT INTO habits (user_id, title, frequency, reminder_hour, reminder_day, active, created_at) "
+                "VALUES (?,?,?,?,?,1,?)",
+                (g.user_id, title, frequency, reminder_hour, reminder_day, db.now()),
             )
         flash(f"Habit added: {title}")
     return redirect(url_for("habits"))
@@ -1533,10 +1557,20 @@ def set_habit_reminder(habit_id):
     reminder_hour = request.form.get("reminder_hour", type=int)
     if reminder_hour is not None:
         reminder_hour = max(0, min(reminder_hour, 23))
+    reminder_day = request.form.get("reminder_day", type=int)
+    if reminder_day is not None:
+        reminder_day = max(0, min(reminder_day, 6))
     with db.get_conn() as conn:
+        habit = conn.execute(
+            "SELECT frequency FROM habits WHERE id = ? AND user_id = ?", (habit_id, g.user_id)
+        ).fetchone()
+        # Same rule as add_habit(): a reminder day only applies to weekly
+        # habits, so don't let one linger on a habit that's daily.
+        if not habit or habit["frequency"] != "weekly":
+            reminder_day = None
         conn.execute(
-            "UPDATE habits SET reminder_hour = ? WHERE id = ? AND user_id = ?",
-            (reminder_hour, habit_id, g.user_id),
+            "UPDATE habits SET reminder_hour = ?, reminder_day = ? WHERE id = ? AND user_id = ?",
+            (reminder_hour, reminder_day, habit_id, g.user_id),
         )
     return redirect(url_for("habits"))
 
