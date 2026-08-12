@@ -36,23 +36,44 @@
 <div class="card wide" style="margin-top: var(--gap-section);">
   <h3>Growth — last 30 days</h3>
   <p class="muted">Daily signups (bars) against the running total (line).</p>
-  <canvas id="signupsChart" height="80"></canvas>
+  {% if stats.total_users > 0 %}
+    <canvas id="signupsChart" height="80"></canvas>
+  {% else %}
+    <p class="muted">No signups yet.</p>
+  {% endif %}
+</div>
+
+<div id="adminChartError" class="card wide" style="margin-top: var(--gap-section); display:none; border-color: var(--danger);">
+  <h3 style="color: var(--danger);">Charts failed to load</h3>
+  <p class="muted">The Chart.js library didn't load in this browser — the numbers above are still accurate, but the graphs below can't render. This is usually a blocked/failed request to the chart script (ad blocker, extension, or network filtering), not missing data. Check the browser console/network tab, or reload the page.</p>
 </div>
 
 <div class="admin-chart-grid">
   <div class="card">
     <h3>Verification status</h3>
-    <canvas id="verifiedChart"></canvas>
+    {% if stats.total_users > 0 %}
+      <canvas id="verifiedChart"></canvas>
+    {% else %}
+      <p class="muted">No users yet.</p>
+    {% endif %}
   </div>
 
   <div class="card">
     <h3>Role split</h3>
-    <canvas id="roleChart"></canvas>
+    {% if stats.total_users > 0 %}
+      <canvas id="roleChart"></canvas>
+    {% else %}
+      <p class="muted">No users yet.</p>
+    {% endif %}
   </div>
 
   <div class="card">
     <h3>Records by feature</h3>
-    <canvas id="contentChart"></canvas>
+    {% if content_totals and (content_totals | sum(attribute='count')) > 0 %}
+      <canvas id="contentChart"></canvas>
+    {% else %}
+      <p class="muted">No records logged yet.</p>
+    {% endif %}
   </div>
 
   <div class="card">
@@ -67,9 +88,19 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"
+        onerror="document.getElementById('adminChartError').style.display='block';"></script>
 <script nonce="{{ csp_nonce() }}">
 (function () {
+  // If the CDN script above didn't load (blocked, offline, etc.), Chart
+  // is undefined here — surface that clearly instead of leaving every
+  // canvas silently blank with no explanation.
+  if (typeof Chart === 'undefined') {
+    const err = document.getElementById('adminChartError');
+    if (err) err.style.display = 'block';
+    return;
+  }
+
   const style = getComputedStyle(document.body);
   const v = (name) => style.getPropertyValue(name).trim();
   const muted = v('--muted'), border = v('--border'), accent = v('--accent');
@@ -81,12 +112,20 @@
 
   const alpha = (hex, pct) => hex + Math.round(pct * 2.55).toString(16).padStart(2, '0');
 
+  // Wrap each chart's setup independently so one bad canvas/dataset can't
+  // silently prevent the rest from drawing.
+  function safe(label, fn) {
+    try { fn(); } catch (e) { console.error('admin chart failed:', label, e); }
+  }
+
   // ── Growth: daily signups (bar) + cumulative total (line) ──
+  const signupsCanvas = document.getElementById('signupsChart');
+  if (signupsCanvas) safe('signups', () => {
   const signups = {{ signups | tojson }};
   let running = {{ stats.total_users - (signups | sum(attribute='count')) }};
   const cumulative = signups.map(d => { running += d.count; return running; });
 
-  new Chart(document.getElementById('signupsChart'), {
+  new Chart(signupsCanvas, {
     data: {
       labels: signups.map(d => d.day.slice(5)),
       datasets: [
@@ -124,9 +163,12 @@
       },
     },
   });
+  });
 
   // ── Verification status donut ──
-  new Chart(document.getElementById('verifiedChart'), {
+  const verifiedCanvas = document.getElementById('verifiedChart');
+  if (verifiedCanvas) safe('verified', () => {
+  new Chart(verifiedCanvas, {
     type: 'doughnut',
     data: {
       labels: ['Verified', 'Unverified'],
@@ -134,9 +176,12 @@
     },
     options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } } },
   });
+  });
 
   // ── Role split donut ──
-  new Chart(document.getElementById('roleChart'), {
+  const roleCanvas = document.getElementById('roleChart');
+  if (roleCanvas) safe('role', () => {
+  new Chart(roleCanvas, {
     type: 'doughnut',
     data: {
       labels: ['Admins', 'Regular users'],
@@ -144,11 +189,14 @@
     },
     options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } } },
   });
+  });
 
   // ── Records by feature (horizontal bar) ──
+  const contentCanvas = document.getElementById('contentChart');
+  if (contentCanvas) safe('content', () => {
   const content = {{ content_totals | tojson }};
   const palette = [accent, primary, success, violet, danger, muted, '#5FE0FF', '#FFB454', '#8FD14F'];
-  new Chart(document.getElementById('contentChart'), {
+  new Chart(contentCanvas, {
     type: 'bar',
     data: {
       labels: content.map(c => c.label),
@@ -163,10 +211,11 @@
       },
     },
   });
+  });
 
   // ── Most active users (horizontal bar) ──
   const topUsersCanvas = document.getElementById('topUsersChart');
-  if (topUsersCanvas) {
+  if (topUsersCanvas) safe('topUsers', () => {
     const topUsers = {{ top_users | tojson }};
     new Chart(topUsersCanvas, {
       type: 'bar',
@@ -183,7 +232,7 @@
         },
       },
     });
-  }
+  });
 })();
 </script>
 {% endblock %}
