@@ -88,13 +88,38 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"
-        onerror="document.getElementById('adminChartError').style.display='block';"></script>
 <script nonce="{{ csp_nonce() }}">
+// Chart.js is fetched from a CDN rather than bundled, so it needs a
+// network path to that CDN. cdnjs.cloudflare.com isn't reachable from
+// every network (some ISPs/regions have spotty routing to it) — so try
+// it first, and if that script never loads, fall back to jsDelivr before
+// giving up. Both hosts are allowed in the CSP script-src (see
+// _build_csp in app.py) so the fallback attempt itself isn't blocked.
 (function () {
-  // If the CDN script above didn't load (blocked, offline, etc.), Chart
-  // is undefined here — surface that clearly instead of leaving every
-  // canvas silently blank with no explanation.
+  const CDNS = [
+    'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js',
+    'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
+  ];
+
+  function tryLoad(i) {
+    if (i >= CDNS.length) {
+      const err = document.getElementById('adminChartError');
+      if (err) err.style.display = 'block';
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = CDNS[i];
+    s.onload = () => { if (window.__renderAdminCharts) window.__renderAdminCharts(); };
+    s.onerror = () => tryLoad(i + 1);
+    document.head.appendChild(s);
+  }
+  tryLoad(0);
+})();
+</script>
+<script nonce="{{ csp_nonce() }}">
+window.__renderAdminCharts = function () {
+  // typeof-guard kept as a last-resort safety net in case this ever runs
+  // before Chart.js has actually finished evaluating.
   if (typeof Chart === 'undefined') {
     const err = document.getElementById('adminChartError');
     if (err) err.style.display = 'block';
@@ -233,6 +258,6 @@
       },
     });
   });
-})();
+};
 </script>
 {% endblock %}
