@@ -82,16 +82,7 @@
               </form>
               <span>{{ hs.habit.title }}</span>
               {% if hs.streak > 0 %}<span class="streak-badge">🔥 {{ hs.streak }}</span>{% endif %}
-              <span class="reminder-time-label {{ 'unset' if hs.habit.reminder_hour is none }}">
-                {% if hs.habit.reminder_hour is none %}
-                  ⏰ No reminder
-                {% elif group_freq == 'weekly' and hs.habit.reminder_day is not none %}
-                  ⏰ {{ hs.habit.reminder_day | weekday_name }} {{ hs.habit.reminder_hour | hour12 }}
-                {% else %}
-                  ⏰ {{ hs.habit.reminder_hour | hour12 }}
-                {% endif %}
-              </span>
-              <form method="post" action="{{ url_for('set_habit_reminder', habit_id=hs.habit.id) }}" class="habit-reminder-form">
+              <form method="post" action="{{ url_for('set_habit_reminder', habit_id=hs.habit.id) }}" class="habit-reminder-form" data-autosave>
                 {% if group_freq == 'weekly' %}
                   <select name="reminder_day"
                           aria-label="Reminder day for {{ hs.habit.title }}"
@@ -110,7 +101,7 @@
                     <option value="{{ h }}" {{ 'selected' if hs.habit.reminder_hour == h }}>{{ h | hour12 }}</option>
                   {% endfor %}
                 </select>
-                <button type="submit" class="btn-icon" title="Save reminder time">💾</button>
+                <span class="save-indicator" aria-live="polite"></span>
               </form>
               <form method="post" action="{{ url_for('delete_habit', habit_id=hs.habit.id) }}" class="delete-form" data-confirm="Delete {{ hs.habit.title }}? Its streak history will be lost.">
                 <button class="btn-icon" title="Remove habit">🗑️</button>
