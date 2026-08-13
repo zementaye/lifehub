@@ -1431,27 +1431,41 @@ def vault_delete(doc_id):
 @app.route("/reminders")
 @login_required
 def reminders():
+    user_id = g.user_id
     with db.get_conn() as conn:
         items = conn.execute(
             "SELECT * FROM reminders WHERE user_id = ? ORDER BY active DESC, date(next_due)",
-            (g.user_id,),
+            (user_id,),
         ).fetchall()
-    return render_template("reminders.html", reminders=items)
+        todos = conn.execute(
+            "SELECT * FROM todos WHERE user_id = ? ORDER BY done, created_at DESC", (user_id,)
+        ).fetchall()
+    return render_template("reminders.html", reminders=items, todos=todos)
 
 
 @app.route("/reminders", methods=["POST"])
 @login_required
 def add_reminder():
     title = request.form.get("title", "").strip()
-    next_due = request.form.get("next_due")
+    next_due = request.form.get("next_due") or None
     recurrence = request.form.get("recurrence", "once")
-    if title and next_due:
-        with db.get_conn() as conn:
+    if not title:
+        return redirect(url_for("reminders"))
+    with db.get_conn() as conn:
+        if next_due:
             conn.execute(
                 "INSERT INTO reminders (user_id, title, next_due, recurrence, active, created_at) VALUES (?,?,?,?,1,?)",
                 (g.user_id, title, next_due, recurrence, db.now()),
             )
-        flash(f"Reminder set: {title}")
+            flash(f"To-do set: {title} (due {next_due})")
+        else:
+            # No due date — it's a plain one-off task, stored the same way
+            # the (now-merged) quick to-do form always has been.
+            conn.execute(
+                "INSERT INTO todos (user_id, title, done, created_at) VALUES (?,?,0,?)",
+                (g.user_id, title, db.now()),
+            )
+            flash(f"Added to-do: {title}")
     return redirect(url_for("reminders"))
 
 
@@ -1503,9 +1517,6 @@ def habits():
             "SELECT * FROM habits WHERE user_id = ? AND active = 1 ORDER BY frequency, title",
             (user_id,),
         ).fetchall()
-        todos = conn.execute(
-            "SELECT * FROM todos WHERE user_id = ? ORDER BY done, created_at DESC", (user_id,)
-        ).fetchall()
 
     today = scheduler.today_local(user_id)
     status = []
@@ -1515,7 +1526,7 @@ def habits():
         s = status_by_id[h["id"]]
         status.append({"habit": h, "done": s["done"], "period_key": pkey, "streak": s["streak"]})
 
-    return render_template("habits.html", status=status, todos=todos)
+    return render_template("habits.html", status=status)
 
 
 @app.route("/habits", methods=["POST"])
@@ -1618,7 +1629,8 @@ def delete_habit(habit_id):
     return redirect(url_for("habits"))
 
 
-# ── To-Dos (one-time, non-recurring) ────────────────────────────────────
+# ── To-Dos (one-time, non-recurring — shown together with Reminders on
+# the To Do page) ─────────────────────────────────────────────────────
 
 @app.route("/todos", methods=["POST"])
 @login_required
@@ -1630,7 +1642,7 @@ def add_todo():
                 "INSERT INTO todos (user_id, title, done, created_at) VALUES (?,?,0,?)",
                 (g.user_id, title, db.now()),
             )
-    return redirect(url_for("habits"))
+    return redirect(url_for("reminders"))
 
 
 @app.route("/todos/<int:todo_id>/check", methods=["POST"])
@@ -1641,7 +1653,7 @@ def check_todo(todo_id):
             "UPDATE todos SET done = 1, completed_at = ? WHERE id = ? AND user_id = ?",
             (db.now(), todo_id, g.user_id),
         )
-    return redirect(url_for("habits"))
+    return redirect(url_for("reminders"))
 
 
 @app.route("/todos/<int:todo_id>/uncheck", methods=["POST"])
@@ -1652,7 +1664,7 @@ def uncheck_todo(todo_id):
             "UPDATE todos SET done = 0, completed_at = NULL WHERE id = ? AND user_id = ?",
             (todo_id, g.user_id),
         )
-    return redirect(url_for("habits"))
+    return redirect(url_for("reminders"))
 
 
 @app.route("/todos/<int:todo_id>/delete", methods=["POST"])
@@ -1660,7 +1672,7 @@ def uncheck_todo(todo_id):
 def delete_todo(todo_id):
     with db.get_conn() as conn:
         conn.execute("DELETE FROM todos WHERE id = ? AND user_id = ?", (todo_id, g.user_id))
-    return redirect(url_for("habits"))
+    return redirect(url_for("reminders"))
 
 
 # ── Budget ───────────────────────────────────────────────────────────────
@@ -2498,7 +2510,7 @@ def ai_quick_add():
                     (user_id, title, db.now()),
                 )
             messages.append(f"Added to-do: {title}")
-            redirect_target = url_for("habits")
+            redirect_target = url_for("reminders")
             continue
 
         # "unclear" or any other/unexpected value — nothing gets written.
