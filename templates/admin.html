@@ -218,8 +218,20 @@ window.__lifehubInitCharts = function () {
     });
   }
 };
+
+// Load Chart.js by creating the <script> element in JS and assigning
+// .onload/.onerror as properties, rather than using onload="..."/onerror="..."
+// HTML attributes on a <script src> tag. Our CSP's script-src has no
+// 'unsafe-inline' — the per-request nonce covers <script> elements (this
+// block included) but does NOT cover inline event-handler attributes, so
+// onload="" / onerror="" attributes are silently blocked by the browser
+// no matter what nonce is on the tag. Assigning the handlers as JS
+// properties from inside this already-nonce-authorized script avoids that
+// restriction entirely.
+const chartScript = document.createElement('script');
+chartScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js';
+chartScript.onload = window.__lifehubInitCharts;
+chartScript.onerror = window.__lifehubChartCdnFailed;
+document.head.appendChild(chartScript);
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"
-        onload="window.__lifehubInitCharts()"
-        onerror="window.__lifehubChartCdnFailed()"></script>
 {% endblock %}
