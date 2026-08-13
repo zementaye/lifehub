@@ -426,6 +426,7 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
   const overlay = document.getElementById('confirm-modal-overlay');
   if (!overlay) return;
   const titleEl = document.getElementById('confirm-modal-title');
+  const subEl = document.getElementById('confirm-modal-sub');
   const okBtn = document.getElementById('confirm-modal-ok');
   const cancelBtn = document.getElementById('confirm-modal-cancel');
   let pendingForm = null;
@@ -433,6 +434,23 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
   function open(form) {
     pendingForm = form;
     titleEl.textContent = form.dataset.confirm;
+
+    // Most confirmations are permanent deletes (the default look: red
+    // "Delete" button, "This can't be undone."). A form can opt into a
+    // milder, reversible-action look via data-confirm-ok (button label)
+    // and data-confirm-danger="false" — e.g. "Make admin", "Suspend",
+    // "Log out everywhere" aren't destructive and shouldn't be styled or
+    // worded as if they were.
+    const isDanger = form.dataset.confirmDanger !== 'false';
+    okBtn.textContent = form.dataset.confirmOk || 'Delete';
+    okBtn.classList.toggle('confirm-modal-danger', isDanger);
+
+    const note = form.dataset.confirmNote !== undefined
+      ? form.dataset.confirmNote
+      : (isDanger ? "This can't be undone." : '');
+    subEl.textContent = note;
+    subEl.style.display = note ? '' : 'none';
+
     overlay.style.display = 'flex';
   }
   function close() {
