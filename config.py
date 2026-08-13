@@ -53,8 +53,8 @@ GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
 # ── Habit nudge / reminder scheduling ───────────────────────────────────
 TIMEZONE = os.environ.get("TIMEZONE", "Africa/Addis_Ababa")
-NUDGE_HOUR = int(os.environ.get("NUDGE_HOUR", "20"))   # 24h, local TZ — daily check time
-REMINDER_HOUR = int(os.environ.get("REMINDER_HOUR", "9"))  # when due reminders get sent
+NUDGE_HOUR = int(os.environ.get("NUDGE_HOUR", "8"))   # 24h, local TZ — daily check time
+REMINDER_HOUR = int(os.environ.get("REMINDER_HOUR", "8"))  # when due reminders get sent
 WEEK_END_DAY = int(os.environ.get("WEEK_END_DAY", "6"))  # 0=Mon ... 6=Sun (ISO weekday-1)
 
 # ── Optional lightweight access gate ────────────────────────────────────

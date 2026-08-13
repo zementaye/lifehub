@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Profile — Life Hub{% endblock %}
+{% block content %}
+<h1>Profile</h1>
+
+<div class="card wide">
+  <h3>Account</h3>
+  <p class="muted">Logged in as <strong>{{ user.email }}</strong></p>
+  {% if user.email_verified_at %}
+    <p class="muted">✅ Email verified</p>
+  {% else %}
+    <p class="muted">
+      ⚠️ Email not verified yet.
+      <form method="post" action="{{ url_for('resend_verification') }}" style="display:inline;">
+        <button type="submit" class="secondary" style="margin-left:6px;">Resend verification email</button>
+      </form>
+    </p>
+  {% endif %}
+  <form method="post" action="{{ url_for('logout') }}">
+    <button type="submit" class="secondary">Log out</button>
+  </form>
+
+  <h4 style="margin-top:22px;">Change password</h4>
+  <p class="muted">
+    Password last changed: {{ user.password_changed_at | fmtdate if user.password_changed_at else 'never (original signup password)' }}.
+    Changing it logs you out on every other device/browser automatically.
+  </p>
+  <button type="button" class="secondary reveal-toggle" data-reveal-target="change-password-panel">Change password</button>
+  <form method="post" action="{{ url_for('change_password') }}" class="inline-form reveal-panel" id="change-password-panel" style="display:none; margin-top:12px;">
+    <label>Current password <input type="password" name="current_password" autocomplete="current-password" required></label>
+    <label>New password <input type="password" name="new_password" autocomplete="new-password" minlength="8" required></label>
+    <label>Confirm new password <input type="password" name="confirm_password" autocomplete="new-password" minlength="8" required></label>
+    <button type="submit">Save new password</button>
+  </form>
+
+  <h4 style="margin-top:22px;">Active sessions</h4>
+  <p class="muted">
+    If you're logged in somewhere you don't recognize — a shared or borrowed
+    computer, an old device — this signs every session out except the one
+    you're using right now.
+  </p>
+  <form method="post" action="{{ url_for('logout_everywhere') }}" data-confirm="Log out on every other device/browser? This one stays logged in."
+        data-confirm-ok="Log out everywhere" data-confirm-danger="false">
+    <button type="submit" class="secondary">Log out everywhere else</button>
+  </form>
+
+  <h4 style="margin-top:22px;">Two-factor authentication</h4>
+  {% if totp_enabled %}
+    <p class="muted">
+      ✅ 2FA is on — logging in requires a code from your authenticator app as well as your password.
+      {{ backup_codes_remaining }} backup code{{ '' if backup_codes_remaining == 1 else 's' }} remaining.
+    </p>
+    <button type="button" class="secondary reveal-toggle" data-reveal-target="regen-codes-panel">Generate new backup codes</button>
+    <form method="post" action="{{ url_for('totp_regenerate_codes') }}" class="inline-form reveal-panel" id="regen-codes-panel" style="display:none; margin-top:12px;">
+      <label>Password, to regenerate backup codes <input type="password" name="password" autocomplete="current-password" required></label>
+      <button type="submit" class="secondary">Generate new backup codes</button>
+    </form>
+
+    <button type="button" class="secondary reveal-toggle" data-reveal-target="disable-2fa-panel" style="margin-top:10px;">Disable 2FA</button>
+    <form method="post" action="{{ url_for('totp_disable') }}" class="inline-form reveal-panel" id="disable-2fa-panel" style="display:none; margin-top:12px;"
+          data-confirm="Turn off 2FA? Logging in will only need your password again." data-confirm-ok="Disable 2FA">
+      <label>Password, to disable 2FA <input type="password" name="password" autocomplete="current-password" required></label>
+      <button type="submit" class="confirm-modal-danger">Disable 2FA</button>
+    </form>
+  {% else %}
+    <p class="muted">
+      ⚠️ 2FA is off. Turning it on means logging in needs a code from an
+      authenticator app (Google Authenticator, Authy, 1Password, etc.) in
+      addition to your password.
+    </p>
+    <a href="{{ url_for('totp_setup') }}"><button type="button">Set up 2FA</button></a>
+  {% endif %}
+
+  <h4 style="margin-top:22px;">Delete account</h4>
+  <p class="muted">
+    Permanently deletes your account and every piece of data in it —
+    budget, notes, habits, vault files, everything. This can't be undone.
+    Consider downloading a backup from Settings first.
+  </p>
+  <button type="button" class="secondary reveal-toggle" data-reveal-target="delete-account-panel">Delete account</button>
+  <form method="post" action="{{ url_for('delete_own_account') }}" class="inline-form reveal-panel" id="delete-account-panel" style="display:none; margin-top:12px;"
+        data-confirm="Permanently delete your account and all of its data? This can't be undone." data-confirm-ok="Delete my account">
+    <label>Password, to confirm <input type="password" name="password" autocomplete="current-password" required></label>
+    <button type="submit" class="confirm-modal-danger">Delete my account</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce() }}">
+// Each destructive/sensitive form (change password, disable 2FA, regenerate
+// backup codes, delete account) starts hidden behind its own button so the
+// page doesn't open with a wall of password fields. Clicking the button
+// reveals that one form and focuses its first field.
+document.querySelectorAll('.reveal-toggle').forEach((btn) => {
+  const panel = document.getElementById(btn.dataset.revealTarget);
+  if (!panel) return;
+  btn.addEventListener('click', () => {
+    const showing = panel.style.display !== 'none';
+    panel.style.display = showing ? 'none' : '';
+    if (!showing) {
+      const first = panel.querySelector('input');
+      if (first) first.focus();
+    }
+  });
+});
+</script>
+{% endblock %}

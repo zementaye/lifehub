@@ -2537,21 +2537,28 @@ def settings():
     values = {
         "tg_chat_id": db.get_setting(user_id, "tg_chat_id", config.TG_CHAT_ID),
         "timezone": db.get_setting(user_id, "timezone", config.TIMEZONE),
-        "reminder_hour": db.get_setting(user_id, "reminder_hour", config.REMINDER_HOUR),
-        "nudge_hour": db.get_setting(user_id, "nudge_hour", config.NUDGE_HOUR),
         "week_end_day": db.get_setting(user_id, "week_end_day", config.WEEK_END_DAY),
         "currency": db.get_setting(user_id, "currency", "ETB"),
         "nutrition_goal_calories": db.get_setting(user_id, "nutrition_goal_calories", ""),
         "nutrition_goal_protein": db.get_setting(user_id, "nutrition_goal_protein", ""),
     }
-    user = db.get_user_by_id(user_id)
-    totp_enabled = bool(user["totp_enabled_at"])
     return render_template(
         "settings.html",
         values=values,
+        tg_bot_configured=bool(config.TG_BOT_TOKEN),
+    )
+
+
+@app.route("/profile")
+@login_required
+def profile():
+    user_id = g.user_id
+    user = db.get_user_by_id(user_id)
+    totp_enabled = bool(user["totp_enabled_at"])
+    return render_template(
+        "profile.html",
         totp_enabled=totp_enabled,
         backup_codes_remaining=db.count_unused_backup_codes(user_id) if totp_enabled else 0,
-        tg_bot_configured=bool(config.TG_BOT_TOKEN),
     )
 
 
@@ -2561,7 +2568,7 @@ def save_settings():
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
     user_id = g.user_id
-    for key in ("tg_chat_id", "timezone", "reminder_hour", "nudge_hour",
+    for key in ("tg_chat_id", "timezone",
                 "week_end_day", "currency", "nutrition_goal_calories", "nutrition_goal_protein"):
         val = request.form.get(key)
         if val is None:
@@ -2592,13 +2599,13 @@ def change_password():
 
     if not db.verify_password(user, current_password):
         flash("Current password is incorrect.")
-        return redirect(url_for("settings"))
+        return redirect(url_for("profile"))
     if len(new_password) < 8:
         flash("New password must be at least 8 characters.")
-        return redirect(url_for("settings"))
+        return redirect(url_for("profile"))
     if new_password != confirm_password:
         flash("New passwords don't match.")
-        return redirect(url_for("settings"))
+        return redirect(url_for("profile"))
 
     db.set_password(g.user_id, new_password)
     # A password change is exactly the situation "Log out everywhere"
@@ -2608,7 +2615,7 @@ def change_password():
     db.invalidate_other_sessions(g.user_id)
     session["session_issued_at"] = time.time()  # keep *this* session logged in
     flash("Password changed, and you've been logged out everywhere else.")
-    return redirect(url_for("settings"))
+    return redirect(url_for("profile"))
 
 
 @app.route("/settings/logout-everywhere", methods=["POST"])
@@ -2617,7 +2624,7 @@ def logout_everywhere():
     db.invalidate_other_sessions(g.user_id)
     session["session_issued_at"] = time.time()  # keep *this* session logged in
     flash("You've been logged out on all other devices/browsers.")
-    return redirect(url_for("settings"))
+    return redirect(url_for("profile"))
 
 
 @app.route("/settings/2fa/setup")
@@ -2631,7 +2638,7 @@ def totp_setup():
     user = db.get_user_by_id(g.user_id)
     if user["totp_enabled_at"]:
         flash("2FA is already enabled. Disable it first if you want to re-enroll.")
-        return redirect(url_for("settings"))
+        return redirect(url_for("profile"))
     secret = totp.generate_secret()
     db.set_totp_pending_secret(g.user_id, crypto.encrypt(secret))
     uri = totp.provisioning_uri(secret, user["email"])
@@ -2674,7 +2681,7 @@ def totp_disable():
     # click with nothing else required.
     if not db.verify_password(user, request.form.get("password", "")):
         flash("Incorrect password — 2FA was not disabled.")
-        return redirect(url_for("settings"))
+        return redirect(url_for("profile"))
     db.disable_totp(g.user_id)
     # Same reasoning as turning 2FA on (see totp_confirm): this changes the
     # account's security posture, so any other lingering session should have
@@ -2683,7 +2690,7 @@ def totp_disable():
     db.invalidate_other_sessions(g.user_id)
     session["session_issued_at"] = time.time()
     flash("2FA has been disabled on your account.")
-    return redirect(url_for("settings"))
+    return redirect(url_for("profile"))
 
 
 @app.route("/settings/2fa/regenerate-codes", methods=["POST"])
@@ -2693,10 +2700,10 @@ def totp_regenerate_codes():
     user = db.get_user_by_id(g.user_id)
     if not user["totp_enabled_at"]:
         flash("2FA isn't enabled.")
-        return redirect(url_for("settings"))
+        return redirect(url_for("profile"))
     if not db.verify_password(user, request.form.get("password", "")):
         flash("Incorrect password — backup codes were not regenerated.")
-        return redirect(url_for("settings"))
+        return redirect(url_for("profile"))
     backup_codes = totp.generate_backup_codes()
     db.set_totp_backup_codes(g.user_id, [generate_password_hash(c) for c in backup_codes])
     return render_template("totp_backup_codes.html", codes=backup_codes, heading="New backup codes")
@@ -2764,10 +2771,10 @@ def delete_own_account():
     user = db.get_user_by_id(g.user_id)
     if not db.verify_password(user, request.form.get("password", "")):
         flash("Incorrect password — your account was not deleted.")
-        return redirect(url_for("settings"))
+        return redirect(url_for("profile"))
     if user["is_admin"] and db.admin_count_admins() <= 1:
         flash("You're the only admin — promote someone else to admin first, or the admin console would be unreachable.")
-        return redirect(url_for("settings"))
+        return redirect(url_for("profile"))
 
     user_id = g.user_id
     email = user["email"]
