@@ -731,6 +731,24 @@ body.auth-page {
   45% { transform: scaleX(1); }
   100% { transform: scaleX(1); opacity: 0; }
 }
+/* Error state for a card — currently just the Chart.js load-failure notice
+   on the admin dashboard (see admin.html), but written generically as a
+   reusable "this piece failed" card in case others need it later. */
+.chart-error-card {
+  border-color: var(--danger);
+}
+.chart-error-card:hover {
+  border-color: var(--danger);
+  box-shadow: var(--shadow), 0 0 0 1px color-mix(in srgb, var(--danger) 18%, transparent), 0 0 26px color-mix(in srgb, var(--danger) 20%, transparent);
+}
+.chart-error-card::before {
+  background: linear-gradient(90deg, transparent, var(--danger), transparent);
+}
+.chart-error-card::after {
+  border-top-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  border-right-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+.chart-error-card h3 { color: var(--danger); }
 @keyframes card-in {
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
