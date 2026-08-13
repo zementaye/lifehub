@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import secrets
+import threading
 import time
 import urllib.parse
 import uuid
@@ -79,6 +80,20 @@ def _hour12(hour):
 
 
 app.jinja_env.filters["hour12"] = _hour12
+
+
+_WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+def _weekday_name(day):
+    """Format an integer weekday (0=Monday..6=Sunday, Python's date.weekday()
+    convention) as a short label, e.g. 5 -> 'Sat'."""
+    if day is None:
+        return None
+    return _WEEKDAY_NAMES[int(day) % 7]
+
+
+app.jinja_env.filters["weekday_name"] = _weekday_name
 
 
 def _fmt_date(epoch):
@@ -759,11 +774,7 @@ def _build_csp(nonce: str) -> str:
     # style attribute with a class, which is separate follow-up work.
     return "; ".join([
         "default-src 'self'",
-        # Chart.js is loaded with a same-origin-first-then-CDN-fallback
-        # strategy (see admin.html) since cdnjs.cloudflare.com alone isn't
-        # reachable from every network — both hosts need to be allowed
-        # here or the fallback attempt gets blocked too.
-        f"script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net 'nonce-{nonce}'",
+        f"script-src 'self' https://cdnjs.cloudflare.com 'nonce-{nonce}'",
         "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'",
         "font-src 'self' https://fonts.gstatic.com",
         _IMG_SRC,
@@ -1512,20 +1523,30 @@ def habits():
 def add_habit():
     title = request.form.get("title", "").strip()
     frequency = request.form.get("frequency", "daily")
-    # Only "daily" and "weekly" are ever offered in the form, and the
-    # habits page groups habits by exactly those two values — anything
-    # else would silently vanish from both sections with no way to see or
-    # delete it, so fall back to "daily" rather than trust the raw value.
-    if frequency not in ("daily", "weekly"):
+    # "daily", "weekly", and "monthly" are the only options ever offered in
+    # the form, and the habits page groups habits by exactly those three
+    # values — anything else would silently vanish from every section with
+    # no way to see or delete it, so fall back to "daily" rather than trust
+    # the raw value.
+    if frequency not in ("daily", "weekly", "monthly"):
         frequency = "daily"
     reminder_hour = request.form.get("reminder_hour", type=int)
     if reminder_hour is not None:
         reminder_hour = max(0, min(reminder_hour, 23))
+    # A day only makes sense for a weekly habit's reminder (a daily habit
+    # fires every day by definition) — ignore it otherwise so a leftover
+    # form value can't quietly attach a day to a daily habit.
+    reminder_day = request.form.get("reminder_day", type=int)
+    if frequency != "weekly" or reminder_day is None:
+        reminder_day = None
+    else:
+        reminder_day = max(0, min(reminder_day, 6))
     if title:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO habits (user_id, title, frequency, reminder_hour, active, created_at) VALUES (?,?,?,?,1,?)",
-                (g.user_id, title, frequency, reminder_hour, db.now()),
+                "INSERT INTO habits (user_id, title, frequency, reminder_hour, reminder_day, active, created_at) "
+                "VALUES (?,?,?,?,?,1,?)",
+                (g.user_id, title, frequency, reminder_hour, reminder_day, db.now()),
             )
         flash(f"Habit added: {title}")
     return redirect(url_for("habits"))
@@ -1537,10 +1558,20 @@ def set_habit_reminder(habit_id):
     reminder_hour = request.form.get("reminder_hour", type=int)
     if reminder_hour is not None:
         reminder_hour = max(0, min(reminder_hour, 23))
+    reminder_day = request.form.get("reminder_day", type=int)
+    if reminder_day is not None:
+        reminder_day = max(0, min(reminder_day, 6))
     with db.get_conn() as conn:
+        habit = conn.execute(
+            "SELECT frequency FROM habits WHERE id = ? AND user_id = ?", (habit_id, g.user_id)
+        ).fetchone()
+        # Same rule as add_habit(): a reminder day only applies to weekly
+        # habits, so don't let one linger on a habit that's daily.
+        if not habit or habit["frequency"] != "weekly":
+            reminder_day = None
         conn.execute(
-            "UPDATE habits SET reminder_hour = ? WHERE id = ? AND user_id = ?",
-            (reminder_hour, habit_id, g.user_id),
+            "UPDATE habits SET reminder_hour = ?, reminder_day = ? WHERE id = ? AND user_id = ?",
+            (reminder_hour, reminder_day, habit_id, g.user_id),
         )
     return redirect(url_for("habits"))
 
@@ -1804,33 +1835,58 @@ def add_transaction():
     description = request.form.get("description", "").strip()
     category_id = request.form.get("category_id", type=int) or None
 
-    # If the person left the category blank on an expense, take one best-
-    # effort shot at guessing it from the description before saving —
-    # never blocks the save, and only ever picks from their own existing
-    # categories (see ai.suggest_category), so a bad/unavailable AI call
-    # just leaves the transaction uncategorized exactly as before.
-    auto_categorized = False
-    if ttype == "expense" and category_id is None and description and ai.available():
-        with db.get_conn() as conn:
-            cats = conn.execute(
-                "SELECT id, name FROM budget_categories WHERE user_id = ?", (user_id,)
-            ).fetchall()
-        if cats:
-            guess, _err = ai.suggest_category(description, [c["name"] for c in cats])
-            if guess:
-                category_id = next((c["id"] for c in cats if c["name"] == guess), None)
-                auto_categorized = category_id is not None
-
     if amount:
         with db.get_conn() as conn:
-            conn.execute(
+            cur = conn.execute(
                 "INSERT INTO transactions (user_id, date, type, category_id, description, amount, created_at) "
                 "VALUES (?,?,?,?,?,?,?)",
                 (user_id, d, ttype, category_id if ttype == "expense" else None, description, abs(amount), db.now()),
             )
-        suffix = " (category auto-filled by AI)" if auto_categorized else ""
-        flash(f"Logged {'income' if ttype == 'income' else 'expense'}: {amount}{suffix}")
+            txn_id = cur.lastrowid
+        flash(f"Logged {'income' if ttype == 'income' else 'expense'}: {amount}")
+
+        # If the person left the category blank on an expense, take one
+        # best-effort shot at guessing it from the description — but off
+        # the request thread, since the Gemini call can take several
+        # seconds and there's no reason to make the save/redirect wait on
+        # it. It just fills the category in a moment later (see
+        # _auto_categorize_transaction); never blocks, and a bad/unavailable
+        # AI call just leaves the transaction uncategorized as before.
+        if ttype == "expense" and category_id is None and description and ai.available():
+            threading.Thread(
+                target=_auto_categorize_transaction,
+                args=(user_id, txn_id, description),
+                daemon=True,
+            ).start()
     return redirect(url_for("budget", month=month))
+
+
+def _auto_categorize_transaction(user_id, txn_id, description):
+    """Background best-effort AI categorization for a just-saved transaction
+    (see add_transaction). Runs off the request thread so logging an expense
+    is never held up waiting on the Gemini API."""
+    try:
+        with db.get_conn() as conn:
+            cats = conn.execute(
+                "SELECT id, name FROM budget_categories WHERE user_id = ?", (user_id,)
+            ).fetchall()
+        if not cats:
+            return
+        guess, _err = ai.suggest_category(description, [c["name"] for c in cats])
+        if not guess:
+            return
+        category_id = next((c["id"] for c in cats if c["name"] == guess), None)
+        if category_id is None:
+            return
+        with db.get_conn() as conn:
+            # Only fill it in if the user hasn't already set one by hand in
+            # the meantime (e.g. edited it themselves before the AI replied).
+            conn.execute(
+                "UPDATE transactions SET category_id = ? WHERE id = ? AND user_id = ? AND category_id IS NULL",
+                (category_id, txn_id, user_id),
+            )
+    except Exception:
+        logger.exception("Background auto-categorization failed for transaction %s", txn_id)
 
 
 @app.route("/budget/transaction/<int:txn_id>/delete", methods=["POST"])
