@@ -774,7 +774,7 @@ def _build_csp(nonce: str) -> str:
     # style attribute with a class, which is separate follow-up work.
     return "; ".join([
         "default-src 'self'",
-        f"script-src 'self' https://cdnjs.cloudflare.com 'nonce-{nonce}'",
+        f"script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net 'nonce-{nonce}'",
         "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'",
         "font-src 'self' https://fonts.gstatic.com",
         _IMG_SRC,
