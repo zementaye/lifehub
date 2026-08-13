@@ -20,11 +20,13 @@
   <a href="{{ url_for('admin_dashboard') }}" class="admin-brand"><span class="dot"></span> LIFEHUB ADMIN</a>
 
   <div class="admin-nav-label">Console</div>
-  <nav class="admin-nav">
-    <a href="{{ url_for('admin_dashboard') }}" class="{{ 'active' if request.endpoint=='admin_dashboard' }}">📊 Overview</a>
-    <a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint=='admin_users' }}">🛡️ Users</a>
-    <a href="{{ url_for('admin_audit_log') }}" class="{{ 'active' if request.endpoint=='admin_audit_log' }}">📜 Audit log</a>
-  </nav>
+  <div class="admin-nav-scroll">
+    <nav class="admin-nav">
+      <a href="{{ url_for('admin_dashboard') }}" class="{{ 'active' if request.endpoint=='admin_dashboard' }}">📊 Overview</a>
+      <a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint=='admin_users' }}">🛡️ Users</a>
+      <a href="{{ url_for('admin_audit_log') }}" class="{{ 'active' if request.endpoint=='admin_audit_log' }}">📜 Audit log</a>
+    </nav>
+  </div>
 
   <!-- Small-viewport stand-in for .admin-sidebar-foot below, which the
        860px media query hides entirely (no room for it in the collapsed
