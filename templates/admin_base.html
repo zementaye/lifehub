@@ -26,6 +26,23 @@
     <a href="{{ url_for('admin_audit_log') }}" class="{{ 'active' if request.endpoint=='admin_audit_log' }}">📜 Audit log</a>
   </nav>
 
+  <!-- Small-viewport stand-in for .admin-sidebar-foot below, which the
+       860px media query hides entirely (no room for it in the collapsed
+       horizontal bar). Without this, the account email, "back to app"
+       link, and log-out button become completely unreachable on mobile.
+       <details>/<summary> gives an accessible, keyboard- and
+       screen-reader-operable disclosure with no JS required. -->
+  <details class="admin-mobile-account">
+    <summary aria-label="Account menu">{{ (user.email[:1] | upper) if user and user.email else '?' }}</summary>
+    <div class="admin-mobile-account-panel">
+      <div class="admin-user-email">{{ user.email if user }}</div>
+      <a href="{{ url_for('dashboard') }}">← Back to app</a>
+      <form method="post" action="{{ url_for('logout') }}" style="margin:0;">
+        <button type="submit">Log out</button>
+      </form>
+    </div>
+  </details>
+
   <div class="admin-sidebar-foot">
     <div class="admin-user-email">{{ user.email if user }}</div>
     <a href="{{ url_for('dashboard') }}">← Back to app</a>

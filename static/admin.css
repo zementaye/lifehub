@@ -138,6 +138,10 @@
 }
 .admin-chart-grid .card canvas { max-height: 260px; }
 
+/* Hidden on desktop — the full .admin-sidebar-foot already covers this.
+   Only shown (as a dropdown) once that footer gets collapsed away below. */
+.admin-mobile-account { display: none; }
+
 @media (max-width: 860px) {
   .admin-sidebar {
     position: static;
@@ -152,4 +156,72 @@
   .admin-sidebar-foot { display: none; }
   .admin-main { margin-left: 0; padding: 20px; }
   .admin-shell { flex-direction: column; }
+
+  /* Account menu: user email / back-to-app / log-out, reachable via a
+     small avatar button pinned to the end of the collapsed nav row. */
+  .admin-mobile-account {
+    display: block;
+    margin-left: auto;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .admin-mobile-account summary {
+    list-style: none;
+    cursor: pointer;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .admin-mobile-account summary::-webkit-details-marker { display: none; }
+  .admin-mobile-account summary::marker { content: ''; }
+  .admin-mobile-account[open] summary { background: var(--surface-raised); border-color: var(--danger); }
+  .admin-mobile-account-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 200px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+    z-index: 30;
+  }
+  .admin-mobile-account-panel .admin-user-email {
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--muted);
+    padding: 0 6px 6px;
+    border-bottom: 1px solid var(--border);
+    overflow-wrap: anywhere;
+  }
+  .admin-mobile-account-panel a,
+  .admin-mobile-account-panel button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 6px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-decoration: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+  .admin-mobile-account-panel a:hover,
+  .admin-mobile-account-panel button:hover { color: var(--ink); background: var(--surface); }
 }
