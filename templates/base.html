@@ -71,8 +71,8 @@
         Tasks <span class="caret">▾</span>
       </button>
       <div class="nav-group-menu">
-        <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}">Habits &amp; To-dos</a>
-        <a href="{{ url_for('reminders') }}" class="{{ 'active' if request.endpoint=='reminders' }}">Reminders</a>
+        <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}">Habits</a>
+        <a href="{{ url_for('reminders') }}" class="{{ 'active' if request.endpoint=='reminders' }}">To Do</a>
       </div>
     </div>
 
@@ -121,8 +121,8 @@
     <a href="{{ url_for('budget') }}" class="{{ 'active' if request.endpoint=='budget' }}">💰 Budget</a>
 
     <div class="sidebar-group-label">Tasks</div>
-    <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}">✅ Habits &amp; To-dos</a>
-    <a href="{{ url_for('reminders') }}" class="{{ 'active' if request.endpoint=='reminders' }}">🔔 Reminders</a>
+    <a href="{{ url_for('habits') }}" class="{{ 'active' if request.endpoint=='habits' }}">🔁 Habits</a>
+    <a href="{{ url_for('reminders') }}" class="{{ 'active' if request.endpoint=='reminders' }}">✅ To Do</a>
 
     <div class="sidebar-group-label">&nbsp;</div>
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">⚙ Settings</a>

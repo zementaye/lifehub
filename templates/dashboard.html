@@ -54,7 +54,7 @@
   </div>
 
   <div class="card">
-    <h3>Upcoming Reminders</h3>
+    <h3>Upcoming To-Dos</h3>
     {% if upcoming_reminders %}
       <ul class="plain-list">
         {% for r in upcoming_reminders %}
@@ -62,9 +62,9 @@
         {% endfor %}
       </ul>
     {% else %}
-      <p class="muted">No upcoming reminders.</p>
+      <p class="muted">Nothing due soon.</p>
     {% endif %}
-    <a class="link" href="{{ url_for('reminders') }}">Manage reminders →</a>
+    <a class="link" href="{{ url_for('reminders') }}">Manage to-dos →</a>
   </div>
 </div>
 {% endblock %}
