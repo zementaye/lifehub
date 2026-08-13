@@ -17,7 +17,7 @@
       <li>"remind me to renew my passport on October 3rd"</li>
       <li>"call the landlord about the leak"</li>
     </ul>
-    <form method="post" class="inline-form">
+    <form method="post" class="inline-form" data-loading-text="Thinking…">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <textarea name="text" rows="3" style="width:100%; resize:vertical;" placeholder="Type it however you'd say it..." required autofocus></textarea>
       <button type="submit">Add it</button>

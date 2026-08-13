@@ -11,7 +11,7 @@
       Answers using your budget, habits, reminders, nutrition, and weight
       data — nothing from Notes, Passwords, or the ID Vault is shared with it.
     </p>
-    <form method="post" class="inline-form">
+    <form method="post" class="inline-form" data-loading-text="Thinking…">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <textarea name="question" rows="2" style="width:100%; resize:vertical;" placeholder="e.g. how much have I spent on food this month?" required autofocus>{{ question or '' }}</textarea>
       <button type="submit">Ask</button>
