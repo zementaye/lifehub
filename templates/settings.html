@@ -143,7 +143,8 @@
     computer, an old device — this signs every session out except the one
     you're using right now.
   </p>
-  <form method="post" action="{{ url_for('logout_everywhere') }}" data-confirm="Log out on every other device/browser? This one stays logged in.">
+  <form method="post" action="{{ url_for('logout_everywhere') }}" data-confirm="Log out on every other device/browser? This one stays logged in."
+        data-confirm-ok="Log out everywhere" data-confirm-danger="false">
     <button type="submit" class="secondary">Log out everywhere else</button>
   </form>
 
@@ -158,7 +159,7 @@
       <button type="submit" class="secondary">Generate new backup codes</button>
     </form>
     <form method="post" action="{{ url_for('totp_disable') }}" class="inline-form" style="margin-top:10px;"
-          data-confirm="Turn off 2FA? Logging in will only need your password again.">
+          data-confirm="Turn off 2FA? Logging in will only need your password again." data-confirm-ok="Disable 2FA">
       <label>Password, to disable 2FA <input type="password" name="password" autocomplete="current-password" required></label>
       <button type="submit" class="confirm-modal-danger">Disable 2FA</button>
     </form>
@@ -178,7 +179,7 @@
     Consider downloading a backup above first.
   </p>
   <form method="post" action="{{ url_for('delete_own_account') }}" class="inline-form"
-        data-confirm="Permanently delete your account and all of its data? This can't be undone.">
+        data-confirm="Permanently delete your account and all of its data? This can't be undone." data-confirm-ok="Delete my account">
     <label>Password, to confirm <input type="password" name="password" autocomplete="current-password" required></label>
     <button type="submit" class="confirm-modal-danger">Delete my account</button>
   </form>

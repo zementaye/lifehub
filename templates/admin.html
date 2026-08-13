@@ -33,47 +33,33 @@
   </div>
 </div>
 
+<div id="chart-load-error" class="card chart-error-card" style="display:none; margin-top: var(--gap-section);">
+  <h3>Charts failed to load</h3>
+  <p class="muted">
+    The Chart.js library didn't load in this browser — the numbers above are still accurate, but the graphs below can't render. This is usually a blocked/failed request to the chart script (ad blocker, extension, or network filtering), not missing data. Check the browser console/network tab, or reload the page.
+  </p>
+</div>
+
 <div class="card wide" style="margin-top: var(--gap-section);">
   <h3>Growth — last 30 days</h3>
   <p class="muted">Daily signups (bars) against the running total (line).</p>
-  {% if stats.total_users > 0 %}
-    <canvas id="signupsChart" height="80"></canvas>
-  {% else %}
-    <p class="muted">No signups yet.</p>
-  {% endif %}
-</div>
-
-<div id="adminChartError" class="card wide" style="margin-top: var(--gap-section); display:none; border-color: var(--danger);">
-  <h3 style="color: var(--danger);">Charts failed to load</h3>
-  <p class="muted">The Chart.js library didn't load in this browser — the numbers above are still accurate, but the graphs below can't render. This is usually a blocked/failed request to the chart script (ad blocker, extension, or network filtering), not missing data. Check the browser console/network tab, or reload the page.</p>
+  <canvas id="signupsChart" height="80"></canvas>
 </div>
 
 <div class="admin-chart-grid">
   <div class="card">
     <h3>Verification status</h3>
-    {% if stats.total_users > 0 %}
-      <canvas id="verifiedChart"></canvas>
-    {% else %}
-      <p class="muted">No users yet.</p>
-    {% endif %}
+    <canvas id="verifiedChart"></canvas>
   </div>
 
   <div class="card">
     <h3>Role split</h3>
-    {% if stats.total_users > 0 %}
-      <canvas id="roleChart"></canvas>
-    {% else %}
-      <p class="muted">No users yet.</p>
-    {% endif %}
+    <canvas id="roleChart"></canvas>
   </div>
 
   <div class="card">
     <h3>Records by feature</h3>
-    {% if content_totals and (content_totals | sum(attribute='count')) > 0 %}
-      <canvas id="contentChart"></canvas>
-    {% else %}
-      <p class="muted">No records logged yet.</p>
-    {% endif %}
+    <canvas id="contentChart"></canvas>
   </div>
 
   <div class="card">
@@ -89,42 +75,33 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce() }}">
-// Chart.js is fetched from a CDN rather than bundled, so it needs a
-// network path to that CDN. cdnjs.cloudflare.com isn't reachable from
-// every network (some ISPs/regions have spotty routing to it) — so try
-// it first, and if that script never loads, fall back to jsDelivr before
-// giving up. Both hosts are allowed in the CSP script-src (see
-// _build_csp in app.py) so the fallback attempt itself isn't blocked.
-(function () {
-  const CDNS = [
-    'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js',
-    'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
-  ];
+// Defined before the Chart.js <script src> tag runs, so its onload/onerror
+// attributes (and the jsdelivr fallback below, if the first CDN is blocked)
+// always have something real to call — no risk of referencing a function
+// that hasn't been defined yet.
+window.__lifehubShowChartError = function () {
+  const el = document.getElementById('chart-load-error');
+  if (el) el.style.display = '';
+};
 
-  function tryLoad(i) {
-    if (i >= CDNS.length) {
-      const err = document.getElementById('adminChartError');
-      if (err) err.style.display = 'block';
-      return;
-    }
-    const s = document.createElement('script');
-    s.src = CDNS[i];
-    s.onload = () => { if (window.__renderAdminCharts) window.__renderAdminCharts(); };
-    s.onerror = () => tryLoad(i + 1);
-    document.head.appendChild(s);
-  }
-  tryLoad(0);
-})();
-</script>
-<script nonce="{{ csp_nonce() }}">
-window.__renderAdminCharts = function () {
-  // typeof-guard kept as a last-resort safety net in case this ever runs
-  // before Chart.js has actually finished evaluating.
-  if (typeof Chart === 'undefined') {
-    const err = document.getElementById('adminChartError');
-    if (err) err.style.display = 'block';
-    return;
-  }
+window.__lifehubChartCdnFailed = function () {
+  // cdnjs didn't load (ad blocker / extension / network filtering are the
+  // common causes) — try one alternate CDN before giving up and showing
+  // the error card.
+  const fallback = document.createElement('script');
+  fallback.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';
+  fallback.onload = window.__lifehubInitCharts;
+  fallback.onerror = window.__lifehubShowChartError;
+  document.head.appendChild(fallback);
+};
+
+// Builds every chart on the page. Called from the Chart.js script tag's
+// onload (normal case) or the jsdelivr fallback's onload above. Guarded so
+// it only ever runs once even if, somehow, both end up firing.
+window.__lifehubInitCharts = function () {
+  if (window.__lifehubChartsInitialized) return;
+  if (typeof Chart === 'undefined') { window.__lifehubShowChartError(); return; }
+  window.__lifehubChartsInitialized = true;
 
   const style = getComputedStyle(document.body);
   const v = (name) => style.getPropertyValue(name).trim();
@@ -137,20 +114,12 @@ window.__renderAdminCharts = function () {
 
   const alpha = (hex, pct) => hex + Math.round(pct * 2.55).toString(16).padStart(2, '0');
 
-  // Wrap each chart's setup independently so one bad canvas/dataset can't
-  // silently prevent the rest from drawing.
-  function safe(label, fn) {
-    try { fn(); } catch (e) { console.error('admin chart failed:', label, e); }
-  }
-
   // ── Growth: daily signups (bar) + cumulative total (line) ──
-  const signupsCanvas = document.getElementById('signupsChart');
-  if (signupsCanvas) safe('signups', () => {
   const signups = {{ signups | tojson }};
   let running = {{ stats.total_users - (signups | sum(attribute='count')) }};
   const cumulative = signups.map(d => { running += d.count; return running; });
 
-  new Chart(signupsCanvas, {
+  new Chart(document.getElementById('signupsChart'), {
     data: {
       labels: signups.map(d => d.day.slice(5)),
       datasets: [
@@ -188,12 +157,9 @@ window.__renderAdminCharts = function () {
       },
     },
   });
-  });
 
   // ── Verification status donut ──
-  const verifiedCanvas = document.getElementById('verifiedChart');
-  if (verifiedCanvas) safe('verified', () => {
-  new Chart(verifiedCanvas, {
+  new Chart(document.getElementById('verifiedChart'), {
     type: 'doughnut',
     data: {
       labels: ['Verified', 'Unverified'],
@@ -201,12 +167,9 @@ window.__renderAdminCharts = function () {
     },
     options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } } },
   });
-  });
 
   // ── Role split donut ──
-  const roleCanvas = document.getElementById('roleChart');
-  if (roleCanvas) safe('role', () => {
-  new Chart(roleCanvas, {
+  new Chart(document.getElementById('roleChart'), {
     type: 'doughnut',
     data: {
       labels: ['Admins', 'Regular users'],
@@ -214,14 +177,11 @@ window.__renderAdminCharts = function () {
     },
     options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } } },
   });
-  });
 
   // ── Records by feature (horizontal bar) ──
-  const contentCanvas = document.getElementById('contentChart');
-  if (contentCanvas) safe('content', () => {
   const content = {{ content_totals | tojson }};
   const palette = [accent, primary, success, violet, danger, muted, '#5FE0FF', '#FFB454', '#8FD14F'];
-  new Chart(contentCanvas, {
+  new Chart(document.getElementById('contentChart'), {
     type: 'bar',
     data: {
       labels: content.map(c => c.label),
@@ -236,11 +196,10 @@ window.__renderAdminCharts = function () {
       },
     },
   });
-  });
 
   // ── Most active users (horizontal bar) ──
   const topUsersCanvas = document.getElementById('topUsersChart');
-  if (topUsersCanvas) safe('topUsers', () => {
+  if (topUsersCanvas) {
     const topUsers = {{ top_users | tojson }};
     new Chart(topUsersCanvas, {
       type: 'bar',
@@ -257,7 +216,10 @@ window.__renderAdminCharts = function () {
         },
       },
     });
-  });
+  }
 };
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"
+        onload="window.__lifehubInitCharts()"
+        onerror="window.__lifehubChartCdnFailed()"></script>
 {% endblock %}

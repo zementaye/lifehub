@@ -38,7 +38,9 @@
             </form>
 
             <form method="post" action="{{ url_for('admin_toggle_admin', user_id=u.id) }}"
-                  data-confirm="{{ 'Remove admin from ' ~ u.email ~ '?' if u.is_admin else 'Make ' ~ u.email ~ ' an admin?' }}">
+                  data-confirm="{{ 'Remove admin from ' ~ u.email ~ '?' if u.is_admin else 'Make ' ~ u.email ~ ' an admin?' }}"
+                  data-confirm-ok="{{ 'Remove admin' if u.is_admin else 'Make admin' }}"
+                  data-confirm-danger="false">
               <button type="submit" class="secondary">
                 {{ 'Remove admin' if u.is_admin else 'Make admin' }}
               </button>
@@ -47,19 +49,22 @@
             {% if u.id != user.id %}
               {% if u.disabled_at %}
                 <form method="post" action="{{ url_for('admin_toggle_suspend', user_id=u.id) }}"
-                      data-confirm="Let {{ u.email }} log in again?">
+                      data-confirm="Let {{ u.email }} log in again?"
+                      data-confirm-ok="Unsuspend" data-confirm-danger="false">
                   <button type="submit" class="secondary">Unsuspend</button>
                 </form>
               {% else %}
                 <form method="post" action="{{ url_for('admin_toggle_suspend', user_id=u.id) }}"
-                      class="inline-form" data-confirm="Suspend {{ u.email }}? They won't be able to log in, but nothing is deleted.">
+                      class="inline-form" data-confirm="Suspend {{ u.email }}? They won't be able to log in, but nothing is deleted."
+                      data-confirm-ok="Suspend" data-confirm-danger="false">
                   <label>Reason <input type="text" name="reason" placeholder="optional, shown in the audit log"></label>
                   <button type="submit" class="secondary">Suspend</button>
                 </form>
               {% endif %}
 
               <form method="post" action="{{ url_for('admin_delete_user', user_id=u.id) }}"
-                    data-confirm="Permanently delete {{ u.email }} and all of their data? Consider Suspend instead if you're not sure.">
+                    data-confirm="Permanently delete {{ u.email }} and all of their data? Consider Suspend instead if you're not sure."
+                    data-confirm-ok="Delete user">
                 <button type="submit" class="confirm-modal-danger">Delete user</button>
               </form>
             {% endif %}
