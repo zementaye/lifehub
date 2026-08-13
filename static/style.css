@@ -892,8 +892,10 @@ button.btn-icon.btn-loading::after {
   backdrop-filter: blur(1px);
   z-index: 9999;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 14px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease;
@@ -909,6 +911,13 @@ button.btn-icon.btn-loading::after {
   border-top-color: var(--tab-color);
   border-radius: 50%;
   animation: btn-spin 0.7s linear infinite;
+}
+.page-loading-text {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink);
 }
 
 /* Shared confirm modal (delete/destructive actions) — see base.html + app.js */

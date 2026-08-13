@@ -478,7 +478,8 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
   const overlay = document.createElement('div');
   overlay.className = 'page-loading-overlay';
   overlay.setAttribute('aria-hidden', 'true');
-  overlay.innerHTML = '<div class="page-loading-spinner"></div>';
+  overlay.innerHTML = '<div class="page-loading-spinner"></div><div class="page-loading-text">Saving…</div>';
+  const textEl = overlay.querySelector('.page-loading-text');
 
   function mountOverlay() {
     if (!overlay.isConnected) document.body.appendChild(overlay);
@@ -505,6 +506,10 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
     document.querySelectorAll('form button').forEach((b) => {
       if (b.type !== 'button') b.disabled = true;
     });
+    // A form can override the overlay's wording via data-loading-text — the
+    // AI forms use this since a Gemini round-trip is a lot longer than a
+    // normal save and "Thinking…" sets that expectation better than "Saving…".
+    textEl.textContent = form.dataset.loadingText || 'Saving…';
     mountOverlay();
     overlay.classList.add('visible');
   });
