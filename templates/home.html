@@ -151,6 +151,17 @@
   }
   .reveal.in-view { opacity: 1; transform: translateY(0); }
 
+  /* style.css gives every .card a built-in "card-in" mount animation
+     (opacity/translateY, animation-fill-mode: both) that fires the
+     instant the page paints, independent of scroll position. CSS
+     animations take priority over transitions on the same property, so
+     that mount animation was overriding .feature-card's scroll-triggered
+     opacity transition below — every card was fully visible within
+     ~0.45s of load, long before you ever scrolled to it, making the
+     scroll-reveal invisible in practice. Disabling it here (scoped to
+     just this page) lets the scroll-triggered transition actually run. */
+  body.landing-page .card { animation: none; }
+
   .feature-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px;
   }
@@ -339,21 +350,35 @@
   (function () {
     var cards = document.querySelectorAll('.feature-card');
     var reveals = document.querySelectorAll('.reveal');
+    var grid = document.querySelector('.feature-grid');
     if (!cards.length && !reveals.length) return;
     if (!('IntersectionObserver' in window)) {
       cards.forEach(function (c) { c.classList.add('in-view'); });
       reveals.forEach(function (r) { r.classList.add('in-view'); });
       return;
     }
-    var cardObserver = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry, i) {
-        if (entry.isIntersecting) {
-          setTimeout(function () { entry.target.classList.add('in-view'); }, i * 70);
-          cardObserver.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.15 });
-    cards.forEach(function (c) { cardObserver.observe(c); });
+
+    // Watching each card individually meant most of them were already
+    // 15% visible (and so already faded in) the instant the section
+    // scrolled into view on a typical laptop-height screen — only the
+    // last, lowest card genuinely started off-screen, so it was the only
+    // one anyone actually saw animate. Watching the grid as a whole and
+    // staggering every card together the moment the grid starts entering
+    // view fixes that: all 7 now visibly animate as a group, regardless
+    // of how many happened to already be in the viewport.
+    if (grid && cards.length) {
+      var gridObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            cards.forEach(function (c, i) {
+              setTimeout(function () { c.classList.add('in-view'); }, i * 70);
+            });
+            gridObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1 });
+      gridObserver.observe(grid);
+    }
 
     var revealObserver = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
