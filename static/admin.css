@@ -138,6 +138,20 @@
 }
 .admin-chart-grid .card canvas { max-height: 260px; }
 
+/* .card has overflow:hidden sitewide (style.css, for its decorative
+   corner-bracket/scan-line effect), so a table sitting directly inside a
+   card can't scroll horizontally when it's wider than the viewport — it
+   just gets sliced off at the card's edge instead. This inner wrapper
+   gives the table its own scroll box, leaving the card's overflow alone. */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+/* Let the table size to its content and overflow the scroll box, rather
+   than squeezing to 100% of a narrow viewport (which is what was making
+   dates wrap to two lines and other columns crush together). */
+.table-scroll .table { width: max-content; min-width: 100%; }
+
 /* Hidden on desktop — the full .admin-sidebar-foot already covers this.
    Only shown (as a dropdown) once that footer gets collapsed away below. */
 .admin-mobile-account { display: none; }
@@ -148,9 +162,17 @@
     width: auto;
     flex-direction: row;
     align-items: center;
-    overflow-x: auto;
     padding: 12px;
   }
+  /* Horizontal scroll lives here, NOT on .admin-sidebar itself. Setting
+     overflow-x on the sidebar bar forces the browser to also clip
+     overflow-y (per spec, an axis can't stay "visible" once the other
+     axis is non-visible) — that turned the whole bar into its own scroll
+     container and trapped the account dropdown inside it, stuck up near
+     the top and unreachable. Scoping the scroll to just the nav links
+     keeps the sidebar bar itself unclipped so the dropdown can render
+     normally below it. */
+  .admin-nav-scroll { overflow-x: auto; min-width: 0; }
   .admin-nav { display: flex; flex-direction: row; gap: 4px; }
   .admin-nav-label { display: none; }
   .admin-sidebar-foot { display: none; }
