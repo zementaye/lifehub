@@ -141,6 +141,16 @@
   .landing-section .section-sub {
     text-align: center; color: var(--muted); max-width: 480px; margin: 0 auto 46px; font-size: 0.95rem;
   }
+
+  /* Generic scroll-reveal, used on the section heading/subtext and the
+     CTA band. .feature-card below has its own copy of this (plus a
+     per-card stagger), so it isn't switched over to this shared class. */
+  .reveal {
+    opacity: 0; transform: translateY(24px);
+    transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1);
+  }
+  .reveal.in-view { opacity: 1; transform: translateY(0); }
+
   .feature-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px;
   }
@@ -189,6 +199,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .hero-blob, .orbit-icon, .hero-eyebrow .dot { animation: none !important; }
+    .feature-card, .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   }
 </style>
 </head>
@@ -251,8 +262,8 @@
 </section>
 
 <section class="landing-section">
-  <h2>Everything, in one place</h2>
-  <p class="section-sub">Seven small tools that together cover the whole day — swap the sticky notes, spreadsheets, and five other apps for one.</p>
+  <h2 class="reveal">Everything, in one place</h2>
+  <p class="section-sub reveal">Seven small tools that together cover the whole day — swap the sticky notes, spreadsheets, and five other apps for one.</p>
   <div class="feature-grid">
     <div class="card feature-card">
       <div class="f-icon">🔥</div>
@@ -292,7 +303,7 @@
   </div>
 </section>
 
-<section class="cta-band landing-section">
+<section class="cta-band landing-section reveal">
   {% if g.user_id %}
     <h2>Welcome back.</h2>
     <p>Pick up right where you left off.</p>
@@ -324,23 +335,35 @@
     }
   })();
 
-  // Scroll-reveal for feature cards.
+  // Scroll-reveal for feature cards, section headings, and the CTA band.
   (function () {
     var cards = document.querySelectorAll('.feature-card');
-    if (!cards.length) return;
+    var reveals = document.querySelectorAll('.reveal');
+    if (!cards.length && !reveals.length) return;
     if (!('IntersectionObserver' in window)) {
       cards.forEach(function (c) { c.classList.add('in-view'); });
+      reveals.forEach(function (r) { r.classList.add('in-view'); });
       return;
     }
-    var observer = new IntersectionObserver(function (entries) {
+    var cardObserver = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry, i) {
         if (entry.isIntersecting) {
           setTimeout(function () { entry.target.classList.add('in-view'); }, i * 70);
-          observer.unobserve(entry.target);
+          cardObserver.unobserve(entry.target);
         }
       });
     }, { threshold: 0.15 });
-    cards.forEach(function (c) { observer.observe(c); });
+    cards.forEach(function (c) { cardObserver.observe(c); });
+
+    var revealObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15 });
+    reveals.forEach(function (r) { revealObserver.observe(r); });
   })();
 </script>
 </body>
