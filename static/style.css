@@ -210,7 +210,20 @@ body.page-reminders  { --tab-color: var(--danger); }
 body.page-habits.page-reminders { --tab-color: var(--danger); }
 body.page-settings   { --tab-color: var(--muted); }
 
-.admin-user-actions { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; padding: 10px 0; }
+.admin-user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  padding: 10px 0;
+  /* The table now sizes to its natural (max-content) width so data rows
+     can scroll horizontally on phones instead of being clipped. This
+     colspan="7" panel inherited that same unconstrained width, so it had
+     enough room to lay all its buttons out on one long line instead of
+     wrapping like before. Capping its width restores the compact,
+     wrapped layout regardless of how wide the table itself ends up. */
+  max-width: 820px;
+}
 .admin-edit-row td { background: var(--surface-raised); border-radius: var(--radius); }
 
 h1, h2, h3, h4 {
