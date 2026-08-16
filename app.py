@@ -846,6 +846,17 @@ def security_headers(resp):
     resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     resp.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
     resp.headers["Content-Security-Policy"] = _build_csp(g.get("csp_nonce", ""))
+    # Authenticated HTML pages must never be served from the browser's
+    # back/forward cache or disk cache. Without this, hitting Back after
+    # navigating away from /admin/* (or after logging out) can restore a
+    # previously rendered page straight from cache — no new request ever
+    # reaches the server, so admin_required's re-authentication check
+    # (see its docstring) never gets a chance to run. no-store is what
+    # actually opts a page out of bfcache in every major browser;
+    # no-cache/must-revalidate alone isn't enough to prevent bfcache.
+    if g.get("user_id") and resp.content_type and resp.content_type.startswith("text/html"):
+        resp.headers["Cache-Control"] = "no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
     if config.IS_PRODUCTION:
         # Only sent over HTTPS deployments (matches SESSION_COOKIE_SECURE
         # below) — meaningless, and potentially locks out local http://
