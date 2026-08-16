@@ -1439,6 +1439,28 @@ def vault_delete(doc_id):
 
 # ── Reminders ────────────────────────────────────────────────────────────
 
+_REMINDERS_SECTIONS = ("new", "due", "nodue")
+
+
+def _reminders_section_order(user_id: int) -> list[str]:
+    """The user's saved display order for the three blocks on the To Do
+    page (add-form / with-a-due-date / no-due-date). Stored as a JSON list
+    under the existing per-user settings table — falls back to the
+    original top-to-bottom order for anyone who hasn't customized it, and
+    silently repairs anything that doesn't look like a valid permutation
+    of the three known section keys (a stale value, tampering, etc.)."""
+    import json
+    raw = db.get_setting(user_id, "reminders_section_order")
+    if raw:
+        try:
+            order = json.loads(raw)
+            if isinstance(order, list) and sorted(order) == sorted(_REMINDERS_SECTIONS):
+                return order
+        except (ValueError, TypeError):
+            pass
+    return list(_REMINDERS_SECTIONS)
+
+
 @app.route("/reminders")
 @login_required
 def reminders():
@@ -1451,7 +1473,26 @@ def reminders():
         todos = conn.execute(
             "SELECT * FROM todos WHERE user_id = ? ORDER BY done, created_at DESC", (user_id,)
         ).fetchall()
-    return render_template("reminders.html", reminders=items, todos=todos)
+    return render_template(
+        "reminders.html", reminders=items, todos=todos,
+        section_order=_reminders_section_order(user_id),
+    )
+
+
+@app.route("/reminders/section-order", methods=["POST"])
+@login_required
+def set_reminders_section_order():
+    """Persists a drag/button reorder of the To Do page's three blocks.
+    Body is JSON: {"order": ["due", "nodue", "new"]}. Silently ignores
+    (204, no error) anything that isn't exactly a permutation of the
+    three known section keys, rather than erroring — a stale client
+    sending an old section set shouldn't be able to corrupt this."""
+    import json
+    data = request.get_json(silent=True) or {}
+    order = data.get("order")
+    if isinstance(order, list) and sorted(order) == sorted(_REMINDERS_SECTIONS):
+        db.set_setting(g.user_id, "reminders_section_order", json.dumps(order))
+    return ("", 204)
 
 
 @app.route("/reminders", methods=["POST"])
