@@ -1596,3 +1596,16 @@ a.btn-secondary:hover {
 @keyframes orbit-spin { to { transform: rotate(360deg); } }
 .orbit-cap { text-align: center; font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); margin-top: 6px; letter-spacing: 0.06em; }
 .orbit-cap b { color: var(--ink); font-weight: 600; }
+
+/* ── Reorderable To Do page sections ─────────────────────────────────── */
+/* Small up/down control shown at the top-right of each of the three To Do
+   blocks (add-form / with-a-due-date / no-due-date), letting a user put
+   them in whatever order suits them. Deliberately buttons rather than
+   drag-and-drop: no extra library, works the same with mouse, keyboard,
+   or touch, and there are only three items so drag adds complexity
+   without much upside. Order is saved server-side per user (see
+   set_reminders_section_order in app.py), so it persists across devices. */
+.reorder-bar { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+.reorder-buttons { display: flex; gap: 4px; }
+.reorder-section:first-child .reorder-up,
+.reorder-section:last-child .reorder-down { visibility: hidden; }
