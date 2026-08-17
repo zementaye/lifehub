@@ -1,0 +1,13 @@
+{# Shared Jinja macros. Currently just the reorder-section button bar, used
+   by every page with reorderable top-level sections (see
+   static/app.js:LifehubReorder and app.py:_REORDERABLE_PAGES /
+   _section_order). Pulled into its own file rather than copy-pasted into
+   each page template so the markup only needs to change in one place. #}
+{% macro reorder_bar() -%}
+<div class="reorder-bar">
+  <div class="reorder-buttons">
+    <button type="button" class="btn-icon reorder-up" title="Move up">⬆️</button>
+    <button type="button" class="btn-icon reorder-down" title="Move down">⬇️</button>
+  </div>
+</div>
+{%- endmacro %}
