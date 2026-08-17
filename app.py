@@ -1519,6 +1519,116 @@ def delete_reminder(reminder_id):
     return redirect(url_for("reminders"))
 
 
+# ── Calendar ─────────────────────────────────────────────────────────────
+# A month-grid view pulling together everything that has (or can be given)
+# a date: reminders on their due date, no-due-date todos on the day they
+# were added, and vault documents as a pair of markers — the day they were
+# added to the vault, and the day they expire. Nothing new is stored here;
+# it's a read-only lens over reminders/todos/documents.
+
+@app.route("/calendar")
+@login_required
+def calendar_view():
+    import calendar as calendar_mod
+
+    user_id = g.user_id
+    tz = scheduler.get_tz(user_id)
+    today = scheduler.today_local(user_id)
+
+    month_param = request.args.get("month")
+    first_of_month = None
+    if month_param:
+        try:
+            y, mo = month_param.split("-")
+            first_of_month = date(int(y), int(mo), 1)
+        except (ValueError, TypeError):
+            first_of_month = None
+    if first_of_month is None:
+        first_of_month = date(today.year, today.month, 1)
+
+    year, month = first_of_month.year, first_of_month.month
+    days_in_month = calendar_mod.monthrange(year, month)[1]
+    last_of_month = date(year, month, days_in_month)
+    prev_month = (first_of_month - timedelta(days=1)).replace(day=1)
+    next_month = last_of_month + timedelta(days=1)
+
+    events_by_day = {d: [] for d in range(1, days_in_month + 1)}
+
+    with db.get_conn() as conn:
+        due_reminders = conn.execute(
+            "SELECT title, next_due, recurrence, active FROM reminders "
+            "WHERE user_id = ? AND next_due BETWEEN ? AND ?",
+            (user_id, first_of_month.isoformat(), last_of_month.isoformat()),
+        ).fetchall()
+        todo_rows = conn.execute(
+            "SELECT title, created_at, done FROM todos WHERE user_id = ?", (user_id,)
+        ).fetchall()
+        doc_rows = conn.execute(
+            "SELECT label, expiry_date, created_at FROM documents WHERE user_id = ?", (user_id,)
+        ).fetchall()
+
+    for r in due_reminders:
+        d = date.fromisoformat(r["next_due"])
+        events_by_day[d.day].append({
+            "type": "reminder",
+            "state": "active" if r["active"] else "paused",
+            "title": r["title"],
+            "sublabel": "due" if r["recurrence"] == "once" else f"due · repeats {r['recurrence']}",
+        })
+
+    for t in todo_rows:
+        d = datetime.fromtimestamp(t["created_at"], tz=tz).date()
+        if d.year == year and d.month == month:
+            events_by_day[d.day].append({
+                "type": "todo",
+                "state": "done" if t["done"] else "open",
+                "title": t["title"],
+                "sublabel": "added",
+            })
+
+    for doc in doc_rows:
+        added = datetime.fromtimestamp(doc["created_at"], tz=tz).date()
+        if added.year == year and added.month == month:
+            events_by_day[added.day].append({
+                "type": "doc",
+                "state": "added",
+                "title": doc["label"],
+                "sublabel": "added to vault",
+            })
+        if doc["expiry_date"]:
+            try:
+                exp = date.fromisoformat(doc["expiry_date"])
+            except ValueError:
+                exp = None
+            if exp and exp.year == year and exp.month == month:
+                days_left = (exp - today).days
+                state = "overdue" if days_left < 0 else ("soon" if days_left <= 30 else "ok")
+                events_by_day[exp.day].append({
+                    "type": "doc",
+                    "state": state,
+                    "title": doc["label"],
+                    "sublabel": "expires",
+                })
+
+    leading_blanks = first_of_month.weekday()  # Monday = 0, matches the rest of the app
+    cells = [None] * leading_blanks + list(range(1, days_in_month + 1))
+    while len(cells) % 7 != 0:
+        cells.append(None)
+    weeks = [cells[i:i + 7] for i in range(0, len(cells), 7)]
+
+    return render_template(
+        "calendar.html",
+        weeks=weeks,
+        events_by_day=events_by_day,
+        month_label=first_of_month.strftime("%B %Y"),
+        today=today,
+        is_current_month=(year == today.year and month == today.month),
+        prev_month=prev_month.strftime("%Y-%m"),
+        next_month=next_month.strftime("%Y-%m"),
+        this_month=today.strftime("%Y-%m"),
+    )
+
+
 # ── Habits ───────────────────────────────────────────────────────────────
 
 @app.route("/habits")

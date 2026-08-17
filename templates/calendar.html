@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Calendar — Life Hub{% endblock %}
+{% block content %}
+<h1>Calendar</h1>
+
+<div class="card wide calendar-card">
+  <div class="calendar-toolbar">
+    <div class="calendar-nav">
+      <a class="btn-icon" href="{{ url_for('calendar_view', month=prev_month) }}" title="Previous month" aria-label="Previous month">
+        <svg viewBox="0 0 20 20" width="16" height="16"><path d="M12 4l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <h3 class="calendar-month-label">{{ month_label }}</h3>
+      <a class="btn-icon" href="{{ url_for('calendar_view', month=next_month) }}" title="Next month" aria-label="Next month">
+        <svg viewBox="0 0 20 20" width="16" height="16"><path d="M8 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+    {% if not is_current_month %}
+      <a class="btn-icon calendar-today-btn" href="{{ url_for('calendar_view', month=this_month) }}">Today</a>
+    {% endif %}
+  </div>
+
+  <div class="calendar-grid calendar-weekdays">
+    <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+  </div>
+
+  <div class="calendar-grid calendar-days">
+    {% for week in weeks %}
+      {% for day in week %}
+        {% if day is none %}
+          <div class="calendar-cell calendar-cell-empty"></div>
+        {% else %}
+          {% set day_events = events_by_day[day] %}
+          <div class="calendar-cell {{ 'calendar-cell-today' if is_current_month and day == today.day }}">
+            <span class="calendar-day-num">{{ day }}</span>
+            {% if day_events %}
+              <div class="calendar-events">
+                {% for ev in day_events[:3] %}
+                  <a class="calendar-evt calendar-evt-{{ ev.type }}-{{ ev.state }}"
+                     href="{{ url_for('vault') if ev.type == 'doc' else url_for('reminders') }}"
+                     title="{{ ev.title }} — {{ ev.sublabel }}">
+                    <span class="calendar-evt-icon">
+                      {%- if ev.type == 'reminder' -%}📌
+                      {%- elif ev.type == 'todo' -%}{{ '✅' if ev.state == 'done' else '🔲' }}
+                      {%- elif ev.state == 'added' -%}📄
+                      {%- elif ev.state == 'overdue' -%}⛔
+                      {%- elif ev.state == 'soon' -%}⚠️
+                      {%- else -%}📄
+                      {%- endif -%}
+                    </span>
+                    <span class="calendar-evt-text">{{ ev.title }}</span>
+                  </a>
+                {% endfor %}
+                {% if day_events | length > 3 %}
+                  <span class="calendar-evt-more">+{{ day_events | length - 3 }} more</span>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  </div>
+
+  <div class="calendar-legend">
+    <span><span class="calendar-dot calendar-evt-reminder-active"></span> Due to-do</span>
+    <span><span class="calendar-dot calendar-evt-todo-open"></span> Added to-do</span>
+    <span><span class="calendar-dot calendar-evt-doc-added"></span> Added to vault</span>
+    <span><span class="calendar-dot calendar-evt-doc-soon"></span> Expiring soon</span>
+    <span><span class="calendar-dot calendar-evt-doc-overdue"></span> Expired</span>
+  </div>
+</div>
+{% endblock %}
