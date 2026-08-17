@@ -1604,7 +1604,9 @@ a.btn-secondary:hover {
    drag-and-drop: no extra library, works the same with mouse, keyboard,
    or touch, and there are only three items so drag adds complexity
    without much upside. Order is saved server-side per user (see
-   set_reminders_section_order in app.py), so it persists across devices. */
+   set_section_order in app.py), so it persists across devices. Now used
+   by every reorderable page, not just this one — see
+   window.LifehubReorder in app.js and _REORDERABLE_PAGES in app.py. */
 .reorder-bar { display: flex; justify-content: flex-end; margin-bottom: 4px; }
 .reorder-buttons { display: flex; gap: 4px; }
 .reorder-section:first-child .reorder-up,

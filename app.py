@@ -991,6 +991,7 @@ def dashboard():
         bmi_category_slug=bmi_category_slug(bmi) if bmi else None,
         upcoming_reminders=upcoming_reminders, habit_status=habit_status,
         totals=totals,
+        section_order=_section_order(user_id, "dashboard"),
     )
 
 
@@ -1019,6 +1020,7 @@ def health():
         bmi_category_slug=bmi_category_slug(bmi) if bmi else None,
         today=date.today().isoformat(),
         sparkline_svg=weight_sparkline_svg(weights),
+        section_order=_section_order(user_id, "health"),
     )
 
 
@@ -1142,7 +1144,8 @@ def nutrition():
     }
 
     return render_template("nutrition.html", totals=totals, meal_summary=meal_summary,
-                            view_date=d, goals=goals, recommendation=recommendation)
+                            view_date=d, goals=goals, recommendation=recommendation,
+                            section_order=_section_order(user_id, "nutrition"))
 
 
 MEAL_LABELS = {"breakfast": "🍳 Breakfast", "lunch": "🥗 Lunch", "dinner": "🍽️ Dinner", "snack": "🍎 Snack"}
@@ -1170,7 +1173,8 @@ def nutrition_meal(meal):
             totals[k] += f[k] * f["servings"]
 
     return render_template("nutrition_meal.html", meal=meal, meal_label=MEAL_LABELS[meal],
-                            entries=entries, custom_foods=custom_foods, totals=totals, view_date=d)
+                            entries=entries, custom_foods=custom_foods, totals=totals, view_date=d,
+                            section_order=_section_order(user_id, "nutrition_meal"))
 
 
 @app.route("/nutrition/search")
@@ -1439,26 +1443,59 @@ def vault_delete(doc_id):
 
 # ── Reminders ────────────────────────────────────────────────────────────
 
-_REMINDERS_SECTIONS = ("new", "due", "nodue")
+_REORDERABLE_PAGES = {
+    "reminders": ("new", "due", "nodue"),
+    "dashboard": ("body", "nutrition", "habits", "focus", "todos"),
+    "budget": ("monthly", "yearly", "log", "category", "spend", "recurring", "savings", "transactions", "yearly_detail"),
+    "habits": ("new", "daily", "weekly", "monthly"),
+    "health": ("profile", "log_weight", "log_session", "weight_trend", "weight_history", "session_history"),
+    "nutrition": ("totals", "recommended", "log_meal"),
+    "nutrition_meal": ("search", "custom", "entries"),
+    "settings": ("appearance", "notifications", "backup", "nutrition_goals", "general"),
+}
 
 
-def _reminders_section_order(user_id: int) -> list[str]:
-    """The user's saved display order for the three blocks on the To Do
-    page (add-form / with-a-due-date / no-due-date). Stored as a JSON list
-    under the existing per-user settings table — falls back to the
-    original top-to-bottom order for anyone who hasn't customized it, and
-    silently repairs anything that doesn't look like a valid permutation
-    of the three known section keys (a stale value, tampering, etc.)."""
+def _section_order(user_id: int, page: str) -> list[str]:
+    """The user's saved display order for a page's reorderable top-level
+    blocks (see _REORDERABLE_PAGES for the fixed set of keys each page
+    supports). Stored as a JSON list under the existing per-user settings
+    table, one row per page. Falls back to that page's original
+    top-to-bottom order for anyone who hasn't customized it, and silently
+    repairs anything that doesn't look like a valid permutation of the
+    page's known section keys (a stale value from before a page's
+    sections changed, tampering, etc.) rather than erroring."""
     import json
-    raw = db.get_setting(user_id, "reminders_section_order")
+    known = _REORDERABLE_PAGES.get(page)
+    if not known:
+        return []
+    raw = db.get_setting(user_id, f"section_order:{page}")
     if raw:
         try:
             order = json.loads(raw)
-            if isinstance(order, list) and sorted(order) == sorted(_REMINDERS_SECTIONS):
+            if isinstance(order, list) and sorted(order) == sorted(known):
                 return order
         except (ValueError, TypeError):
             pass
-    return list(_REMINDERS_SECTIONS)
+    return list(known)
+
+
+@app.route("/section-order/<page>", methods=["POST"])
+@login_required
+def set_section_order(page):
+    """Persists a button reorder of one page's top-level blocks (see
+    _REORDERABLE_PAGES). Body is JSON: {"order": ["due", "nodue", "new"]}.
+    Silently ignores (204, no error) an unknown page or anything that
+    isn't exactly a permutation of that page's known section keys — a
+    stale client sending an old section set shouldn't be able to corrupt
+    this, and there's nothing actionable for the user to fix here."""
+    import json
+    known = _REORDERABLE_PAGES.get(page)
+    if known:
+        data = request.get_json(silent=True) or {}
+        order = data.get("order")
+        if isinstance(order, list) and sorted(order) == sorted(known):
+            db.set_setting(g.user_id, f"section_order:{page}", json.dumps(order))
+    return ("", 204)
 
 
 @app.route("/reminders")
@@ -1475,24 +1512,8 @@ def reminders():
         ).fetchall()
     return render_template(
         "reminders.html", reminders=items, todos=todos,
-        section_order=_reminders_section_order(user_id),
+        section_order=_section_order(user_id, "reminders"),
     )
-
-
-@app.route("/reminders/section-order", methods=["POST"])
-@login_required
-def set_reminders_section_order():
-    """Persists a drag/button reorder of the To Do page's three blocks.
-    Body is JSON: {"order": ["due", "nodue", "new"]}. Silently ignores
-    (204, no error) anything that isn't exactly a permutation of the
-    three known section keys, rather than erroring — a stale client
-    sending an old section set shouldn't be able to corrupt this."""
-    import json
-    data = request.get_json(silent=True) or {}
-    order = data.get("order")
-    if isinstance(order, list) and sorted(order) == sorted(_REMINDERS_SECTIONS):
-        db.set_setting(g.user_id, "reminders_section_order", json.dumps(order))
-    return ("", 204)
 
 
 @app.route("/reminders", methods=["POST"])
@@ -1578,7 +1599,7 @@ def habits():
         s = status_by_id[h["id"]]
         status.append({"habit": h, "done": s["done"], "period_key": pkey, "streak": s["streak"]})
 
-    return render_template("habits.html", status=status)
+    return render_template("habits.html", status=status, section_order=_section_order(user_id, "habits"))
 
 
 @app.route("/habits", methods=["POST"])
@@ -1879,6 +1900,7 @@ def budget():
         yearly_income_total=yearly_income_total, yearly_expense_total=yearly_expense_total,
         yearly_net=yearly_income_total - yearly_expense_total,
         yearly_category_totals=yearly_category_totals,
+        section_order=_section_order(user_id, "budget"),
     )
 
 
@@ -2598,6 +2620,7 @@ def settings():
         "settings.html",
         values=values,
         tg_bot_configured=bool(config.TG_BOT_TOKEN),
+        section_order=_section_order(user_id, "settings"),
     )
 
 

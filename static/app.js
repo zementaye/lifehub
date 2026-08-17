@@ -586,3 +586,60 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
     });
   });
 })();
+
+// ── Reorderable page sections ───────────────────────────────────────────
+// Shared by every page that lets a user reorder its top-level blocks
+// (Dashboard, Budget, Habits, Health, Nutrition, Settings, To Do, ...).
+// Each such page renders its sections inside a wrapper element, each
+// direct child tagged class="reorder-section" data-section="<key>", and
+// calls LifehubReorder.init(wrapperId, pageKey, initialOrder) once from a
+// small nonce'd inline <script> (the actual reorder/save logic lives here
+// so it's loaded once, not duplicated per page). initialOrder is the
+// server-computed order (see _section_order in app.py) — applied here by
+// physically re-appending elements in that order, which keeps the Jinja
+// template itself straightforward (always renders sections in their
+// natural/default order) while still respecting what the user saved.
+window.LifehubReorder = {
+  init: function (wrapperId, pageKey, initialOrder) {
+    const wrap = document.getElementById(wrapperId);
+    if (!wrap) return;
+
+    (initialOrder || []).forEach(function (key) {
+      const el = wrap.querySelector('.reorder-section[data-section="' + key + '"]');
+      if (el) wrap.appendChild(el);
+    });
+
+    function currentOrder() {
+      return Array.prototype.map.call(
+        wrap.querySelectorAll('.reorder-section'),
+        function (el) { return el.getAttribute('data-section'); }
+      );
+    }
+
+    function saveOrder() {
+      fetch('/section-order/' + encodeURIComponent(pageKey), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': window.LIFEHUB_CSRF_TOKEN || '',
+        },
+        body: JSON.stringify({ order: currentOrder() }),
+      }).catch(function () { /* best-effort — worst case it re-saves next click */ });
+    }
+
+    wrap.addEventListener('click', function (e) {
+      const btn = e.target.closest('.reorder-up, .reorder-down');
+      if (!btn) return;
+      const section = btn.closest('.reorder-section');
+      if (!section) return;
+      if (btn.classList.contains('reorder-up')) {
+        const prev = section.previousElementSibling;
+        if (prev) wrap.insertBefore(section, prev);
+      } else {
+        const next = section.nextElementSibling;
+        if (next) wrap.insertBefore(next, section);
+      }
+      saveOrder();
+    });
+  },
+};

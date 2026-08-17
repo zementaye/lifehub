@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_macros.html" as m %}
 {% block title %}To Do — Life Hub{% endblock %}
 {% block content %}
 <h1>To Do</h1>
@@ -6,12 +7,7 @@
 <div id="reminders-sections">
 
 <div class="card reorder-section" data-section="new">
-  <div class="reorder-bar">
-    <div class="reorder-buttons">
-      <button type="button" class="btn-icon reorder-up" title="Move up">⬆️</button>
-      <button type="button" class="btn-icon reorder-down" title="Move down">⬇️</button>
-    </div>
-  </div>
+  {{ m.reorder_bar() }}
   <h3>New To-Do</h3>
   <p class="muted">Give it a due date if it should come back and nudge you (once, monthly, or yearly) — leave it blank for a simple one-off task.</p>
   <form method="post" action="{{ url_for('add_reminder') }}" class="inline-form">
@@ -30,12 +26,7 @@
 
 <div class="grid reorder-section" data-section="due">
   <div class="card wide">
-    <div class="reorder-bar">
-      <div class="reorder-buttons">
-        <button type="button" class="btn-icon reorder-up" title="Move up">⬆️</button>
-        <button type="button" class="btn-icon reorder-down" title="Move down">⬇️</button>
-      </div>
-    </div>
+    {{ m.reorder_bar() }}
     <h3>With a due date</h3>
     {% if reminders %}
       <table class="table">
@@ -75,12 +66,7 @@
 
 <div class="grid reorder-section" data-section="nodue">
   <div class="card wide">
-    <div class="reorder-bar">
-      <div class="reorder-buttons">
-        <button type="button" class="btn-icon reorder-up" title="Move up">⬆️</button>
-        <button type="button" class="btn-icon reorder-down" title="Move down">⬇️</button>
-      </div>
-    </div>
+    {{ m.reorder_bar() }}
     <h3>No due date</h3>
     {% if todos %}
       <ul class="checklist interactive">
@@ -106,52 +92,6 @@
 </div>
 
 <script nonce="{{ csp_nonce() }}">
-(function () {
-  var wrap = document.getElementById('reminders-sections');
-  if (!wrap) return;
-
-  // Apply the server-rendered order (data-order, a JSON array of section
-  // keys) by physically reordering the section elements in the DOM —
-  // simplest way to keep template markup straightforward while still
-  // letting Python own the canonical order/validation.
-  var order = {{ section_order | tojson }};
-  order.forEach(function (key) {
-    var el = wrap.querySelector('[data-section="' + key + '"]');
-    if (el) wrap.appendChild(el);
-  });
-
-  function currentOrder() {
-    return Array.prototype.map.call(
-      wrap.querySelectorAll('.reorder-section'),
-      function (el) { return el.getAttribute('data-section'); }
-    );
-  }
-
-  function saveOrder() {
-    fetch('{{ url_for("set_reminders_section_order") }}', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': window.LIFEHUB_CSRF_TOKEN || '',
-      },
-      body: JSON.stringify({ order: currentOrder() }),
-    }).catch(function () { /* best-effort — worst case it re-saves next click */ });
-  }
-
-  wrap.addEventListener('click', function (e) {
-    var btn = e.target.closest('.reorder-up, .reorder-down');
-    if (!btn) return;
-    var section = btn.closest('.reorder-section');
-    if (!section) return;
-    if (btn.classList.contains('reorder-up')) {
-      var prev = section.previousElementSibling;
-      if (prev) wrap.insertBefore(section, prev);
-    } else {
-      var next = section.nextElementSibling;
-      if (next) wrap.insertBefore(next, section);
-    }
-    saveOrder();
-  });
-})();
+window.LifehubReorder.init('reminders-sections', 'reminders', {{ section_order | tojson }});
 </script>
 {% endblock %}

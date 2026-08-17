@@ -1,9 +1,13 @@
 {% extends "base.html" %}
+{% import "_macros.html" as m %}
 {% block title %}Habits — Life Hub{% endblock %}
 {% block content %}
 <h1>Habits</h1>
 
-<div class="card">
+<div id="habits-sections">
+
+<div class="card reorder-section" data-section="new">
+  {{ m.reorder_bar() }}
   <h3>New Habit</h3>
   <form method="post" action="{{ url_for('add_habit') }}" class="inline-form">
     <label>Title <input type="text" name="title" placeholder="e.g. Learn French for 50 min" required></label>
@@ -34,11 +38,12 @@
   <p class="muted" style="margin-top:8px;">Leave blank to just get lumped into the general evening check-in instead, set in Settings.</p>
 </div>
 
-<div class="grid">
-  {% for group_name, group_freq in [('Daily', 'daily'), ('Weekly', 'weekly'), ('Monthly', 'monthly')] %}
-    {% set items = status | selectattr('habit.frequency', 'equalto', group_freq) | list %}
-    {% if items %}
+{% for group_name, group_freq in [('Daily', 'daily'), ('Weekly', 'weekly'), ('Monthly', 'monthly')] %}
+  {% set items = status | selectattr('habit.frequency', 'equalto', group_freq) | list %}
+  {% if items %}
+    <div class="grid reorder-section" data-section="{{ group_freq }}">
       <div class="card wide">
+        {{ m.reorder_bar() }}
         <h3>{{ group_name }}</h3>
         <ul class="checklist interactive">
           {% for hs in items %}
@@ -77,10 +82,16 @@
           {% endfor %}
         </ul>
       </div>
-    {% endif %}
-  {% endfor %}
-  {% if not status %}
-    <p class="muted">No habits yet — add one above.</p>
+    </div>
   {% endif %}
+{% endfor %}
+{% if not status %}
+  <p class="muted">No habits yet — add one above.</p>
+{% endif %}
+
 </div>
+
+<script nonce="{{ csp_nonce() }}">
+window.LifehubReorder.init('habits-sections', 'habits', {{ section_order | tojson }});
+</script>
 {% endblock %}
