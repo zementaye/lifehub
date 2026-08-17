@@ -1,13 +1,11 @@
 {% extends "base.html" %}
-{% import "_macros.html" as m %}
 {% block title %}Budget — Life Hub{% endblock %}
 {% block content %}
 <h1>Budget</h1>
 
-<div class="grid" id="budget-sections">
+<div class="grid">
 
-  <div class="card reorder-section" data-section="monthly">
-    {{ m.reorder_bar() }}
+  <div class="card">
     <h3>Monthly — {{ month }}</h3>
     <form method="get" class="inline-form">
       <label>Month <input type="month" name="month" value="{{ month }}" onchange="this.form.submit()"></label>
@@ -20,8 +18,7 @@
     </div>
   </div>
 
-  <div class="card reorder-section" data-section="yearly">
-    {{ m.reorder_bar() }}
+  <div class="card">
     <div id="yearly-summary">
     <h3>Yearly — {{ year }}</h3>
     <form method="get" class="inline-form">
@@ -57,8 +54,7 @@
     </div>
   </div>
 
-  <div class="card reorder-section" data-section="log">
-    {{ m.reorder_bar() }}
+  <div class="card">
     <h3>Log a Transaction</h3>
     <form method="post" action="{{ url_for('add_transaction') }}" class="inline-form">
       <input type="hidden" name="month" value="{{ month }}">
@@ -81,8 +77,7 @@
     </form>
   </div>
 
-  <div class="card reorder-section" data-section="category">
-    {{ m.reorder_bar() }}
+  <div class="card">
     <h3>New Category</h3>
     <form method="post" action="{{ url_for('add_budget_category') }}" class="inline-form">
       <label>Name <input type="text" name="name" placeholder="e.g. Food" required></label>
@@ -105,8 +100,7 @@
   </div>
 
   {% if category_spend %}
-  <div class="card wide reorder-section" data-section="spend">
-    {{ m.reorder_bar() }}
+  <div class="card wide">
     <h3>Spend vs. Limit ({{ month }})</h3>
     {% for cs in category_spend %}
       {% if cs.limit %}
@@ -124,8 +118,7 @@
   </div>
   {% endif %}
 
-  <div class="card wide reorder-section" data-section="recurring">
-    {{ m.reorder_bar() }}
+  <div class="card wide">
     <h3>Recurring — Jobs, Salary &amp; Bills</h3>
     <p class="muted">Auto-logs itself as a transaction on a schedule you set — monthly (e.g. payday, rent due date) or weekly (e.g. a job that pays every Tuesday).</p>
     <form method="post" action="{{ url_for('add_recurring_transaction') }}" class="inline-form">
@@ -206,8 +199,7 @@
     {% endif %}
   </div>
 
-  <div class="card wide savings-card reorder-section" data-section="savings">
-    {{ m.reorder_bar() }}
+  <div class="card wide savings-card">
     <h3>Savings Goals</h3>
     <p class="muted">Set up separate jars to save toward — adding money logs it as an expense (moved out of what's available to spend); withdrawing logs it back as income.</p>
     <form method="post" action="{{ url_for('add_savings_goal') }}" class="inline-form">
@@ -270,8 +262,7 @@
     {% endif %}
   </div>
 
-  <div class="card wide reorder-section" data-section="transactions">
-    {{ m.reorder_bar() }}
+  <div class="card wide">
     <h3>Transactions — {{ month }}</h3>
     {% if txns %}
       <table class="table">
@@ -299,8 +290,7 @@
     {% endif %}
   </div>
 
-  <div class="card wide reorder-section" data-section="yearly_detail">
-    {{ m.reorder_bar() }}
+  <div class="card wide">
     <h3>Yearly Detail — {{ year }}</h3>
     <table class="table">
       <thead><tr><th>Month</th><th>Income</th><th>Expenses</th><th>Net</th></tr></thead>
@@ -338,7 +328,4 @@
 
 </div>
 
-<script nonce="{{ csp_nonce() }}">
-window.LifehubReorder.init('budget-sections', 'budget', {{ section_order | tojson }});
-</script>
 {% endblock %}

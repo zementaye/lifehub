@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% import "_macros.html" as m %}
 {% block title %}{{ meal_label }} — Life Hub{% endblock %}
 {% block content %}
 <a class="link" href="{{ url_for('nutrition', date=view_date) }}">← Back to Nutrition</a>
@@ -16,9 +15,8 @@
   </div>
 </div>
 
-<div class="grid" id="nutrition_meal-sections">
-  <div class="card reorder-section" data-section="search">
-    {{ m.reorder_bar() }}
+<div class="grid">
+  <div class="card">
     <h3>Search &amp; Log Food</h3>
     <input type="text" id="food-search" placeholder="Search e.g. banana, chicken breast..." autocomplete="off">
     <div id="search-results" class="search-results"></div>
@@ -39,8 +37,7 @@
     </form>
   </div>
 
-  <div class="card reorder-section" data-section="custom">
-    {{ m.reorder_bar() }}
+  <div class="card">
     <h3>Or Log a Custom Food</h3>
     <form method="post" action="{{ url_for('log_food') }}" class="inline-form">
       <input type="hidden" name="date" value="{{ view_date }}">
@@ -99,8 +96,7 @@
     </form>
   </div>
 
-  <div class="card wide reorder-section" data-section="entries">
-    {{ m.reorder_bar() }}
+  <div class="card wide">
     <h3>{{ meal_label }} — {{ view_date }}</h3>
     {% if entries %}
       <table class="table">
@@ -130,10 +126,6 @@
     {% endif %}
   </div>
 </div>
-
-<script nonce="{{ csp_nonce() }}">
-window.LifehubReorder.init('nutrition_meal-sections', 'nutrition_meal', {{ section_order | tojson }});
-</script>
 {% endblock %}
 
 {% block scripts %}

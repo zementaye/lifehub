@@ -1,12 +1,10 @@
 {% extends "base.html" %}
-{% import "_macros.html" as m %}
 {% block title %}Dashboard — Life Hub{% endblock %}
 {% block content %}
 <h1>Dashboard</h1>
 
-<div class="grid" id="dashboard-sections">
-  <div class="card reorder-section" data-section="body">
-    {{ m.reorder_bar() }}
+<div class="grid">
+  <div class="card">
     <h3>Body</h3>
     {% if bmi %}
       <div class="stat-row">
@@ -19,8 +17,7 @@
     <a class="link" href="{{ url_for('health') }}">Go to Health →</a>
   </div>
 
-  <div class="card reorder-section" data-section="nutrition">
-    {{ m.reorder_bar() }}
+  <div class="card">
     <h3>Today's Nutrition</h3>
     <div class="stat-row">
       <div class="stat"><span class="stat-value" data-countup="{{ totals.calories | round | int }}">0</span><span class="stat-label">calories</span></div>
@@ -31,8 +28,7 @@
     <a class="link" href="{{ url_for('nutrition') }}">Log food →</a>
   </div>
 
-  <div class="card reorder-section" data-section="habits">
-    {{ m.reorder_bar() }}
+  <div class="card">
     <h3>Today's Habits</h3>
     {% if habit_status %}
       <ul class="checklist">
@@ -46,8 +42,7 @@
     <a class="link" href="{{ url_for('habits') }}">Go to Habits →</a>
   </div>
 
-  <div class="card reorder-section" data-section="focus">
-    {{ m.reorder_bar() }}
+  <div class="card">
     <h3>Focus</h3>
     <div class="orbit-wrap">
       <div class="orbit-ring r3"><span class="orbit-sat"></span></div>
@@ -58,8 +53,7 @@
     <div class="orbit-cap"><b>{{ (habit_status | rejectattr('done') | list | length) + (upcoming_reminders | length) }}</b> active tracks</div>
   </div>
 
-  <div class="card reorder-section" data-section="todos">
-    {{ m.reorder_bar() }}
+  <div class="card">
     <h3>Upcoming To-Dos</h3>
     {% if upcoming_reminders %}
       <ul class="plain-list">
@@ -73,8 +67,4 @@
     <a class="link" href="{{ url_for('reminders') }}">Manage to-dos →</a>
   </div>
 </div>
-
-<script nonce="{{ csp_nonce() }}">
-window.LifehubReorder.init('dashboard-sections', 'dashboard', {{ section_order | tojson }});
-</script>
 {% endblock %}

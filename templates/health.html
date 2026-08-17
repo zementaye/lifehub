@@ -1,12 +1,10 @@
 {% extends "base.html" %}
-{% import "_macros.html" as m %}
 {% block title %}Health — Life Hub{% endblock %}
 {% block content %}
 <h1>Health</h1>
 
-<div class="grid" id="health-sections">
-  <div class="card reorder-section" data-section="profile">
-    {{ m.reorder_bar() }}
+<div class="grid">
+  <div class="card">
     <h3>Profile</h3>
     <form method="post" action="{{ url_for('set_height') }}" class="inline-form settings-form">
       <div class="settings-fields">
@@ -32,8 +30,7 @@
     {% endif %}
   </div>
 
-  <div class="card reorder-section" data-section="log_weight">
-    {{ m.reorder_bar() }}
+  <div class="card">
     <h3>Log Weight</h3>
     <form method="post" action="{{ url_for('add_weight') }}" class="inline-form">
       <label>Date <input type="date" name="date" value="{{ today }}"></label>
@@ -42,8 +39,7 @@
     </form>
   </div>
 
-  <div class="card reorder-section" data-section="log_session">
-    {{ m.reorder_bar() }}
+  <div class="card">
     <h3>Log a Session</h3>
     <form method="post" action="{{ url_for('add_session') }}" class="inline-form">
       <label>Date <input type="date" name="date" value="{{ today }}"></label>
@@ -62,8 +58,7 @@
     </form>
   </div>
 
-  <div class="card wide reorder-section" data-section="weight_trend">
-    {{ m.reorder_bar() }}
+  <div class="card wide">
     <h3>Weight Trend</h3>
     {% if sparkline_svg %}
       {{ sparkline_svg | safe }}
@@ -72,8 +67,7 @@
     {% endif %}
   </div>
 
-  <div class="card wide reorder-section" data-section="weight_history">
-    {{ m.reorder_bar() }}
+  <div class="card wide">
     <h3>Weight History</h3>
     {% if weights %}
       <table class="table">
@@ -97,8 +91,7 @@
     {% endif %}
   </div>
 
-  <div class="card wide reorder-section" data-section="session_history">
-    {{ m.reorder_bar() }}
+  <div class="card wide">
     <h3>Session History</h3>
     {% if sessions %}
       <table class="table">
@@ -124,10 +117,6 @@
     {% endif %}
   </div>
 </div>
-
-<script nonce="{{ csp_nonce() }}">
-window.LifehubReorder.init('health-sections', 'health', {{ section_order | tojson }});
-</script>
 {% endblock %}
 
 {% block scripts %}

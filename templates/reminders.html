@@ -1,13 +1,9 @@
 {% extends "base.html" %}
-{% import "_macros.html" as m %}
 {% block title %}To Do — Life Hub{% endblock %}
 {% block content %}
 <h1>To Do</h1>
 
-<div id="reminders-sections">
-
-<div class="card reorder-section" data-section="new">
-  {{ m.reorder_bar() }}
+<div class="card">
   <h3>New To-Do</h3>
   <p class="muted">Give it a due date if it should come back and nudge you (once, monthly, or yearly) — leave it blank for a simple one-off task.</p>
   <form method="post" action="{{ url_for('add_reminder') }}" class="inline-form">
@@ -24,74 +20,62 @@
   </form>
 </div>
 
-<div class="grid reorder-section" data-section="due">
-  <div class="card wide">
-    {{ m.reorder_bar() }}
-    <h3>With a due date</h3>
-    {% if reminders %}
-      <table class="table">
-        <thead><tr><th>Title</th><th>Next due</th><th>Repeats</th><th>Status</th><th></th></tr></thead>
-        <tbody>
-        {% for r in reminders %}
-          <tr class="{{ '' if r.active else 'muted' }}">
-            <td>{{ r.title }}</td>
-            <td>{{ r.next_due }}</td>
-            <td>{{ r.recurrence }}</td>
-            <td>{{ 'Active' if r.active else 'Paused' }}</td>
-            <td class="row-actions">
-              <form method="post" action="{{ url_for('snooze_reminder', reminder_id=r.id) }}">
-                <input type="hidden" name="days" value="3">
-                <button class="btn-icon" title="Snooze 3 days">😴 3d</button>
-              </form>
-              <form method="post" action="{{ url_for('snooze_reminder', reminder_id=r.id) }}">
-                <input type="hidden" name="days" value="7">
-                <button class="btn-icon" title="Snooze 7 days">😴 7d</button>
-              </form>
-              <form method="post" action="{{ url_for('toggle_reminder', reminder_id=r.id) }}">
-                <button class="btn-icon" title="{{ 'Pause' if r.active else 'Resume' }}">{{ '⏸️' if r.active else '▶️' }}</button>
-              </form>
-              <form method="post" action="{{ url_for('delete_reminder', reminder_id=r.id) }}" data-confirm="Delete {{ r.title }}?">
-                <button class="btn-icon" title="Delete">🗑️</button>
-              </form>
-            </td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <p class="muted">Nothing with a due date yet.</p>
-    {% endif %}
-  </div>
-</div>
-
-<div class="grid reorder-section" data-section="nodue">
-  <div class="card wide">
-    {{ m.reorder_bar() }}
-    <h3>No due date</h3>
-    {% if todos %}
-      <ul class="checklist interactive">
-        {% for t in todos %}
-          <li class="{{ 'done' if t.done }}" data-item-id="todo-{{ t.id }}">
-            <form method="post" action="{{ url_for('uncheck_todo' if t.done else 'check_todo', todo_id=t.id) }}" class="checkbox-form"
-                  data-check-url="{{ url_for('check_todo', todo_id=t.id) }}" data-uncheck-url="{{ url_for('uncheck_todo', todo_id=t.id) }}">
-              <button type="submit" class="checkbox-btn {{ 'checked' if t.done }}" aria-label="{{ 'Mark not done' if t.done else 'Mark done' }}"></button>
+<div class="card wide">
+  <h3>With a due date</h3>
+  {% if reminders %}
+    <table class="table">
+      <thead><tr><th>Title</th><th>Next due</th><th>Repeats</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for r in reminders %}
+        <tr class="{{ '' if r.active else 'muted' }}">
+          <td>{{ r.title }}</td>
+          <td>{{ r.next_due }}</td>
+          <td>{{ r.recurrence }}</td>
+          <td>{{ 'Active' if r.active else 'Paused' }}</td>
+          <td class="row-actions">
+            <form method="post" action="{{ url_for('snooze_reminder', reminder_id=r.id) }}">
+              <input type="hidden" name="days" value="3">
+              <button class="btn-icon" title="Snooze 3 days">😴 3d</button>
             </form>
-            <span>{{ t.title }}</span>
-            <form method="post" action="{{ url_for('delete_todo', todo_id=t.id) }}" class="delete-form" data-confirm="Delete {{ t.title }}?">
-              <button class="btn-icon" title="Remove to-do">🗑️</button>
+            <form method="post" action="{{ url_for('snooze_reminder', reminder_id=r.id) }}">
+              <input type="hidden" name="days" value="7">
+              <button class="btn-icon" title="Snooze 7 days">😴 7d</button>
             </form>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p class="muted">No to-dos yet — add one above.</p>
-    {% endif %}
-  </div>
+            <form method="post" action="{{ url_for('toggle_reminder', reminder_id=r.id) }}">
+              <button class="btn-icon" title="{{ 'Pause' if r.active else 'Resume' }}">{{ '⏸️' if r.active else '▶️' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('delete_reminder', reminder_id=r.id) }}" data-confirm="Delete {{ r.title }}?">
+              <button class="btn-icon" title="Delete">🗑️</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">Nothing with a due date yet.</p>
+  {% endif %}
 </div>
 
+<div class="card wide">
+  <h3>No due date</h3>
+  {% if todos %}
+    <ul class="checklist interactive">
+      {% for t in todos %}
+        <li class="{{ 'done' if t.done }}" data-item-id="todo-{{ t.id }}">
+          <form method="post" action="{{ url_for('uncheck_todo' if t.done else 'check_todo', todo_id=t.id) }}" class="checkbox-form"
+                data-check-url="{{ url_for('check_todo', todo_id=t.id) }}" data-uncheck-url="{{ url_for('uncheck_todo', todo_id=t.id) }}">
+            <button type="submit" class="checkbox-btn {{ 'checked' if t.done }}" aria-label="{{ 'Mark not done' if t.done else 'Mark done' }}"></button>
+          </form>
+          <span>{{ t.title }}</span>
+          <form method="post" action="{{ url_for('delete_todo', todo_id=t.id) }}" class="delete-form" data-confirm="Delete {{ t.title }}?">
+            <button class="btn-icon" title="Remove to-do">🗑️</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">No to-dos yet — add one above.</p>
+  {% endif %}
 </div>
-
-<script nonce="{{ csp_nonce() }}">
-window.LifehubReorder.init('reminders-sections', 'reminders', {{ section_order | tojson }});
-</script>
 {% endblock %}

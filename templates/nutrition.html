@@ -1,13 +1,9 @@
 {% extends "base.html" %}
-{% import "_macros.html" as m %}
 {% block title %}Nutrition — Life Hub{% endblock %}
 {% block content %}
 <h1>Nutrition</h1>
 
-<div id="nutrition-sections">
-
-<div class="card reorder-section" data-section="totals">
-  {{ m.reorder_bar() }}
+<div class="card">
   <h3>Totals for {{ view_date }}</h3>
   <div class="stat-row">
     <div class="stat"><span class="stat-value">{{ totals.calories | round | int }}</span><span class="stat-label">calories</span></div>
@@ -48,8 +44,7 @@
   {% endif %}
 </div>
 
-<div class="card reorder-section" data-section="recommended">
-  {{ m.reorder_bar() }}
+<div class="card">
   <h3>Recommended Intake</h3>
   {% if recommendation %}
     <p class="muted">Based on your height, weight, age, sex, and {{ recommendation.activity_label | lower }}.</p>
@@ -76,8 +71,7 @@
   {% endif %}
 </div>
 
-<div class="card wide reorder-section" data-section="log_meal">
-  {{ m.reorder_bar() }}
+<div class="card wide">
   <h3>Log a Meal</h3>
   <p class="muted">Tap a meal to search and add the foods you had.</p>
   <div class="meal-tiles">
@@ -97,10 +91,4 @@
     {% endfor %}
   </div>
 </div>
-
-</div>
-
-<script nonce="{{ csp_nonce() }}">
-window.LifehubReorder.init('nutrition-sections', 'nutrition', {{ section_order | tojson }});
-</script>
 {% endblock %}
