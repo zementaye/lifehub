@@ -1624,20 +1624,27 @@ a.btn-secondary:hover {
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
-.reorder-up, .reorder-down {
-  all: unset;
-  box-sizing: border-box;
+.btn-icon.reorder-up, .btn-icon.reorder-down {
+  /* .btn-icon (see above) already does the proven reset of the site's
+     default button chrome — background, border, padding, uppercase text
+     styling, and the hover sheen animation. Layering on top of that
+     (rather than all: unset, which was here originally and made these
+     buttons unreliable to click) avoids reintroducing an unpredictable
+     reset of properties like line-height or focus behavior. Selector
+     needs both classes (not just .reorder-up) to out-specificity the
+     "button.btn-icon" base rule's own padding, or this padding override
+     silently loses. */
   display: flex;
   align-items: center;
   justify-content: center;
   width: 24px;
   height: 20px;
+  padding: 0;
   border-radius: 999px;
   color: var(--muted);
-  cursor: pointer;
   transition: color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
 }
-.reorder-up svg, .reorder-down svg {
+.btn-icon.reorder-up svg, .btn-icon.reorder-down svg {
   width: 13px;
   height: 13px;
   fill: none;
@@ -1648,19 +1655,20 @@ a.btn-secondary:hover {
   pointer-events: none;
 }
 .reorder-divider { width: 14px; height: 1px; background: var(--border); margin: 1px 0; }
-.reorder-up:hover, .reorder-down:hover {
+.btn-icon.reorder-up:hover, .btn-icon.reorder-down:hover {
   color: var(--tab-color);
   background: color-mix(in srgb, var(--tab-color) 18%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--tab-color) 40%, transparent), 0 0 10px color-mix(in srgb, var(--tab-color) 50%, transparent);
+  transform: none;
 }
-.reorder-up:active, .reorder-down:active { transform: scale(0.82); }
-.reorder-up:focus-visible, .reorder-down:focus-visible {
+.btn-icon.reorder-up:active, .btn-icon.reorder-down:active { transform: scale(0.82); }
+.btn-icon.reorder-up:focus-visible, .btn-icon.reorder-down:focus-visible {
   outline: 2px solid var(--tab-color);
   outline-offset: 2px;
 }
-.reorder-section:first-child .reorder-up,
-.reorder-section:last-child .reorder-down { opacity: 0.25; pointer-events: none; }
+.reorder-section:first-child .btn-icon.reorder-up,
+.reorder-section:last-child .btn-icon.reorder-down { opacity: 0.25; pointer-events: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .reorder-up, .reorder-down { transition: none; }
+  .btn-icon.reorder-up, .btn-icon.reorder-down { transition: none; }
 }
