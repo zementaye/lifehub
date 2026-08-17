@@ -6,8 +6,13 @@
 {% macro reorder_bar() -%}
 <div class="reorder-bar">
   <div class="reorder-buttons">
-    <button type="button" class="btn-icon reorder-up" title="Move up">⬆️</button>
-    <button type="button" class="btn-icon reorder-down" title="Move down">⬇️</button>
+    <button type="button" class="reorder-up" title="Move up">
+      <svg viewBox="0 0 20 20"><path d="M5 12l5-5 5 5"/></svg>
+    </button>
+    <span class="reorder-divider"></span>
+    <button type="button" class="reorder-down" title="Move down">
+      <svg viewBox="0 0 20 20"><path d="M5 8l5 5 5-5"/></svg>
+    </button>
   </div>
 </div>
 {%- endmacro %}
