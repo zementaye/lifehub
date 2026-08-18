@@ -45,11 +45,12 @@
               <div class="calendar-events">
                 {% for ev in day_events[:3] %}
                   <a class="calendar-evt calendar-evt-{{ ev.type }}-{{ ev.state }}"
-                     href="{{ url_for('vault') if ev.type == 'doc' else url_for('reminders') }}"
+                     href="{{ url_for('vault') if ev.type == 'doc' else (url_for('notes') if ev.type == 'note' else url_for('reminders')) }}"
                      title="{{ ev.title }} — {{ ev.sublabel }}">
                     <span class="calendar-evt-icon">
                       {%- if ev.type == 'reminder' -%}📌
                       {%- elif ev.type == 'todo' -%}{{ '✅' if ev.state == 'done' else '🔲' }}
+                      {%- elif ev.type == 'note' -%}📝
                       {%- elif ev.state == 'added' -%}📄
                       {%- elif ev.state == 'overdue' -%}⛔
                       {%- elif ev.state == 'soon' -%}⚠️
@@ -66,10 +67,11 @@
                   <template>
                     {% for ev in day_events %}
                       <a class="calendar-evt calendar-evt-{{ ev.type }}-{{ ev.state }}"
-                         href="{{ url_for('vault') if ev.type == 'doc' else url_for('reminders') }}">
+                         href="{{ url_for('vault') if ev.type == 'doc' else (url_for('notes') if ev.type == 'note' else url_for('reminders')) }}">
                         <span class="calendar-evt-icon">
                           {%- if ev.type == 'reminder' -%}📌
                           {%- elif ev.type == 'todo' -%}{{ '✅' if ev.state == 'done' else '🔲' }}
+                          {%- elif ev.type == 'note' -%}📝
                           {%- elif ev.state == 'added' -%}📄
                           {%- elif ev.state == 'overdue' -%}⛔
                           {%- elif ev.state == 'soon' -%}⚠️
@@ -94,6 +96,7 @@
     <span><span class="calendar-dot calendar-evt-reminder-active"></span> Due to-do</span>
     <span><span class="calendar-dot calendar-evt-todo-open"></span> Added to-do</span>
     <span><span class="calendar-dot calendar-evt-doc-added"></span> Added to vault</span>
+    <span><span class="calendar-dot calendar-evt-note-added"></span> Note</span>
     <span><span class="calendar-dot calendar-evt-doc-soon"></span> Expiring soon</span>
     <span><span class="calendar-dot calendar-evt-doc-overdue"></span> Expired</span>
   </div>
@@ -117,6 +120,7 @@
     </div>
     <form method="post" action="{{ url_for('add_note') }}" class="calendar-note-form">
       <input type="hidden" name="body" id="calendarNoteBodyInput">
+      <input type="hidden" name="linked_date" id="calendarNoteDateInput">
       <label>
         <input type="text" name="title" id="calendarNoteTitleInput" placeholder="e.g. Zemen's Birthday" maxlength="200" required autocomplete="off">
       </label>
@@ -174,6 +178,7 @@
   var noteTitleEl = document.getElementById('calendarNoteModalTitle');
   var noteInput = document.getElementById('calendarNoteTitleInput');
   var noteBodyInput = document.getElementById('calendarNoteBodyInput');
+  var noteDateInput = document.getElementById('calendarNoteDateInput');
   var noteCloseBtn = document.getElementById('calendarNoteModalClose');
   if (!noteBackdrop) return;
 
@@ -187,6 +192,7 @@
     var label = formatDate(dateStr);
     noteTitleEl.textContent = 'Add note — ' + label;
     noteBodyInput.value = '\uD83D\uDCC5 ' + label;
+    noteDateInput.value = dateStr;
     noteInput.value = '';
     noteBackdrop.hidden = false;
     noteInput.focus();
