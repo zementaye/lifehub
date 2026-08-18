@@ -1655,8 +1655,13 @@ body.page-calendar_view { --tab-color: var(--accent); }
 }
 .calendar-weekend-label { color: color-mix(in srgb, var(--tab-color) 65%, var(--muted)); }
 
+/* Every cell — whatever week it's in, however many events land on it — is
+   exactly the same height. Content that doesn't fit is clipped, not
+   allowed to stretch the cell (that's what the "+N more" / day-modal is
+   for). Fixed height (not min-height) on both the cell and its rows is
+   what keeps every row in the grid the same height as every other. */
 .calendar-cell {
-  min-height: 96px;
+  height: 138px;
   padding: 8px;
   border-radius: 10px;
   border: 1px solid var(--border-soft);
@@ -1664,6 +1669,7 @@ body.page-calendar_view { --tab-color: var(--accent); }
   display: flex;
   flex-direction: column;
   gap: 5px;
+  overflow: hidden;
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 .calendar-cell:not(.calendar-cell-empty):hover {
@@ -1671,14 +1677,13 @@ body.page-calendar_view { --tab-color: var(--accent); }
   background: color-mix(in srgb, var(--surface-raised) 75%, transparent);
 }
 .calendar-cell-empty { border: none; background: none; }
-.calendar-cell-expanded { z-index: 2; box-shadow: 0 10px 24px -10px rgba(0,0,0,.35); }
 
 /* Sat/Sun columns get a faint tab-color wash so the week's edges read at a
    glance, the same way most calendar apps mark weekends. */
 .calendar-days .calendar-cell:nth-child(7n+6) { background: color-mix(in srgb, var(--tab-color) 5%, color-mix(in srgb, var(--surface-raised) 45%, transparent)); }
 .calendar-days .calendar-cell:nth-child(7n)   { background: color-mix(in srgb, var(--tab-color) 5%, color-mix(in srgb, var(--surface-raised) 45%, transparent)); }
 
-.calendar-cell-top { display: flex; align-items: center; justify-content: space-between; }
+.calendar-cell-top { display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto; }
 .calendar-day-num {
   display: flex;
   align-items: center;
@@ -1708,12 +1713,17 @@ body.page-calendar_view { --tab-color: var(--accent); }
   background: color-mix(in srgb, var(--muted) 16%, transparent);
   border-radius: 999px;
   padding: 1px 6px;
+  flex: 0 0 auto;
 }
 
-.calendar-events { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.calendar-evt-extra { display: none; }
-.calendar-cell-expanded .calendar-evt-extra { display: flex; }
-.calendar-cell-expanded { min-height: auto; }
+.calendar-events {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
 
 .calendar-evt {
   display: flex;
@@ -1730,6 +1740,7 @@ body.page-calendar_view { --tab-color: var(--accent); }
   background: color-mix(in srgb, var(--surface) 55%, transparent);
   text-decoration: none;
   color: var(--ink);
+  flex: 0 0 auto;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 .calendar-evt:hover {
@@ -1738,10 +1749,11 @@ body.page-calendar_view { --tab-color: var(--accent); }
 }
 .calendar-evt-icon { flex: 0 0 auto; font-size: 0.74rem; line-height: 1; }
 .calendar-evt-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-evt-sub { flex: 0 0 auto; margin-left: auto; font-size: 0.64rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 
 .calendar-evt-more-btn {
   align-self: flex-start;
-  margin-top: 1px;
+  flex: 0 0 auto;
   font-family: var(--font-body);
   font-size: 0.66rem;
   font-weight: 600;
@@ -1785,22 +1797,70 @@ body.page-calendar_view { --tab-color: var(--accent); }
   flex: 0 0 auto;
   background: currentColor;
 }
-.calendar-legend .calendar-evt-reminder-active,
-.calendar-legend .calendar-evt-todo-open,
-.calendar-legend .calendar-evt-doc-added,
-.calendar-legend .calendar-evt-doc-soon,
-.calendar-legend .calendar-evt-doc-overdue { color: inherit; }
+
+/* Day-detail modal — where events beyond the first 3 in a cell live. A
+   single shared modal, populated on open by cloning the matching day's
+   hidden <template>, rather than growing the triggering cell. */
+.calendar-day-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: color-mix(in srgb, var(--bg) 65%, transparent);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.calendar-day-modal-backdrop[hidden] { display: none; }
+.calendar-day-modal {
+  width: 100%;
+  max-width: 380px;
+  max-height: min(70vh, 520px);
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(165deg, var(--surface), var(--bg-glow));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), 0 0 0 1px color-mix(in srgb, var(--tab-color) 20%, transparent), 0 0 40px color-mix(in srgb, var(--tab-color) 18%, transparent);
+  overflow: hidden;
+}
+.calendar-day-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  flex: 0 0 auto;
+}
+.calendar-day-modal-header h3 { font-size: 1rem; }
+.calendar-day-modal-events {
+  padding: 12px 14px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.calendar-day-modal-events .calendar-evt {
+  white-space: normal;
+  font-size: 0.82rem;
+  padding: 8px 10px;
+}
+.calendar-day-modal-events .calendar-evt-text { white-space: normal; }
 
 @media (max-width: 700px) {
   .calendar-toolbar { padding-bottom: 12px; margin-bottom: 12px; }
   .calendar-month-label { min-width: 0; font-size: 1.05rem; }
   .calendar-nav { gap: 8px; }
-  .calendar-cell { min-height: 60px; padding: 5px; border-radius: 8px; gap: 3px; }
+  .calendar-cell { height: 128px; padding: 5px; border-radius: 8px; gap: 3px; }
   .calendar-day-num { min-width: 18px; height: 18px; font-size: 0.68rem; }
   .calendar-evt-text { display: none; }
   .calendar-evt { justify-content: center; padding: 3px; border-left-width: 2px; }
   .calendar-evt-icon { font-size: 0.8rem; }
   .calendar-evt-more-btn { align-self: center; font-size: 0.6rem; }
+  .calendar-evt-count { font-size: 0.56rem; padding: 0 4px; }
   .calendar-weekdays span { font-size: 0.6rem; }
   .calendar-legend { font-size: 0.7rem; gap: 8px 12px; margin-top: 14px; padding-top: 10px; }
+  .calendar-day-modal-events .calendar-evt-text { display: inline; }
 }

@@ -30,15 +30,16 @@
           <div class="calendar-cell calendar-cell-empty"></div>
         {% else %}
           {% set day_events = events_by_day[day] %}
+          {% set overflow_count = (day_events | length) - 3 %}
           <div class="calendar-cell {{ 'calendar-cell-today' if is_current_month and day == today.day }}">
             <div class="calendar-cell-top">
               <span class="calendar-day-num">{{ day }}</span>
-              {% if day_events | length > 3 %}<span class="calendar-evt-count">{{ day_events | length }}</span>{% endif %}
+              {% if overflow_count > 0 %}<span class="calendar-evt-count">{{ day_events | length }}</span>{% endif %}
             </div>
             {% if day_events %}
               <div class="calendar-events">
-                {% for ev in day_events %}
-                  <a class="calendar-evt calendar-evt-{{ ev.type }}-{{ ev.state }} {{ 'calendar-evt-extra' if loop.index > 3 }}"
+                {% for ev in day_events[:3] %}
+                  <a class="calendar-evt calendar-evt-{{ ev.type }}-{{ ev.state }}"
                      href="{{ url_for('vault') if ev.type == 'doc' else url_for('reminders') }}"
                      title="{{ ev.title }} — {{ ev.sublabel }}">
                     <span class="calendar-evt-icon">
@@ -53,11 +54,28 @@
                     <span class="calendar-evt-text">{{ ev.title }}</span>
                   </a>
                 {% endfor %}
-                {% if day_events | length > 3 %}
-                  <button type="button" class="calendar-evt-more-btn"
-                          data-more-label="+{{ day_events | length - 3 }} more" data-less-label="Show less">
-                    +{{ day_events | length - 3 }} more
+                {% if overflow_count > 0 %}
+                  <button type="button" class="calendar-evt-more-btn" data-day-label="{{ day }} {{ month_label }}">
+                    +{{ overflow_count }} more
                   </button>
+                  <template>
+                    {% for ev in day_events %}
+                      <a class="calendar-evt calendar-evt-{{ ev.type }}-{{ ev.state }}"
+                         href="{{ url_for('vault') if ev.type == 'doc' else url_for('reminders') }}">
+                        <span class="calendar-evt-icon">
+                          {%- if ev.type == 'reminder' -%}📌
+                          {%- elif ev.type == 'todo' -%}{{ '✅' if ev.state == 'done' else '🔲' }}
+                          {%- elif ev.state == 'added' -%}📄
+                          {%- elif ev.state == 'overdue' -%}⛔
+                          {%- elif ev.state == 'soon' -%}⚠️
+                          {%- else -%}📄
+                          {%- endif -%}
+                        </span>
+                        <span class="calendar-evt-text">{{ ev.title }}</span>
+                        <span class="calendar-evt-sub">{{ ev.sublabel }}</span>
+                      </a>
+                    {% endfor %}
+                  </template>
                 {% endif %}
               </div>
             {% endif %}
@@ -76,18 +94,54 @@
   </div>
 </div>
 
+<div class="calendar-day-modal-backdrop" id="calendarDayModalBackdrop" hidden>
+  <div class="calendar-day-modal" role="dialog" aria-modal="true" aria-labelledby="calendarDayModalTitle">
+    <div class="calendar-day-modal-header">
+      <h3 id="calendarDayModalTitle"></h3>
+      <button type="button" class="btn-icon" id="calendarDayModalClose" aria-label="Close">✕</button>
+    </div>
+    <div class="calendar-day-modal-events" id="calendarDayModalEvents"></div>
+  </div>
+</div>
+
 <script nonce="{{ csp_nonce() }}">
-// Expands a day cell to reveal events beyond the first 3, in place — no
-// reload, no separate day-detail page needed for a feature this small.
-document.querySelectorAll('.calendar-days').forEach(function (grid) {
-  grid.addEventListener('click', function (e) {
-    var btn = e.target.closest('.calendar-evt-more-btn');
-    if (!btn) return;
-    e.preventDefault();
-    var cell = btn.closest('.calendar-cell');
-    var expanded = cell.classList.toggle('calendar-cell-expanded');
-    btn.textContent = expanded ? btn.dataset.lessLabel : btn.dataset.moreLabel;
+// Every day cell stays a fixed size no matter how many events land on it —
+// only the first 3 render inline; the rest live in a <template> next to the
+// "+N more" button and get cloned into a single shared modal on click,
+// rather than growing the cell itself (which used to throw the whole
+// month's row heights out of alignment).
+(function () {
+  var backdrop = document.getElementById('calendarDayModalBackdrop');
+  var titleEl = document.getElementById('calendarDayModalTitle');
+  var eventsEl = document.getElementById('calendarDayModalEvents');
+  var closeBtn = document.getElementById('calendarDayModalClose');
+
+  function openModal(dayLabel, templateEl) {
+    titleEl.textContent = dayLabel;
+    eventsEl.innerHTML = '';
+    eventsEl.appendChild(templateEl.content.cloneNode(true));
+    backdrop.hidden = false;
+  }
+  function closeModal() {
+    backdrop.hidden = true;
+  }
+
+  document.querySelectorAll('.calendar-days').forEach(function (grid) {
+    grid.addEventListener('click', function (e) {
+      var btn = e.target.closest('.calendar-evt-more-btn');
+      if (!btn) return;
+      var template = btn.nextElementSibling;
+      if (!template || template.tagName !== 'TEMPLATE') return;
+      openModal(btn.dataset.dayLabel, template);
+    });
   });
-});
+  closeBtn.addEventListener('click', closeModal);
+  backdrop.addEventListener('click', function (e) {
+    if (e.target === backdrop) closeModal();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !backdrop.hidden) closeModal();
+  });
+})();
 </script>
 {% endblock %}
