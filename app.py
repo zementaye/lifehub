@@ -285,6 +285,14 @@ def inject_user():
 
 
 @app.context_processor
+def inject_ai_available():
+    """Makes {{ ai_available }} available in every template, so base.html
+    can decide whether to render the floating AI chat popup without every
+    route needing to pass it explicitly."""
+    return {"ai_available": ai.available()}
+
+
+@app.context_processor
 def inject_csp_nonce():
     """Makes {{ csp_nonce() }} available in every template. Called as a
     function (not a bare variable) so Jinja re-evaluates it fresh if a
@@ -2504,21 +2512,13 @@ def ai_chat():
     return render_template("ai_chat.html", ai_available=True, answer=answer, question=question)
 
 
-@app.route("/ai/quick-add", methods=["GET", "POST"])
-@login_required
-def ai_quick_add():
-    if request.method == "GET":
-        return render_template("ai_quick_add.html", ai_available=ai.available())
-
-    text = request.form.get("text", "").strip()
-    if not text:
-        flash("Type something to add first.")
-        return redirect(url_for("ai_quick_add"))
-    if not ai.available():
-        flash("AI isn't configured on this server.")
-        return redirect(url_for("ai_quick_add"))
-
-    user_id = g.user_id
+def _quick_add_execute(text, user_id):
+    """Parse a freeform quick-add note and apply whatever actions it implies
+    (transaction / food log / reminder / to-do). Returns (messages,
+    redirect_target) — messages is a list of human-readable confirmation or
+    error strings (one per action attempted), redirect_target is the page to
+    jump to when exactly one action was applied, else None. Shared by the
+    classic form-post route and the JSON popup API so the two never drift."""
     today = scheduler.today_local(user_id).isoformat()
     with db.get_conn() as conn:
         categories = conn.execute(
@@ -2527,8 +2527,7 @@ def ai_quick_add():
 
     result, err = ai.parse_quick_add(text, [c["name"] for c in categories], today)
     if err or result is None:
-        flash(f"Couldn't parse that: {err or 'unexpected response'}")
-        return redirect(url_for("ai_quick_add"))
+        return [f"Couldn't parse that: {err or 'unexpected response'}"], None
 
     # The model is asked for a JSON array (one note can imply more than one
     # action, e.g. "ate pancakes, cost me 450" = food + transaction). Stay
@@ -2536,8 +2535,7 @@ def ai_quick_add():
     actions = result if isinstance(result, list) else [result]
     actions = [a for a in actions if isinstance(a, dict)]
     if not actions:
-        flash("Couldn't parse that: unexpected response")
-        return redirect(url_for("ai_quick_add"))
+        return ["Couldn't parse that: unexpected response"], None
 
     messages = []
     redirect_target = None  # only used when exactly one action was applied
@@ -2655,15 +2653,73 @@ def ai_quick_add():
         reason = result.get("reason") if isinstance(result.get("reason"), str) else None
         messages.append(f"Wasn't sure what you meant{': ' + reason if reason else ''} — try rephrasing with more detail.")
 
+    # If the note produced exactly one action, the caller can jump straight
+    # to the page it affects. With multiple actions (e.g. food + expense)
+    # there's no single "right" page, so redirect_target stays None and the
+    # caller shows both confirmations in place instead.
+    return messages, (redirect_target if len(actions) == 1 else None)
+
+
+@app.route("/ai/quick-add", methods=["GET", "POST"])
+@login_required
+def ai_quick_add():
+    if request.method == "GET":
+        return render_template("ai_quick_add.html", ai_available=ai.available())
+
+    text = request.form.get("text", "").strip()
+    if not text:
+        flash("Type something to add first.")
+        return redirect(url_for("ai_quick_add"))
+    if not ai.available():
+        flash("AI isn't configured on this server.")
+        return redirect(url_for("ai_quick_add"))
+
+    messages, redirect_target = _quick_add_execute(text, g.user_id)
     for m in messages:
         flash(m)
-
-    # If the note produced exactly one action, jump straight to the page it
-    # affects, same as before. With multiple actions (e.g. food + expense)
-    # there's no single "right" page, so stay put and show both confirmations.
-    if redirect_target and len(actions) == 1:
+    if redirect_target:
         return redirect(redirect_target)
     return redirect(url_for("ai_quick_add"))
+
+
+@app.route("/api/ai/chat", methods=["POST"])
+@login_required
+def api_ai_chat():
+    """JSON endpoint backing the floating AI chat popup (see base.html /
+    app.js). Mirrors ai_chat() above but returns JSON instead of a
+    full-page render, since the popup lives on every page, not just
+    /ai/chat."""
+    if not ai.available():
+        return jsonify(ok=False, error="AI isn't configured on this server.")
+
+    data = request.get_json(silent=True) or {}
+    question = str(data.get("question") or "").strip()
+    if not question:
+        return jsonify(ok=False, error="Type a question first.")
+
+    context = _build_chat_context(g.user_id)
+    answer, err = ai.ask(question, context)
+    if err:
+        return jsonify(ok=False, error=err)
+    return jsonify(ok=True, answer=answer)
+
+
+@app.route("/api/ai/quick-add", methods=["POST"])
+@login_required
+def api_ai_quick_add():
+    """JSON endpoint backing the floating AI chat popup's Quick Add tab.
+    Mirrors ai_quick_add() above but returns JSON instead of flashing +
+    redirecting, since the popup lives on every page."""
+    if not ai.available():
+        return jsonify(ok=False, error="AI isn't configured on this server.")
+
+    data = request.get_json(silent=True) or {}
+    text = str(data.get("text") or "").strip()
+    if not text:
+        return jsonify(ok=False, error="Type something to add first.")
+
+    messages, redirect_target = _quick_add_execute(text, g.user_id)
+    return jsonify(ok=True, messages=messages, redirect=redirect_target)
 
 
 # ── Settings ─────────────────────────────────────────────────────────────
