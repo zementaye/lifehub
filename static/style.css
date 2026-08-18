@@ -1683,7 +1683,19 @@ body.page-calendar_view { --tab-color: var(--accent); }
   background: color-mix(in srgb, var(--surface-raised) 70%, var(--tab-color) 8%);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--tab-color) 20%, transparent);
 }
-.calendar-cell-empty { border: none; background: none; cursor: default; }
+.calendar-cell-empty {
+  border: 1px solid transparent;
+  cursor: default;
+  /* Meaningfully darker than an in-month cell (not just a different mix
+     of the same near-white/near-black tokens, which read as identical) —
+     dark mode drops straight to --bg, the darkest token in the theme;
+     light mode blends in --muted, since --bg alone is barely distinguishable
+     from the card there. */
+  background: var(--bg);
+}
+body[data-theme="light"] .calendar-cell-empty {
+  background: color-mix(in srgb, var(--muted) 30%, var(--surface) 70%);
+}
 
 body[data-theme="light"] .calendar-cell {
   background: color-mix(in srgb, var(--surface-raised) 55%, var(--border-soft) 45%);
@@ -1695,12 +1707,12 @@ body[data-theme="light"] .calendar-cell:not(.calendar-cell-empty):hover {
 /* Sat/Sun columns get a faint tab-color wash on top of the base cell
    color so the week's edges read at a glance, the same way most calendar
    apps mark weekends. */
-.calendar-days .calendar-cell:nth-child(7n+6),
-.calendar-days .calendar-cell:nth-child(7n) {
+.calendar-days .calendar-cell:not(.calendar-cell-empty):nth-child(7n+6),
+.calendar-days .calendar-cell:not(.calendar-cell-empty):nth-child(7n) {
   background: color-mix(in srgb, var(--tab-color) 8%, color-mix(in srgb, var(--surface-raised) 88%, white 6%));
 }
-body[data-theme="light"] .calendar-days .calendar-cell:nth-child(7n+6),
-body[data-theme="light"] .calendar-days .calendar-cell:nth-child(7n) {
+body[data-theme="light"] .calendar-days .calendar-cell:not(.calendar-cell-empty):nth-child(7n+6),
+body[data-theme="light"] .calendar-days .calendar-cell:not(.calendar-cell-empty):nth-child(7n) {
   background: color-mix(in srgb, var(--tab-color) 8%, color-mix(in srgb, var(--surface-raised) 55%, var(--border-soft) 45%));
 }
 
