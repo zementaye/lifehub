@@ -588,3 +588,154 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
 })();
 
 
+// Floating AI assistant popup (Ask / Quick Add). Replaces the old "AI" nav
+// dropdown — the markup lives in base.html (#ai-fab / #ai-popup), only
+// rendered for logged-in users. Talks to the JSON endpoints in app.py
+// (/api/ai/chat, /api/ai/quick-add) rather than the classic form-post
+// /ai/chat and /ai/quick-add pages, since this widget is on every page.
+(function () {
+  const fab = document.getElementById('ai-fab');
+  const popup = document.getElementById('ai-popup');
+  if (!fab || !popup) return;
+
+  const closeBtn = document.getElementById('ai-popup-close');
+  const tabs = popup.querySelectorAll('.ai-tab');
+  const panes = popup.querySelectorAll('.ai-pane');
+
+  function open() {
+    popup.hidden = false;
+    // Force a reflow so the .open transition actually plays instead of
+    // jumping straight to the end state.
+    void popup.offsetWidth;
+    popup.classList.add('open');
+    fab.setAttribute('aria-expanded', 'true');
+    const activePane = popup.querySelector('.ai-pane:not([hidden])');
+    const input = activePane && activePane.querySelector('textarea');
+    if (input) input.focus();
+  }
+  function close() {
+    popup.classList.remove('open');
+    fab.setAttribute('aria-expanded', 'false');
+    window.setTimeout(() => { popup.hidden = true; }, 180);
+  }
+
+  fab.addEventListener('click', () => {
+    popup.classList.contains('open') ? close() : open();
+  });
+  if (closeBtn) closeBtn.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && popup.classList.contains('open')) close();
+  });
+  document.addEventListener('click', (e) => {
+    if (!popup.classList.contains('open')) return;
+    if (popup.contains(e.target) || fab.contains(e.target)) return;
+    close();
+  });
+
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach((t) => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+      panes.forEach((p) => { p.hidden = p.dataset.pane !== tab.dataset.tab; });
+      const activePane = popup.querySelector(`.ai-pane[data-pane="${tab.dataset.tab}"]`);
+      const input = activePane && activePane.querySelector('textarea');
+      if (input) input.focus();
+    });
+  });
+
+  // Auto-grow each textarea up to the CSS max-height, then let it scroll.
+  function autoGrow(el) {
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }
+
+  function addMessage(thread, text, kind) {
+    const div = document.createElement('div');
+    div.className = 'ai-msg ai-msg-' + kind;
+    div.textContent = text;
+    thread.appendChild(div);
+    thread.scrollTop = thread.scrollHeight;
+    return div;
+  }
+
+  async function postJSON(url, body) {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': window.LIFEHUB_CSRF_TOKEN || '',
+      },
+      body: JSON.stringify(body),
+    });
+    return resp.json();
+  }
+
+  function wireForm(formId, threadId, { buildBody, onResult }) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+    const thread = document.getElementById(threadId);
+    const textarea = form.querySelector('textarea');
+    const button = form.querySelector('button');
+
+    textarea.addEventListener('input', () => autoGrow(textarea));
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const value = textarea.value.trim();
+      if (!value) return;
+
+      addMessage(thread, value, 'user');
+      textarea.value = '';
+      autoGrow(textarea);
+      textarea.disabled = true;
+      button.disabled = true;
+      const thinking = addMessage(thread, 'Thinking…', 'thinking');
+
+      try {
+        const data = await postJSON(form.action, buildBody(value));
+        thinking.remove();
+        onResult(thread, data);
+      } catch (err) {
+        thinking.remove();
+        addMessage(thread, "Couldn't reach the server — try again.", 'error');
+      } finally {
+        textarea.disabled = false;
+        button.disabled = false;
+        textarea.focus();
+      }
+    });
+  }
+
+  const askForm = document.getElementById('ai-ask-form');
+  if (askForm) askForm.action = '/api/ai/chat';
+  wireForm('ai-ask-form', 'ai-ask-thread', {
+    buildBody: (question) => ({ question }),
+    onResult: (thread, data) => {
+      if (data.ok) {
+        addMessage(thread, data.answer || '(no answer)', 'bot');
+      } else {
+        addMessage(thread, data.error || 'Something went wrong.', 'error');
+      }
+    },
+  });
+
+  const qaForm = document.getElementById('ai-qa-form');
+  if (qaForm) qaForm.action = '/api/ai/quick-add';
+  wireForm('ai-qa-form', 'ai-qa-thread', {
+    buildBody: (text) => ({ text }),
+    onResult: (thread, data) => {
+      if (data.ok) {
+        (data.messages || []).forEach((m) => addMessage(thread, m, 'bot'));
+      } else {
+        addMessage(thread, data.error || 'Something went wrong.', 'error');
+      }
+    },
+  });
+})();
