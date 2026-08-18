@@ -1611,9 +1611,20 @@ def calendar_view():
                 })
 
     leading_blanks = first_of_month.weekday()  # Monday = 0, matches the rest of the app
-    cells = [None] * leading_blanks + list(range(1, days_in_month + 1))
+    prev_days_in_month = calendar_mod.monthrange(prev_month.year, prev_month.month)[1]
+    leading_cells = [
+        {"day": d, "in_month": False, "date": prev_month.replace(day=d).isoformat()}
+        for d in range(prev_days_in_month - leading_blanks + 1, prev_days_in_month + 1)
+    ]
+    current_cells = [
+        {"day": d, "in_month": True, "date": date(year, month, d).isoformat()}
+        for d in range(1, days_in_month + 1)
+    ]
+    cells = leading_cells + current_cells
+    trailing_day = 1
     while len(cells) % 7 != 0:
-        cells.append(None)
+        cells.append({"day": trailing_day, "in_month": False, "date": next_month.replace(day=trailing_day).isoformat()})
+        trailing_day += 1
     weeks = [cells[i:i + 7] for i in range(0, len(cells), 7)]
 
     return render_template(
