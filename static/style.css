@@ -2012,6 +2012,7 @@ body[data-theme="light"] .calendar-cell.calendar-cell-empty {
 .ai-popup-empty { padding: 18px; margin: 0; }
 
 .ai-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ai-pane[hidden] { display: none; }
 .ai-thread {
   flex: 1;
   min-height: 0;
