@@ -1621,6 +1621,7 @@ def calendar_view():
         weeks=weeks,
         events_by_day=events_by_day,
         month_label=first_of_month.strftime("%B %Y"),
+        month_value=first_of_month.strftime("%Y-%m"),
         today=today,
         is_current_month=(year == today.year and month == today.month),
         prev_month=prev_month.strftime("%Y-%m"),
@@ -2341,7 +2342,10 @@ def add_note():
                 (user_id, title, body, db.now(), db.now()),
             )
         flash(f"Note added: {title}")
-    return redirect(url_for("notes"))
+    # Sent from the notes page itself, or quick-added from a calendar day —
+    # send them back wherever they came from instead of always jumping to
+    # /notes (matches the request.referrer fallback used elsewhere in the app).
+    return redirect(request.referrer or url_for("notes"))
 
 
 @app.route("/notes/<int:note_id>/edit", methods=["POST"])
