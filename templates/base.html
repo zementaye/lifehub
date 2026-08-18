@@ -79,16 +79,6 @@
 
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">Settings</a>
     <a href="{{ url_for('profile') }}" class="{{ 'active' if request.endpoint=='profile' }}">Profile</a>
-
-    <div class="nav-group">
-      <button type="button" class="nav-group-toggle {{ 'active' if request.endpoint in ['ai_chat','ai_quick_add'] }}">
-        AI <span class="caret">▾</span>
-      </button>
-      <div class="nav-group-menu">
-        <a href="{{ url_for('ai_quick_add') }}" class="{{ 'active' if request.endpoint=='ai_quick_add' }}">Quick Add</a>
-        <a href="{{ url_for('ai_chat') }}" class="{{ 'active' if request.endpoint=='ai_chat' }}">Ask</a>
-      </div>
-    </div>
   </nav>
 </header>
 
@@ -130,10 +120,6 @@
     <div class="sidebar-group-label">&nbsp;</div>
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">⚙ Settings</a>
     <a href="{{ url_for('profile') }}" class="{{ 'active' if request.endpoint=='profile' }}">👤 Profile</a>
-
-    <div class="sidebar-group-label">AI</div>
-    <a href="{{ url_for('ai_quick_add') }}" class="{{ 'active' if request.endpoint=='ai_quick_add' }}">✨ Quick Add</a>
-    <a href="{{ url_for('ai_chat') }}" class="{{ 'active' if request.endpoint=='ai_chat' }}">💬 Ask</a>
   </nav>
 </aside>
 
@@ -174,6 +160,59 @@
     </div>
   </div>
 </div>
+
+{% if user %}
+<!-- Floating AI assistant. Replaces the old "AI" nav dropdown (Quick Add /
+     Ask were separate pages) with a single popup available from anywhere
+     in the app — see the #ai-fab / #ai-popup handling in app.js. -->
+<script nonce="{{ csp_nonce() }}">window.LIFEHUB_AI_AVAILABLE = {{ 'true' if ai_available else 'false' }};</script>
+<button type="button" id="ai-fab" aria-haspopup="dialog" aria-expanded="false" aria-controls="ai-popup" aria-label="Open AI assistant">
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M12 3l1.8 4.6L18 9.4l-4.2 1.8L12 16l-1.8-4.8L6 9.4l4.2-1.8L12 3z" fill="currentColor"/>
+    <path d="M18.5 14l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9.9-2.3z" fill="currentColor"/>
+  </svg>
+</button>
+
+<div id="ai-popup" class="ai-popup" role="dialog" aria-modal="false" aria-label="AI assistant" hidden>
+  <div class="ai-popup-header">
+    <div class="ai-popup-tabs" role="tablist">
+      <button type="button" class="ai-tab active" data-tab="ask" role="tab" aria-selected="true">Ask</button>
+      <button type="button" class="ai-tab" data-tab="quick-add" role="tab" aria-selected="false">Quick Add</button>
+    </div>
+    <button type="button" id="ai-popup-close" aria-label="Close AI assistant">✕</button>
+  </div>
+
+  <div class="ai-popup-body">
+    {% if not ai_available %}
+      <p class="muted ai-popup-empty">⚠️ AI isn't set up on this server yet — an admin needs to configure it.</p>
+    {% else %}
+      <div class="ai-pane" data-pane="ask">
+        <div class="ai-thread" id="ai-ask-thread">
+          <div class="ai-msg ai-msg-bot">
+            Ask me about your budget, habits, to-dos, nutrition, or weight — nothing from Notes, Passwords, or the ID Vault is shared with me.
+          </div>
+        </div>
+        <form id="ai-ask-form" class="ai-input-row">
+          <textarea id="ai-ask-input" rows="1" placeholder="e.g. how much have I spent on food this month?" required></textarea>
+          <button type="submit" class="btn-icon" aria-label="Send">➤</button>
+        </form>
+      </div>
+
+      <div class="ai-pane" data-pane="quick-add" hidden>
+        <div class="ai-thread" id="ai-qa-thread">
+          <div class="ai-msg ai-msg-bot">
+            Type a sentence and it'll land in the right place — a transaction, a logged meal, a reminder, or a to-do. Try "spent 350 on groceries" or "remind me to renew my passport on October 3rd".
+          </div>
+        </div>
+        <form id="ai-qa-form" class="ai-input-row">
+          <textarea id="ai-qa-input" rows="1" placeholder="Type it however you'd say it..." required></textarea>
+          <button type="submit" class="btn-icon" aria-label="Send">➤</button>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
 <script src="{{ url_for('static', filename='app.js') }}?v={{ asset_version }}"></script>
 {% block scripts %}{% endblock %}
