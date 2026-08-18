@@ -36,6 +36,7 @@
             <input type="checkbox" class="note-select-box">
           </label>
           <h4>{{ n.title }}</h4>
+          {% if n.linked_date %}<span class="note-linked-date" title="Added from the calendar">📅 {{ n.linked_date }}</span>{% endif %}
         </div>
         <form method="post" action="{{ url_for('delete_note', note_id=n.id) }}" data-confirm="Delete {{ n.title }}?" class="note-delete-form">
           <button class="btn-icon" title="Delete">🗑️</button>

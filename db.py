@@ -238,6 +238,7 @@ CREATE TABLE IF NOT EXISTS notes (
     user_id INTEGER,
     title TEXT NOT NULL,
     body TEXT,
+    linked_date TEXT,
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
 );
@@ -288,6 +289,10 @@ _MIGRATIONS = [
     ("savings_goals", "user_id", "INTEGER"),
     ("passwords", "user_id", "INTEGER"),
     ("notes", "user_id", "INTEGER"),
+    # ISO date (YYYY-MM-DD) a note was tagged with when added from a
+    # calendar day cell, so the calendar can show it back on that day.
+    # NULL for notes added the normal way (from the Notes page).
+    ("notes", "linked_date", "TEXT"),
     ("users", "email_verified_at", "REAL"),
     ("users", "is_admin", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "disabled_at", "REAL"),

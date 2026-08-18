@@ -1457,6 +1457,7 @@ body.vault-blur-off .doc-thumb-wrap::after { content: none; }
   font-size: 0.85rem;
 }
 .note-body { white-space: pre-wrap; font-size: 0.9rem; margin: 6px 0; }
+.note-linked-date { flex: 0 0 auto; font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
 
 /* Bulk-select toolbar (Notes, and reusable wherever else it's needed) */
 .list-toolbar {
@@ -1814,6 +1815,7 @@ body[data-theme="light"] .calendar-cell.calendar-cell-empty {
 .calendar-evt-doc-ok          { border-left-color: color-mix(in srgb, var(--violet) 50%, var(--border)); color: color-mix(in srgb, var(--violet) 75%, var(--muted)); }
 .calendar-evt-doc-soon        { border-left-color: var(--primary); color: var(--primary); }
 .calendar-evt-doc-overdue     { border-left-color: var(--danger); color: var(--danger); font-weight: 600; background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.calendar-evt-note-added      { border-left-color: var(--success); color: var(--success); }
 
 .calendar-legend {
   display: flex;

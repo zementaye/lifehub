@@ -1574,6 +1574,10 @@ def calendar_view():
         doc_rows = conn.execute(
             "SELECT label, expiry_date, created_at FROM documents WHERE user_id = ?", (user_id,)
         ).fetchall()
+        note_rows = conn.execute(
+            "SELECT title, linked_date FROM notes WHERE user_id = ? AND linked_date BETWEEN ? AND ?",
+            (user_id, first_of_month.isoformat(), last_of_month.isoformat()),
+        ).fetchall()
 
     for r in due_reminders:
         d = date.fromisoformat(r["next_due"])
@@ -1617,6 +1621,15 @@ def calendar_view():
                     "title": doc["label"],
                     "sublabel": "expires",
                 })
+
+    for n in note_rows:
+        d = date.fromisoformat(n["linked_date"])
+        events_by_day[d.day].append({
+            "type": "note",
+            "state": "added",
+            "title": n["title"],
+            "sublabel": "note",
+        })
 
     leading_blanks = first_of_month.weekday()  # Monday = 0, matches the rest of the app
     prev_days_in_month = calendar_mod.monthrange(prev_month.year, prev_month.month)[1]
@@ -2354,11 +2367,17 @@ def add_note():
     user_id = g.user_id
     title = request.form.get("title", "").strip()
     body = request.form.get("body", "").strip()
+    linked_date = request.form.get("linked_date", "").strip() or None
+    if linked_date:
+        try:
+            date.fromisoformat(linked_date)
+        except ValueError:
+            linked_date = None
     if title:
         with db.get_conn() as conn:
             conn.execute(
-                "INSERT INTO notes (user_id, title, body, created_at, updated_at) VALUES (?,?,?,?,?)",
-                (user_id, title, body, db.now(), db.now()),
+                "INSERT INTO notes (user_id, title, body, linked_date, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+                (user_id, title, body, linked_date, db.now(), db.now()),
             )
         flash(f"Note added: {title}")
     # Sent from the notes page itself, or quick-added from a calendar day —
