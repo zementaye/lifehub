@@ -1683,19 +1683,6 @@ body.page-calendar_view { --tab-color: var(--accent); }
   background: color-mix(in srgb, var(--surface-raised) 70%, var(--tab-color) 8%);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--tab-color) 20%, transparent);
 }
-.calendar-cell-empty {
-  border: 1px solid transparent;
-  cursor: default;
-  /* Meaningfully darker than an in-month cell (not just a different mix
-     of the same near-white/near-black tokens, which read as identical) —
-     dark mode drops straight to --bg, the darkest token in the theme;
-     light mode blends in --muted, since --bg alone is barely distinguishable
-     from the card there. */
-  background: var(--bg);
-}
-body[data-theme="light"] .calendar-cell-empty {
-  background: color-mix(in srgb, var(--muted) 30%, var(--surface) 70%);
-}
 
 body[data-theme="light"] .calendar-cell {
   background: color-mix(in srgb, var(--surface-raised) 55%, var(--border-soft) 45%);
@@ -1714,6 +1701,22 @@ body[data-theme="light"] .calendar-cell:not(.calendar-cell-empty):hover {
 body[data-theme="light"] .calendar-days .calendar-cell:not(.calendar-cell-empty):nth-child(7n+6),
 body[data-theme="light"] .calendar-days .calendar-cell:not(.calendar-cell-empty):nth-child(7n) {
   background: color-mix(in srgb, var(--tab-color) 8%, color-mix(in srgb, var(--surface-raised) 55%, var(--border-soft) 45%));
+}
+
+/* Empty (outside-the-month) cells — placed last and selected as
+   .calendar-cell.calendar-cell-empty so this reliably beats every rule
+   above regardless of source order or theme, instead of losing a
+   same-specificity tiebreak to the light-theme .calendar-cell override. */
+.calendar-cell.calendar-cell-empty {
+  border: 1px solid transparent;
+  cursor: default;
+  /* Dark mode drops straight to --bg, the darkest token in the theme.
+     Light mode blends in --muted, since --bg alone is barely
+     distinguishable from the card there. */
+  background: var(--bg);
+}
+body[data-theme="light"] .calendar-cell.calendar-cell-empty {
+  background: color-mix(in srgb, var(--muted) 30%, var(--surface) 70%);
 }
 
 .calendar-cell-top { display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto; }
