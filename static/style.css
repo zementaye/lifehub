@@ -1708,15 +1708,15 @@ body[data-theme="light"] .calendar-days .calendar-cell:not(.calendar-cell-empty)
    above regardless of source order or theme, instead of losing a
    same-specificity tiebreak to the light-theme .calendar-cell override. */
 .calendar-cell.calendar-cell-empty {
-  border: 1px solid transparent;
+  border: 1px solid var(--border-soft);
   cursor: default;
-  /* Dark mode drops straight to --bg, the darkest token in the theme.
-     Light mode blends in --muted, since --bg alone is barely
-     distinguishable from the card there. */
-  background: var(--bg);
+  /* Blended partway toward --bg rather than set to --bg outright — pure
+     --bg reads as flat black and makes the cell disappear into the page
+     behind it instead of looking like a dimmed card. */
+  background: color-mix(in srgb, var(--bg) 45%, var(--surface-raised) 55%);
 }
 body[data-theme="light"] .calendar-cell.calendar-cell-empty {
-  background: color-mix(in srgb, var(--muted) 30%, var(--surface) 70%);
+  background: color-mix(in srgb, var(--muted) 22%, var(--surface) 78%);
 }
 
 .calendar-cell-top { display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto; }
@@ -1733,6 +1733,7 @@ body[data-theme="light"] .calendar-cell.calendar-cell-empty {
   font-weight: 600;
   color: var(--muted);
 }
+.calendar-day-num-outside { opacity: 0.55; }
 .calendar-cell-today {
   border-color: var(--tab-color);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--tab-color) 45%, transparent), 0 0 16px color-mix(in srgb, var(--tab-color) 25%, transparent);
