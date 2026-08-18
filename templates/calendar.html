@@ -25,13 +25,18 @@
 
   <div class="calendar-grid calendar-days">
     {% for week in weeks %}
-      {% for day in week %}
-        {% if day is none %}
-          <div class="calendar-cell calendar-cell-empty"></div>
+      {% for cell in week %}
+        {% if not cell.in_month %}
+          <div class="calendar-cell calendar-cell-empty">
+            <div class="calendar-cell-top">
+              <span class="calendar-day-num calendar-day-num-outside">{{ cell.day }}</span>
+            </div>
+          </div>
         {% else %}
+          {% set day = cell.day %}
           {% set day_events = events_by_day[day] %}
           {% set overflow_count = (day_events | length) - 3 %}
-          <div class="calendar-cell {{ 'calendar-cell-today' if is_current_month and day == today.day }}" data-date="{{ month_value }}-{{ '%02d' % day }}">
+          <div class="calendar-cell {{ 'calendar-cell-today' if is_current_month and day == today.day }}" data-date="{{ cell.date }}">
             <div class="calendar-cell-top">
               <span class="calendar-day-num">{{ day }}</span>
               {% if overflow_count > 0 %}<span class="calendar-evt-count">{{ day_events | length }}</span>{% endif %}
