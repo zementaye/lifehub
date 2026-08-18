@@ -31,7 +31,7 @@
         {% else %}
           {% set day_events = events_by_day[day] %}
           {% set overflow_count = (day_events | length) - 3 %}
-          <div class="calendar-cell {{ 'calendar-cell-today' if is_current_month and day == today.day }}">
+          <div class="calendar-cell {{ 'calendar-cell-today' if is_current_month and day == today.day }}" data-date="{{ month_value }}-{{ '%02d' % day }}">
             <div class="calendar-cell-top">
               <span class="calendar-day-num">{{ day }}</span>
               {% if overflow_count > 0 %}<span class="calendar-evt-count">{{ day_events | length }}</span>{% endif %}
@@ -104,6 +104,23 @@
   </div>
 </div>
 
+<div class="calendar-note-modal-backdrop" id="calendarNoteModalBackdrop" hidden>
+  <div class="calendar-note-modal" role="dialog" aria-modal="true" aria-labelledby="calendarNoteModalTitle">
+    <div class="calendar-note-modal-header">
+      <h3 id="calendarNoteModalTitle">Add note</h3>
+      <button type="button" class="btn-icon" id="calendarNoteModalClose" aria-label="Close">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('add_note') }}" class="calendar-note-form">
+      <input type="hidden" name="body" id="calendarNoteBodyInput">
+      <label>
+        <input type="text" name="title" id="calendarNoteTitleInput" placeholder="e.g. Zemen's Birthday" maxlength="200" required autocomplete="off">
+      </label>
+      <span class="calendar-note-hint">Saved to Notes, tagged with this date.</span>
+      <button type="submit">Save to Notes</button>
+    </form>
+  </div>
+</div>
+
 <script nonce="{{ csp_nonce() }}">
 // Every day cell stays a fixed size no matter how many events land on it —
 // only the first 3 render inline; the rest live in a <template> next to the
@@ -141,6 +158,52 @@
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !backdrop.hidden) closeModal();
+  });
+})();
+
+// Click any day cell (empty space, not an event or the "+N more" button)
+// to jot a quick note for that date — e.g. "Zemen's Birthday" — which is
+// saved straight into Notes, tagged with the date it was added from.
+(function () {
+  var noteBackdrop = document.getElementById('calendarNoteModalBackdrop');
+  var noteTitleEl = document.getElementById('calendarNoteModalTitle');
+  var noteInput = document.getElementById('calendarNoteTitleInput');
+  var noteBodyInput = document.getElementById('calendarNoteBodyInput');
+  var noteCloseBtn = document.getElementById('calendarNoteModalClose');
+  if (!noteBackdrop) return;
+
+  function formatDate(dateStr) {
+    var d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  function openNoteModal(dateStr) {
+    var label = formatDate(dateStr);
+    noteTitleEl.textContent = 'Add note — ' + label;
+    noteBodyInput.value = '\uD83D\uDCC5 ' + label;
+    noteInput.value = '';
+    noteBackdrop.hidden = false;
+    noteInput.focus();
+  }
+  function closeNoteModal() {
+    noteBackdrop.hidden = true;
+  }
+
+  document.querySelectorAll('.calendar-days').forEach(function (grid) {
+    grid.addEventListener('click', function (e) {
+      if (e.target.closest('.calendar-evt, .calendar-evt-more-btn')) return;
+      var cell = e.target.closest('.calendar-cell');
+      if (!cell || !cell.dataset.date) return;
+      openNoteModal(cell.dataset.date);
+    });
+  });
+  noteCloseBtn.addEventListener('click', closeNoteModal);
+  noteBackdrop.addEventListener('click', function (e) {
+    if (e.target === noteBackdrop) closeNoteModal();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !noteBackdrop.hidden) closeNoteModal();
   });
 })();
 </script>
