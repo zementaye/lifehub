@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tomi Fashion — Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/png" sizes="32x32" href="../Pictures/Icons/favicon-32.png">
+    <link rel="stylesheet" href="tomy-fashion.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin-body">
+
+<!-- LOGIN SCREEN -->
+<section id="loginScreen" class="admin-login">
+    <form id="loginForm" class="admin-login-card">
+        <span class="section-eyebrow">Tomi Fashion</span>
+        <h1>Admin Login</h1>
+        <label for="passwordInput">Password</label>
+        <input type="password" id="passwordInput" placeholder="Admin password" required autocomplete="current-password">
+        <button type="submit" class="btn">Log In</button>
+        <p id="loginError" class="admin-error" role="alert"></p>
+        <p class="admin-hint">Not configured yet? See <code>Tomy/admin-backend/README.md</code>.</p>
+    </form>
+</section>
+
+<!-- ADMIN DASHBOARD -->
+<section id="adminScreen" class="admin-dashboard hidden">
+    <header class="admin-header">
+        <span class="logo admin-logo">
+            <svg width="34" height="34" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo-mark" aria-hidden="true">
+                <rect x="1" y="1" width="34" height="34" rx="10" class="logo-badge"/>
+                <rect x="1" y="1" width="34" height="34" rx="10" fill="none" stroke="rgba(255,255,255,0.25)"/>
+                <path d="M10 11.5H26V15.5H20.2V25.5H15.8V15.5H10V11.5Z" fill="#fff"/>
+            </svg>
+            <span class="logo-word"><b>TOMI</b><span>FASHION</span></span>
+            <span class="admin-logo-tag">Admin</span>
+        </span>
+        <div class="admin-header-actions">
+            <a href="tomy-fashion.html" class="btn-ghost" target="_blank" rel="noopener">View Site ↗</a>
+            <button id="logoutBtn" class="btn-ghost">Log Out</button>
+        </div>
+    </header>
+
+    <div class="admin-toolbar">
+        <div class="admin-filters">
+            <select id="categoryFilter">
+                <option value="">All categories</option>
+                <option value="hoodies">Hoodies</option>
+                <option value="shirts">Shirts</option>
+                <option value="pants">Pants</option>
+                <option value="shoes">Shoes</option>
+                <option value="tracksuits">Tracksuits</option>
+                <option value="hats">Hats</option>
+            </select>
+            <input type="text" id="tableSearch" placeholder="Search by name...">
+        </div>
+        <button id="newProductBtn" class="btn">+ Add Product</button>
+    </div>
+
+    <p id="adminStatus" class="admin-status" role="status"></p>
+
+    <div class="admin-table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Featured</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="productsTableBody">
+                <tr><td colspan="6" class="admin-loading">Loading products…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- PRODUCT EDITOR MODAL -->
+<div id="editorOverlay" class="admin-overlay hidden">
+    <form id="productForm" class="admin-modal">
+        <div class="admin-modal-header">
+            <h3 id="editorTitle">Add Product</h3>
+            <button type="button" id="closeEditorBtn" class="admin-modal-close" aria-label="Close">&times;</button>
+        </div>
+
+        <input type="hidden" id="productId">
+
+        <label for="fieldName">Name</label>
+        <input type="text" id="fieldName" required placeholder="e.g. Classic Black Hoodie">
+
+        <div class="admin-field-row">
+            <div>
+                <label for="fieldCategory">Category</label>
+                <select id="fieldCategory" required>
+                    <option value="hoodies">Hoodies</option>
+                    <option value="shirts">Shirts</option>
+                    <option value="pants">Pants</option>
+                    <option value="shoes">Shoes</option>
+                    <option value="tracksuits">Tracksuits</option>
+                    <option value="hats">Hats</option>
+                </select>
+            </div>
+            <div>
+                <label for="fieldType">Card style</label>
+                <select id="fieldType">
+                    <option value="simple">Single image</option>
+                    <option value="swatch">Color swatches</option>
+                    <option value="slider">Image slider</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="admin-field-row">
+            <div>
+                <label for="fieldPrice">Price (Birr)</label>
+                <input type="number" id="fieldPrice" min="0" step="1" required placeholder="4900">
+            </div>
+            <div>
+                <label for="fieldOldPrice">Old price (optional, for a discount badge)</label>
+                <input type="number" id="fieldOldPrice" min="0" step="1" placeholder="e.g. 7900">
+            </div>
+        </div>
+
+        <div id="discountPercentRow" class="admin-field-row hidden">
+            <div>
+                <label for="fieldDiscountPercent">Discount badge % to show customers</label>
+                <input type="number" id="fieldDiscountPercent" min="1" max="99" step="1" placeholder="e.g. 20">
+                <p class="admin-field-hint">
+                    The price didn't go down, so there's no real % off to calculate. Set one here if you
+                    still want a "-X% OFF" badge on the storefront — it's just for display and won't
+                    change what the customer pays.
+                </p>
+            </div>
+        </div>
+
+        <label class="admin-checkbox">
+            <input type="checkbox" id="fieldFeatured">
+            Show on homepage "Featured Products"
+        </label>
+
+        <div class="admin-images-header">
+            <label>Images</label>
+            <button type="button" id="addImageBtn" class="btn-ghost btn-small">+ Add image</button>
+        </div>
+        <p class="admin-hint">
+            Use a path into <code>../Pictures/...</code> (existing product photos) or a full image URL.
+            Add a color only for "Color swatches" style — it's the swatch's hex code or a CSS gradient.
+        </p>
+        <div id="imagesList" class="admin-images-list"></div>
+
+        <div class="admin-images-header">
+            <label>Sizes &amp; stock</label>
+            <button type="button" id="addSizeBtn" class="btn-ghost btn-small">+ Add size</button>
+        </div>
+        <p class="admin-hint">
+            Add a row per size you carry with how many are in stock. Customers see this count when they tap that size.
+            Leave empty for one-size items (hats, accessories) — no size picker will show.
+        </p>
+        <div id="sizesList" class="admin-sizes-list"></div>
+
+        <p id="formError" class="admin-error" role="alert"></p>
+
+        <div class="admin-modal-footer">
+            <button type="button" id="deleteProductBtn" class="btn-danger hidden">Delete</button>
+            <div class="admin-modal-footer-right">
+                <button type="button" id="cancelEditorBtn" class="btn-ghost">Cancel</button>
+                <button type="submit" class="btn" id="saveProductBtn">Save</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script src="products-api.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
