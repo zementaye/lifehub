@@ -795,6 +795,11 @@ body.auth-page {
   font-size: 0.72rem; color: var(--muted); font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.04em;
 }
+.inline-form-field {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 0.72rem; color: var(--muted); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
 .inline-form input, .inline-form select, .inline-form textarea {
   padding: 8px 10px;
   border: 1px solid var(--border);
@@ -1501,6 +1506,111 @@ body.vault-blur-off .doc-thumb-wrap::after { content: none; }
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/* Styled file picker (used for note photo uploads) — hides the native
+   input/button entirely and replaces it with a dashed dropzone + preview
+   chips, since the raw "Choose Files" control looks out of place. */
+.photo-picker {
+  margin-top: 6px;
+}
+.photo-picker-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+.photo-picker-drop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  background: var(--border-soft);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.photo-picker-drop:hover {
+  border-color: var(--violet);
+}
+.photo-picker-drop.drag-active,
+.photo-picker-drop:focus-within {
+  border-color: var(--violet);
+  background: color-mix(in srgb, var(--violet) 10%, var(--border-soft));
+}
+.photo-picker-drop.has-files {
+  padding: 10px 16px;
+}
+.photo-picker-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.photo-picker-text {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.photo-picker-text strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.photo-picker-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.photo-picker-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 180px;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+  font-size: 0.75rem;
+}
+.photo-picker-chip img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+.photo-picker-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.photo-picker-chip-remove {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  min-width: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: none;
+  background: var(--border);
+  color: inherit;
+  font-size: 0.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.photo-picker-chip-remove:hover {
+  background: var(--violet);
+  color: #fff;
 }
 
 /* Bulk-select toolbar (Notes, and reusable wherever else it's needed) */

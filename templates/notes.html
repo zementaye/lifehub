@@ -10,9 +10,16 @@
     <label style="flex:1 1 100%;">Note
       <textarea name="body" rows="3" style="width:100%; resize:vertical;"></textarea>
     </label>
-    <label style="flex:1 1 100%;">Photos <span class="muted">(optional)</span>
-      <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/heic" multiple>
-    </label>
+    <div class="inline-form-field" style="flex:1 1 100%;">Photos <span class="muted" style="text-transform:none;">(optional)</span>
+      <div class="photo-picker" data-photo-picker>
+        <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/heic" multiple id="new-note-photos" class="photo-picker-input">
+        <label for="new-note-photos" class="photo-picker-drop">
+          <span class="photo-picker-icon">📷</span>
+          <span class="photo-picker-text"><strong>Click to add photos</strong><br>or drag them here</span>
+        </label>
+        <div class="photo-picker-list"></div>
+      </div>
+    </div>
     <button type="submit">Save</button>
   </form>
 </div>
@@ -75,9 +82,16 @@
         <button type="submit">Save</button>
       </form>
       <form method="post" action="{{ url_for('add_note_images', note_id=n.id) }}" enctype="multipart/form-data" class="inline-form note-photo-form" style="display:none; margin-top:10px;">
-        <label style="flex:1 1 100%;">Photos
-          <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/heic" multiple required>
-        </label>
+        <div class="inline-form-field" style="flex:1 1 100%;">Photos
+          <div class="photo-picker" data-photo-picker>
+            <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/heic" multiple required id="note-photos-{{ n.id }}" class="photo-picker-input">
+            <label for="note-photos-{{ n.id }}" class="photo-picker-drop">
+              <span class="photo-picker-icon">📷</span>
+              <span class="photo-picker-text"><strong>Click to add photos</strong><br>or drag them here</span>
+            </label>
+            <div class="photo-picker-list"></div>
+          </div>
+        </div>
         <button type="submit">Upload</button>
       </form>
     </div>
@@ -89,6 +103,80 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce() }}">
+// Turns a plain <input type="file"> into a styled dropzone with filename/
+// thumbnail chips, so people aren't stuck looking at the ugly native
+// "Choose Files" button. Purely a front-end presentation layer — the real
+// <input> still holds the files and still submits normally; we just keep
+// it in sync via DataTransfer when someone removes a chip.
+function initPhotoPicker(root) {
+  const input = root.querySelector('.photo-picker-input');
+  const drop = root.querySelector('.photo-picker-drop');
+  const list = root.querySelector('.photo-picker-list');
+  if (!input || !drop || !list) return;
+
+  function render() {
+    list.innerHTML = '';
+    Array.from(input.files).forEach((file, i) => {
+      const chip = document.createElement('div');
+      chip.className = 'photo-picker-chip';
+
+      if (file.type.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.onload = () => URL.revokeObjectURL(img.src);
+        chip.appendChild(img);
+      }
+
+      const name = document.createElement('span');
+      name.className = 'photo-picker-chip-name';
+      name.textContent = file.name;
+      chip.appendChild(name);
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'photo-picker-chip-remove';
+      remove.title = 'Remove';
+      remove.textContent = '✕';
+      remove.addEventListener('click', () => {
+        const dt = new DataTransfer();
+        Array.from(input.files).forEach((f, j) => { if (j !== i) dt.items.add(f); });
+        input.files = dt.files;
+        render();
+      });
+      chip.appendChild(remove);
+
+      list.appendChild(chip);
+    });
+    drop.classList.toggle('has-files', input.files.length > 0);
+  }
+
+  input.addEventListener('change', render);
+
+  ['dragenter', 'dragover'].forEach(evt => {
+    drop.addEventListener(evt, (e) => {
+      e.preventDefault();
+      drop.classList.add('drag-active');
+    });
+  });
+  ['dragleave', 'dragend', 'drop'].forEach(evt => {
+    drop.addEventListener(evt, (e) => {
+      e.preventDefault();
+      drop.classList.remove('drag-active');
+    });
+  });
+  drop.addEventListener('drop', (e) => {
+    const dropped = e.dataTransfer && e.dataTransfer.files;
+    if (!dropped || !dropped.length) return;
+    const dt = new DataTransfer();
+    Array.from(input.files).forEach(f => dt.items.add(f));
+    Array.from(dropped).forEach(f => dt.items.add(f));
+    input.files = dt.files;
+    render();
+  });
+}
+
+document.querySelectorAll('[data-photo-picker]').forEach(initPhotoPicker);
+
 document.querySelectorAll('.note-card').forEach(card => {
   const editToggle = card.querySelector('.note-edit-toggle');
   const editForm = card.querySelector('.note-edit-form');
