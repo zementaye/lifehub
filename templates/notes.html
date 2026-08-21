@@ -5,10 +5,13 @@
 
 <div class="card">
   <h3>New Note</h3>
-  <form method="post" action="{{ url_for('add_note') }}" class="inline-form">
+  <form method="post" action="{{ url_for('add_note') }}" enctype="multipart/form-data" class="inline-form">
     <label>Title <input type="text" name="title" placeholder="e.g. Wifi password, packing list" required></label>
     <label style="flex:1 1 100%;">Note
       <textarea name="body" rows="3" style="width:100%; resize:vertical;"></textarea>
+    </label>
+    <label style="flex:1 1 100%;">Photos <span class="muted">(optional)</span>
+      <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/heic" multiple>
     </label>
     <button type="submit">Save</button>
   </form>
@@ -43,13 +46,39 @@
         </form>
       </div>
       {% if n.body %}<p class="note-body">{{ n.body }}</p>{% endif %}
-      <button type="button" class="secondary note-edit-toggle">Edit</button>
+
+      {% set images = images_by_note.get(n.id, []) %}
+      {% if images %}
+        <div class="note-images">
+          {% for img in images %}
+            <div class="note-image-wrap">
+              <a href="{{ url_for('note_image_file', filename=img.filename) }}" target="_blank" rel="noopener">
+                <img src="{{ url_for('note_image_file', filename=img.filename) }}" class="note-image-thumb" alt="Photo attached to {{ n.title }}">
+              </a>
+              <form method="post" action="{{ url_for('delete_note_image', image_id=img.id) }}" data-confirm="Remove this photo?" class="note-image-delete-form">
+                <button type="submit" class="btn-icon note-image-delete-btn" title="Remove photo">✕</button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="note-card-actions">
+        <button type="button" class="secondary note-edit-toggle">Edit</button>
+        <button type="button" class="secondary note-photo-toggle">Add photo</button>
+      </div>
       <form method="post" action="{{ url_for('edit_note', note_id=n.id) }}" class="inline-form note-edit-form" style="display:none; margin-top:10px;">
         <label style="flex:1 1 100%;">Title <input type="text" name="title" value="{{ n.title }}" required></label>
         <label style="flex:1 1 100%;">Note
           <textarea name="body" rows="4" style="width:100%; resize:vertical;">{{ n.body or '' }}</textarea>
         </label>
         <button type="submit">Save</button>
+      </form>
+      <form method="post" action="{{ url_for('add_note_images', note_id=n.id) }}" enctype="multipart/form-data" class="inline-form note-photo-form" style="display:none; margin-top:10px;">
+        <label style="flex:1 1 100%;">Photos
+          <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/heic" multiple required>
+        </label>
+        <button type="submit">Upload</button>
       </form>
     </div>
   {% else %}
@@ -66,6 +95,14 @@ document.querySelectorAll('.note-card').forEach(card => {
   editToggle.addEventListener('click', () => {
     editForm.style.display = editForm.style.display === 'none' ? 'flex' : 'none';
   });
+
+  const photoToggle = card.querySelector('.note-photo-toggle');
+  const photoForm = card.querySelector('.note-photo-form');
+  if (photoToggle && photoForm) {
+    photoToggle.addEventListener('click', () => {
+      photoForm.style.display = photoForm.style.display === 'none' ? 'flex' : 'none';
+    });
+  }
 });
 
 // Select mode: pick several notes and delete them in one go instead of

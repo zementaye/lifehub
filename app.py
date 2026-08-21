@@ -1290,6 +1290,10 @@ def delete_custom_food(food_id):
 
 ALLOWED_EXT = {"png", "jpg", "jpeg", "webp", "heic", "pdf"}
 
+# Subset of ALLOWED_EXT usable for note photo attachments — no PDFs, notes
+# images are strictly pictures.
+NOTE_IMAGE_EXT = {"png", "jpg", "jpeg", "webp", "heic"}
+
 
 @app.route("/vault")
 @login_required
@@ -2358,7 +2362,65 @@ def notes():
         items = conn.execute(
             "SELECT * FROM notes WHERE user_id = ? ORDER BY updated_at DESC", (g.user_id,)
         ).fetchall()
-    return render_template("notes.html", items=items)
+        image_rows = conn.execute(
+            "SELECT * FROM note_images WHERE user_id = ? ORDER BY created_at", (g.user_id,)
+        ).fetchall()
+
+    images_by_note = {}
+    for img in image_rows:
+        images_by_note.setdefault(img["note_id"], []).append(img)
+
+    return render_template("notes.html", items=items, images_by_note=images_by_note)
+
+
+def _delete_note_image_files(filenames):
+    """Best-effort removal of note photo files from storage (local disk or
+    B2). Mirrors the vault's own cleanup — a failure here shouldn't block
+    the note/db row from being deleted, just gets logged."""
+    for filename in filenames:
+        try:
+            if config.USE_B2:
+                storage.delete_file(filename)
+            else:
+                path = config.UPLOAD_DIR / filename
+                if path.exists():
+                    path.unlink()
+        except Exception:
+            logger.exception("Failed to delete note image %s", filename)
+
+
+def _save_note_images(note_id, user_id, files):
+    """Uploads any valid image files onto an existing note. Returns
+    (saved_count, skipped_count) — skipped covers empty slots and
+    unsupported extensions, so the caller can flash a useful message."""
+    saved = 0
+    skipped = 0
+    for file in files:
+        if not file or not file.filename:
+            continue
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+        if ext not in NOTE_IMAGE_EXT:
+            skipped += 1
+            continue
+
+        filename = f"{uuid.uuid4().hex}.{ext}"
+        if config.USE_B2:
+            try:
+                storage.upload_fileobj(file, filename, content_type=file.mimetype)
+            except Exception:
+                logger.exception("B2 upload failed for note image %s", filename)
+                skipped += 1
+                continue
+        else:
+            file.save(config.UPLOAD_DIR / filename)
+
+        with db.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO note_images (note_id, user_id, filename, created_at) VALUES (?,?,?,?)",
+                (note_id, user_id, filename, db.now()),
+            )
+        saved += 1
+    return saved, skipped
 
 
 @app.route("/notes", methods=["POST"])
@@ -2375,11 +2437,21 @@ def add_note():
             linked_date = None
     if title:
         with db.get_conn() as conn:
-            conn.execute(
+            cur = conn.execute(
                 "INSERT INTO notes (user_id, title, body, linked_date, created_at, updated_at) VALUES (?,?,?,?,?,?)",
                 (user_id, title, body, linked_date, db.now(), db.now()),
             )
-        flash(f"Note added: {title}")
+            note_id = cur.lastrowid
+
+        images = [f for f in request.files.getlist("images") if f and f.filename]
+        if images:
+            _saved, skipped = _save_note_images(note_id, user_id, images)
+            if skipped:
+                flash(f"Note added: {title} (skipped {skipped} unsupported photo{'s' if skipped != 1 else ''})")
+            else:
+                flash(f"Note added: {title}")
+        else:
+            flash(f"Note added: {title}")
     # Sent from the notes page itself, or quick-added from a calendar day —
     # send them back wherever they came from instead of always jumping to
     # /notes (matches the request.referrer fallback used elsewhere in the app).
@@ -2400,11 +2472,69 @@ def edit_note(note_id):
     return redirect(url_for("notes"))
 
 
+@app.route("/notes/<int:note_id>/images", methods=["POST"])
+@login_required
+def add_note_images(note_id):
+    with db.get_conn() as conn:
+        owned = conn.execute(
+            "SELECT 1 FROM notes WHERE id = ? AND user_id = ?", (note_id, g.user_id)
+        ).fetchone()
+    if not owned:
+        return redirect(url_for("notes"))
+
+    images = [f for f in request.files.getlist("images") if f and f.filename]
+    if not images:
+        flash("Choose at least one photo to add.")
+        return redirect(url_for("notes"))
+
+    saved, skipped = _save_note_images(note_id, g.user_id, images)
+    if saved and skipped:
+        flash(f"Added {saved} photo{'s' if saved != 1 else ''} (skipped {skipped} unsupported).")
+    elif saved:
+        flash(f"Added {saved} photo{'s' if saved != 1 else ''}.")
+    else:
+        flash("Unsupported file type — use PNG, JPG, WEBP, or HEIC.")
+    return redirect(url_for("notes"))
+
+
+@app.route("/notes/image/<filename>")
+@login_required
+def note_image_file(filename):
+    with db.get_conn() as conn:
+        owned = conn.execute(
+            "SELECT 1 FROM note_images WHERE filename = ? AND user_id = ?", (filename, g.user_id)
+        ).fetchone()
+    if not owned:
+        return "Not found.", 404
+    if config.USE_B2:
+        return redirect(storage.presigned_url(filename))
+    return send_from_directory(config.UPLOAD_DIR, filename)
+
+
+@app.route("/notes/image/<int:image_id>/delete", methods=["POST"])
+@login_required
+def delete_note_image(image_id):
+    with db.get_conn() as conn:
+        img = conn.execute(
+            "SELECT * FROM note_images WHERE id = ? AND user_id = ?", (image_id, g.user_id)
+        ).fetchone()
+        if img:
+            conn.execute("DELETE FROM note_images WHERE id = ?", (image_id,))
+    if img:
+        _delete_note_image_files([img["filename"]])
+    return redirect(url_for("notes"))
+
+
 @app.route("/notes/<int:note_id>/delete", methods=["POST"])
 @login_required
 def delete_note(note_id):
     with db.get_conn() as conn:
+        image_rows = conn.execute(
+            "SELECT filename FROM note_images WHERE note_id = ? AND user_id = ?", (note_id, g.user_id)
+        ).fetchall()
+        conn.execute("DELETE FROM note_images WHERE note_id = ? AND user_id = ?", (note_id, g.user_id))
         conn.execute("DELETE FROM notes WHERE id = ? AND user_id = ?", (note_id, g.user_id))
+    _delete_note_image_files([r["filename"] for r in image_rows])
     return redirect(url_for("notes"))
 
 
@@ -2415,10 +2545,19 @@ def bulk_delete_notes():
     if ids:
         with db.get_conn() as conn:
             placeholders = ",".join("?" * len(ids))
+            image_rows = conn.execute(
+                f"SELECT filename FROM note_images WHERE user_id = ? AND note_id IN ({placeholders})",
+                (g.user_id, *ids),
+            ).fetchall()
+            conn.execute(
+                f"DELETE FROM note_images WHERE user_id = ? AND note_id IN ({placeholders})",
+                (g.user_id, *ids),
+            )
             conn.execute(
                 f"DELETE FROM notes WHERE user_id = ? AND id IN ({placeholders})",
                 (g.user_id, *ids),
             )
+        _delete_note_image_files([r["filename"] for r in image_rows])
         flash(f"Deleted {len(ids)} note{'s' if len(ids) != 1 else ''}.")
     return redirect(url_for("notes"))
 

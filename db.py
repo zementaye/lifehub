@@ -243,6 +243,14 @@ CREATE TABLE IF NOT EXISTS notes (
     updated_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS note_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_id INTEGER NOT NULL,
+    user_id INTEGER,
+    filename TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS admin_audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     actor_id INTEGER,             -- admin who performed the action; NULL if their account was later deleted
@@ -319,7 +327,7 @@ _USER_SCOPED_TABLES = [
     "profile", "weight_entries", "sessions", "custom_foods", "food_log",
     "documents", "reminders", "habits", "todos", "settings",
     "budget_categories", "transactions", "recurring_transactions",
-    "savings_goals", "passwords", "notes",
+    "savings_goals", "passwords", "notes", "note_images",
 ]
 
 # These four tables carried a table-level constraint in the old single-user
@@ -809,6 +817,7 @@ _CONTENT_TABLES = [
     ("Habits", "habits"),
     ("To-dos", "todos"),
     ("Notes", "notes"),
+    ("Note images", "note_images"),
     ("Vault documents", "documents"),
     ("Passwords", "passwords"),
     ("Transactions", "transactions"),
@@ -1029,14 +1038,17 @@ def admin_prune_audit_log(days: int = 180, keep_min: int = 2000) -> int:
 
 def admin_delete_user(user_id: int):
     """Deletes a user and every row of their data across every user-scoped
-    table. Returns the list of vault document filenames the caller should
-    also remove from file storage (local disk or B2) — that part isn't
-    tracked here since db.py doesn't know about storage.py."""
+    table. Returns the list of vault document and note image filenames the
+    caller should also remove from file storage (local disk or B2) — that
+    part isn't tracked here since db.py doesn't know about storage.py."""
     with get_conn() as conn:
         doc_rows = conn.execute(
             "SELECT filename FROM documents WHERE user_id = ?", (user_id,)
         ).fetchall()
-        filenames = [r["filename"] for r in doc_rows]
+        image_rows = conn.execute(
+            "SELECT filename FROM note_images WHERE user_id = ?", (user_id,)
+        ).fetchall()
+        filenames = [r["filename"] for r in doc_rows] + [r["filename"] for r in image_rows]
 
         # savings_contributions hangs off savings_goals (goal_id), not a
         # direct user_id column, so it needs its own scoped delete before
