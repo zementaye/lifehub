@@ -17,24 +17,25 @@ if (-not $repoRoot) {
 }
 
 $outFile = Join-Path $repoRoot "COMMIT_HISTORY.md"
+$timestamp = Get-Date -Format "yyyy-MM-dd HH:mm"
 
-$header = @"
-# Commit History
+$headerLines = @(
+    "# Commit History",
+    "",
+    "Auto-generated from git log - do not hand-edit. Regenerate with:",
+    "",
+    '```powershell',
+    '.\scripts\Update-CommitHistory.ps1',
+    '```',
+    "",
+    "Last updated: $timestamp",
+    "",
+    "---",
+    ""
+)
 
-Auto-generated from `git log` — do not hand-edit. Regenerate with:
+$log = git log --date=short --pretty=format:"- **%ad** `%h` - %s (%an)"
 
-``````powershell
-.\scripts\Update-CommitHistory.ps1
-``````
-
-Last updated: $(Get-Date -Format "yyyy-MM-dd HH:mm")
-
----
-
-"@
-
-$log = git log --date=short --pretty=format:"- **%ad** ``%h`` — %s (%an)"
-
-$header + $log | Set-Content -Path $outFile -Encoding utf8
+($headerLines + $log) | Set-Content -Path $outFile -Encoding utf8
 
 Write-Host "Wrote $outFile"
