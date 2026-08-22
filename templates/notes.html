@@ -46,7 +46,12 @@
             <input type="checkbox" class="note-select-box">
           </label>
           <h4>{{ n.title }}</h4>
-          {% if n.linked_date %}<span class="note-linked-date" title="Added from the calendar">📅 {{ n.linked_date }}</span>{% endif %}
+          {% if n.linked_date %}
+            <span class="note-linked-date" title="Added from the calendar">📅 {{ n.linked_date }}</span>
+            {% if n.recurrence and n.recurrence != 'once' %}
+              <span class="note-recurrence-badge" title="Repeats {{ n.recurrence }}">🔁 {{ n.recurrence|capitalize }}</span>
+            {% endif %}
+          {% endif %}
         </div>
         <form method="post" action="{{ url_for('delete_note', note_id=n.id) }}" data-confirm="Delete {{ n.title }}?" class="note-delete-form">
           <button class="btn-icon" title="Delete">🗑️</button>
@@ -79,6 +84,16 @@
         <label style="flex:1 1 100%;">Note
           <textarea name="body" rows="4" style="width:100%; resize:vertical;">{{ n.body or '' }}</textarea>
         </label>
+        {% if n.linked_date %}
+          <label style="flex:1 1 100%;">Repeats <span class="muted" style="text-transform:none;">(tagged {{ n.linked_date }})</span>
+            <select name="recurrence">
+              <option value="once" {{ 'selected' if n.recurrence == 'once' or not n.recurrence }}>Never (just this date)</option>
+              <option value="weekly" {{ 'selected' if n.recurrence == 'weekly' }}>Weekly</option>
+              <option value="monthly" {{ 'selected' if n.recurrence == 'monthly' }}>Monthly</option>
+              <option value="yearly" {{ 'selected' if n.recurrence == 'yearly' }}>Yearly</option>
+            </select>
+          </label>
+        {% endif %}
         <button type="submit">Save</button>
       </form>
       <form method="post" action="{{ url_for('add_note_images', note_id=n.id) }}" enctype="multipart/form-data" class="inline-form note-photo-form" style="display:none; margin-top:10px;">

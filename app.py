@@ -6,6 +6,7 @@ import threading
 import time
 import urllib.parse
 import uuid
+import calendar
 from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 
@@ -1293,6 +1294,7 @@ ALLOWED_EXT = {"png", "jpg", "jpeg", "webp", "heic", "pdf"}
 # Subset of ALLOWED_EXT usable for note photo attachments — no PDFs, notes
 # images are strictly pictures.
 NOTE_IMAGE_EXT = {"png", "jpg", "jpeg", "webp", "heic"}
+NOTE_RECURRENCES = {"once", "weekly", "monthly", "yearly"}
 
 
 @app.route("/vault")
@@ -1538,6 +1540,72 @@ def delete_reminder(reminder_id):
 # added to the vault, and the day they expire. Nothing new is stored here;
 # it's a read-only lens over reminders/todos/documents.
 
+_NOTE_RECURRENCE_LOOP_CAP = 1000  # safety net, not a realistic ceiling
+
+
+def _note_occurrences_in_range(anchor, recurrence, start, end):
+    """Every date a linked note (optionally recurring) lands on within
+    [start, end] — a birthday tagged 'yearly' shows up every year on the
+    same month/day, 'monthly' every month on the same day-of-month (or the
+    month's last day if it's shorter, e.g. an anchor of the 31st), 'weekly'
+    every 7 days from the anchor. Nothing is stored per-occurrence; this is
+    just projected on the fly whenever the calendar is rendered. Never
+    projects before the anchor date itself."""
+    if anchor > end:
+        return []
+
+    if recurrence == "weekly":
+        occs = []
+        cur = anchor
+        while cur < start:
+            cur += timedelta(days=7)
+        i = 0
+        while cur <= end and i < _NOTE_RECURRENCE_LOOP_CAP:
+            occs.append(cur)
+            cur += timedelta(days=7)
+            i += 1
+        return occs
+
+    if recurrence == "monthly":
+        occs = []
+        y, m = anchor.year, anchor.month
+        i = 0
+        while i < _NOTE_RECURRENCE_LOOP_CAP:
+            days_in = calendar.monthrange(y, m)[1]
+            candidate = date(y, m, min(anchor.day, days_in))
+            if candidate > end:
+                break
+            if candidate >= start:
+                occs.append(candidate)
+            m += 1
+            if m > 12:
+                m = 1
+                y += 1
+            i += 1
+        return occs
+
+    if recurrence == "yearly":
+        occs = []
+        y = anchor.year
+        i = 0
+        while i < _NOTE_RECURRENCE_LOOP_CAP:
+            try:
+                candidate = date(y, anchor.month, anchor.day)
+            except ValueError:
+                candidate = date(y, anchor.month, 28)  # anchor was Feb 29, this year isn't a leap year
+            if candidate > end:
+                break
+            if candidate >= start:
+                occs.append(candidate)
+            y += 1
+            i += 1
+        return occs
+
+    # 'once' (or anything unrecognized) — a single occurrence on the
+    # anchor date itself.
+    return [anchor] if start <= anchor <= end else []
+
+
 @app.route("/calendar")
 @login_required
 def calendar_view():
@@ -1579,8 +1647,8 @@ def calendar_view():
             "SELECT label, expiry_date, created_at FROM documents WHERE user_id = ?", (user_id,)
         ).fetchall()
         note_rows = conn.execute(
-            "SELECT title, linked_date FROM notes WHERE user_id = ? AND linked_date BETWEEN ? AND ?",
-            (user_id, first_of_month.isoformat(), last_of_month.isoformat()),
+            "SELECT title, linked_date, recurrence FROM notes WHERE user_id = ? AND linked_date IS NOT NULL",
+            (user_id,),
         ).fetchall()
 
     for r in due_reminders:
@@ -1627,13 +1695,15 @@ def calendar_view():
                 })
 
     for n in note_rows:
-        d = date.fromisoformat(n["linked_date"])
-        events_by_day[d.day].append({
-            "type": "note",
-            "state": "added",
-            "title": n["title"],
-            "sublabel": "note",
-        })
+        anchor = date.fromisoformat(n["linked_date"])
+        recurrence = n["recurrence"] or "once"
+        for occ in _note_occurrences_in_range(anchor, recurrence, first_of_month, last_of_month):
+            events_by_day[occ.day].append({
+                "type": "note",
+                "state": "added",
+                "title": n["title"],
+                "sublabel": "note" if recurrence == "once" else f"note · repeats {recurrence}",
+            })
 
     leading_blanks = first_of_month.weekday()  # Monday = 0, matches the rest of the app
     prev_days_in_month = calendar_mod.monthrange(prev_month.year, prev_month.month)[1]
@@ -2435,11 +2505,17 @@ def add_note():
             date.fromisoformat(linked_date)
         except ValueError:
             linked_date = None
+    # Recurrence only means anything alongside a linked date (a birthday
+    # tagged yearly, etc.) — a plain note with no date is always 'once'
+    # regardless of what the form sends.
+    recurrence = request.form.get("recurrence", "once")
+    if recurrence not in NOTE_RECURRENCES or not linked_date:
+        recurrence = "once"
     if title:
         with db.get_conn() as conn:
             cur = conn.execute(
-                "INSERT INTO notes (user_id, title, body, linked_date, created_at, updated_at) VALUES (?,?,?,?,?,?)",
-                (user_id, title, body, linked_date, db.now(), db.now()),
+                "INSERT INTO notes (user_id, title, body, linked_date, recurrence, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+                (user_id, title, body, linked_date, recurrence, db.now(), db.now()),
             )
             note_id = cur.lastrowid
 
@@ -2464,10 +2540,22 @@ def edit_note(note_id):
     title = request.form.get("title", "").strip()
     body = request.form.get("body", "").strip()
     with db.get_conn() as conn:
-        conn.execute(
-            "UPDATE notes SET title=?, body=?, updated_at=? WHERE id=? AND user_id=?",
-            (title, body, db.now(), note_id, g.user_id),
-        )
+        existing = conn.execute(
+            "SELECT linked_date FROM notes WHERE id = ? AND user_id = ?", (note_id, g.user_id)
+        ).fetchone()
+        if existing and existing["linked_date"]:
+            recurrence = request.form.get("recurrence", "once")
+            if recurrence not in NOTE_RECURRENCES:
+                recurrence = "once"
+            conn.execute(
+                "UPDATE notes SET title=?, body=?, recurrence=?, updated_at=? WHERE id=? AND user_id=?",
+                (title, body, recurrence, db.now(), note_id, g.user_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE notes SET title=?, body=?, updated_at=? WHERE id=? AND user_id=?",
+                (title, body, db.now(), note_id, g.user_id),
+            )
     flash("Note updated.")
     return redirect(url_for("notes"))
 

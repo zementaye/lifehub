@@ -124,6 +124,15 @@
       <label>
         <input type="text" name="title" id="calendarNoteTitleInput" placeholder="e.g. Zemen's Birthday" maxlength="200" required autocomplete="off">
       </label>
+      <label class="calendar-note-repeat-label">
+        Repeats <span class="muted">(optional — e.g. a birthday, every year)</span>
+        <select name="recurrence" id="calendarNoteRecurrenceInput">
+          <option value="once">Never (just this date)</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </label>
       <span class="calendar-note-hint">Saved to Notes, tagged with this date.</span>
       <button type="submit">Save to Notes</button>
     </form>
@@ -179,6 +188,7 @@
   var noteInput = document.getElementById('calendarNoteTitleInput');
   var noteBodyInput = document.getElementById('calendarNoteBodyInput');
   var noteDateInput = document.getElementById('calendarNoteDateInput');
+  var noteRecurrenceInput = document.getElementById('calendarNoteRecurrenceInput');
   var noteCloseBtn = document.getElementById('calendarNoteModalClose');
   if (!noteBackdrop) return;
 
@@ -194,6 +204,7 @@
     noteBodyInput.value = '\uD83D\uDCC5 ' + label;
     noteDateInput.value = dateStr;
     noteInput.value = '';
+    noteRecurrenceInput.value = 'once';
     noteBackdrop.hidden = false;
     noteInput.focus();
   }

@@ -239,6 +239,7 @@ CREATE TABLE IF NOT EXISTS notes (
     title TEXT NOT NULL,
     body TEXT,
     linked_date TEXT,
+    recurrence TEXT NOT NULL DEFAULT 'once',
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
 );
@@ -301,6 +302,11 @@ _MIGRATIONS = [
     # calendar day cell, so the calendar can show it back on that day.
     # NULL for notes added the normal way (from the Notes page).
     ("notes", "linked_date", "TEXT"),
+    # 'once' (default), 'weekly', 'monthly', or 'yearly' — only meaningful
+    # alongside linked_date (e.g. a birthday tagged yearly). The calendar
+    # projects future occurrences from linked_date forward; it isn't
+    # stored per-occurrence, just computed on the fly in calendar_view().
+    ("notes", "recurrence", "TEXT NOT NULL DEFAULT 'once'"),
     ("users", "email_verified_at", "REAL"),
     ("users", "is_admin", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "disabled_at", "REAL"),

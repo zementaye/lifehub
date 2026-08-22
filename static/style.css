@@ -1463,6 +1463,15 @@ body.vault-blur-off .doc-thumb-wrap::after { content: none; }
 }
 .note-body { white-space: pre-wrap; font-size: 0.9rem; margin: 6px 0; }
 .note-linked-date { flex: 0 0 auto; font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+.note-recurrence-badge {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: var(--violet);
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--violet) 14%, transparent);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
 
 .note-images {
   display: flex;
@@ -2064,8 +2073,36 @@ body[data-theme="light"] .calendar-cell.calendar-cell-empty {
   flex-direction: column;
   gap: 10px;
 }
-.calendar-note-form input[type="text"] {
+.calendar-note-form input[type="text"],
+.calendar-note-form select {
   width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.92rem;
+  font-family: var(--font-body);
+  background: var(--surface-raised);
+  color: var(--ink);
+  color-scheme: dark;
+}
+body[data-theme="light"] .calendar-note-form input[type="text"],
+body[data-theme="light"] .calendar-note-form select { color-scheme: light; }
+.calendar-note-form input[type="text"]::placeholder { color: var(--muted); }
+.calendar-note-form select { cursor: pointer; }
+.calendar-note-repeat-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.calendar-note-repeat-label .muted {
+  text-transform: none;
+  font-weight: 400;
+  font-size: 0.72rem;
 }
 .calendar-note-form .calendar-note-hint {
   font-size: 0.76rem;
