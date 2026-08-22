@@ -96,11 +96,13 @@
 {% block scripts %}
 <style>
 .settings-fields input[readonly] {
-  opacity: .6;
+  color: color-mix(in srgb, var(--ink) 68%, var(--muted));
+  border-color: var(--border-soft);
   cursor: default;
 }
 .settings-fields select.settings-locked-field {
-  opacity: .6;
+  color: color-mix(in srgb, var(--ink) 68%, var(--muted));
+  border-color: var(--border-soft);
   cursor: default;
   pointer-events: none;
 }
