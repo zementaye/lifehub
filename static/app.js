@@ -527,7 +527,21 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
     // A form can override the overlay's wording via data-loading-text — the
     // AI forms use this since a Gemini round-trip is a lot longer than a
     // normal save and "Thinking…" sets that expectation better than "Saving…".
-    textEl.textContent = form.dataset.loadingText || 'Saving…';
+    // Delete actions get their own wording too: every delete form either
+    // goes through the shared confirm modal with the default "Delete"
+    // button label, or explicitly overrides it (e.g. "Delete user",
+    // "Delete my account") — non-destructive confirmations always set a
+    // different label (Suspend, Make admin, Log out everywhere, etc.), so
+    // checking that label tells us this is actually a delete without
+    // needing every template to opt in individually.
+    let loadingText = form.dataset.loadingText;
+    if (!loadingText && form.dataset.confirm) {
+      const confirmLabel = form.dataset.confirmOk || 'Delete';
+      if (/^(delete|remove)/i.test(confirmLabel)) {
+        loadingText = 'Deleting…';
+      }
+    }
+    textEl.textContent = loadingText || 'Saving…';
     mountOverlay();
     overlay.classList.add('visible');
   });
