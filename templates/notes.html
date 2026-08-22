@@ -232,6 +232,20 @@ document.querySelectorAll('.note-card').forEach(card => {
     if (e.target.classList.contains('note-select-box')) updateCount();
   });
 
+  // While selecting, clicking anywhere on a card toggles it — not just the
+  // tiny checkbox. Real controls still work as themselves (the checkbox's
+  // own label, Edit/Add photo buttons, photo links) so this only catches
+  // clicks that land on the card body/title/blank space.
+  grid.addEventListener('click', (e) => {
+    if (!grid.classList.contains('selecting')) return;
+    if (e.target.closest('a, button, input, textarea, select, label')) return;
+    const card = e.target.closest('.note-card');
+    const box = card && card.querySelector('.note-select-box');
+    if (!box) return;
+    box.checked = !box.checked;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
   bulkForm.addEventListener('submit', (e) => {
     // Bake the currently-checked note ids into the form right before it
     // submits (they live on cards elsewhere on the page, not inside this

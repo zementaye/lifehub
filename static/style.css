@@ -1647,9 +1647,20 @@ body.vault-blur-off .doc-thumb-wrap::after { content: none; }
 .grid.selecting .note-card .note-delete-form { display: none; }
 .grid.selecting .note-card {
   transition: box-shadow 0.15s ease;
+  cursor: pointer;
+}
+.grid.selecting .note-card:hover {
+  box-shadow: 0 0 0 1px var(--border-soft);
 }
 .grid.selecting .note-card:has(.note-select-box:checked) {
   box-shadow: 0 0 0 2px var(--tab-color);
+}
+.grid.selecting .note-card a,
+.grid.selecting .note-card button,
+.grid.selecting .note-card input,
+.grid.selecting .note-card textarea,
+.grid.selecting .note-card select {
+  cursor: auto;
 }
 
 /* Link styled like button.secondary, for <a> tags */
