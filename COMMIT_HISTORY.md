@@ -6,10 +6,18 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-08-21 22:51
+Last updated: 2026-08-23 15:33
 
 ---
 
+- **2026-08-23** 9e25c02 - Add shared calendar dates feature with notifications inbox (Zemen)
+- **2026-08-23** 9a8d732 - Add shared calendar dates feature (notifications, share links) (Zemen)
+- **2026-08-22** 1cce218 - Add optional recurrence to calendar notes; fix dull add-note modal text (Zemen)
+- **2026-08-22** 0d0a09d - Brighten muted text color in dark mode for readability (Zemen)
+- **2026-08-22** 6716000 - Allow clicking anywhere on a note card to select it (Zemen)
+- **2026-08-22** 553ebcb - Fix low-contrast locked settings fields in dark mode (Zemen)
+- **2026-08-22** b9d9e6f - Show 'Deleting...' instead of 'Saving...' for delete actions (Zemen)
+- **2026-08-21** a79f135 - Fix commit history script (encoding/here-string bug) (Zemen)
 - **2026-08-21** 9e00b2a - Add project docs: rules, commit history, chat history (Zemen)
 - **2026-08-21** 10b021a - Style the note photo upload as a dropzone (Zemen)
 - **2026-08-21** 30f5ebe - Add optional photo attachments to notes (Zemen)
