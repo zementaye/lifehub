@@ -56,6 +56,9 @@ Rules for this flow:
 
 - Claude always lists out the exact `Copy-Item` commands for each changed
   file — never a blind folder copy that could overwrite unrelated files.
+- Each delivered zip gets a unique filename — never reuse the same zip name
+  across deliverables in a session or across sessions, so old downloads in
+  `C:\Users\HP\Downloads` don't get confused with new ones.
 - HP reviews `git diff` before committing. Claude should tell them what to
   look for if it isn't obvious.
 - Commit messages are short, specific, and describe the change (not "update

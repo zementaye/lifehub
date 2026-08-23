@@ -37,3 +37,25 @@ going forward so it doesn't need to be re-explained each session.
 `scripts/Update-CommitHistory.ps1`), and this file, `CHAT_HISTORY.md`
 (session-by-session summary), so future sessions have context without
 re-deriving it from scratch.
+
+## 2026-08-23
+
+**Shared calendar dates.** New feature: share specific dated notes (e.g. a
+birthday) with another LifeHub account without exposing the whole
+calendar. Flow: pick dated notes on the Notes page → get a link → send it
+however you like → recipient logs in/signs up, previews, and
+accepts/declines. Accepted dates read live off the source note (title/date/
+recurrence), so edits on the owner's side show up automatically — no
+re-sharing needed. Owner can revoke a whole link or remove a single date;
+recipient can remove it from their own calendar. New DB tables:
+`share_requests`, `share_request_items`.
+
+**Notifications inbox.** Added as a dependency of the sharing feature but
+built generic — new `notifications` table, a `/notifications` page, and a
+bell icon with unread badge in both nav bars. Currently only sharing
+activity (accepted/declined/revoked) writes to it, but any future feature
+can drop a row in without new schema.
+
+**Login/register now preserve a `next=` redirect.** Needed so someone who
+opens a share link without an account yet gets bounced back to it after
+signing up, instead of landing on the dashboard.
