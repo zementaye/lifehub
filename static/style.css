@@ -1990,6 +1990,7 @@ body[data-theme="light"] .calendar-cell.calendar-cell-empty {
 .calendar-evt-doc-soon        { border-left-color: var(--primary); color: var(--primary); }
 .calendar-evt-doc-overdue     { border-left-color: var(--danger); color: var(--danger); font-weight: 600; background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .calendar-evt-note-added      { border-left-color: var(--success); color: var(--success); }
+.calendar-evt-shared-added    { border-left-color: var(--rivet); color: var(--rivet); }
 
 .calendar-legend {
   display: flex;
@@ -2294,4 +2295,132 @@ body[data-theme="light"] .calendar-note-form select { color-scheme: light; }
     height: min(70vh, calc(100vh - 116px));
   }
   #ai-fab { right: 16px; bottom: 16px; }
+}
+
+/* Shared dates — sharing specific calendar dates with another account
+   (Notes page management UI + the notification bell). */
+.section-heading {
+  margin: var(--gap-section) 0 var(--gap-sub);
+  font-size: 1.1rem;
+}
+.share-link-card { border: 1px solid var(--rivet); }
+.share-link-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.share-link-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+}
+.share-request-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.share-request-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.share-request-row:last-child { border-bottom: none; padding-bottom: 0; }
+.share-request-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.share-request-to { font-weight: 600; font-size: 0.85rem; }
+.share-request-items-list { font-size: 0.78rem; }
+.share-request-actions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.share-status-badge {
+  display: inline-block;
+  width: fit-content;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  margin-bottom: 2px;
+}
+.share-status-pending  { background: color-mix(in srgb, var(--primary) 18%, transparent); color: var(--primary); }
+.share-status-accepted { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
+.share-status-declined { background: color-mix(in srgb, var(--muted) 18%, transparent); color: var(--muted); }
+.share-status-revoked  { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+
+/* Notifications bell (topbar + sidebar) */
+.nav-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.nav-bell-count {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+.notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.notification-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+.notification-row:hover { background: var(--surface-raised); }
+.notification-row.unread { background: color-mix(in srgb, var(--rivet) 8%, transparent); }
+.notification-title { font-weight: 600; font-size: 0.88rem; }
+.notification-body { font-size: 0.8rem; color: var(--muted); }
+.notification-time { font-size: 0.7rem; color: var(--muted); }
+
+.shared-preview-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.shared-preview-list li {
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+.shared-preview-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
 }

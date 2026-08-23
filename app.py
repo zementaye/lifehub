@@ -331,11 +331,16 @@ def register():
     session.permanent = True
     session["session_issued_at"] = time.time()
     _start_email_verification(user_id, email)
+    # Same "come back here after auth" support login() has — most useful
+    # for someone who followed a shared-dates link (/shared/<token>) but
+    # didn't have an account yet: sign up, then land straight back on the
+    # link to accept it instead of at the dashboard.
+    next_path = _safe_next(request.form.get("next") or request.args.get("next"))
     # Mark this browser as recognized without sending a "new sign-in"
     # email — they're already getting the verification email below, and
     # a second "new device" email for the browser they just registered
     # from would just be redundant noise.
-    resp = make_response(redirect(url_for("dashboard")))
+    resp = make_response(redirect(next_path or url_for("dashboard")))
     return _remember_device(resp, user_id)
 
 
@@ -1651,6 +1656,8 @@ def calendar_view():
             (user_id,),
         ).fetchall()
 
+    shared_rows = db.shared_dates_for_calendar(user_id)
+
     for r in due_reminders:
         d = date.fromisoformat(r["next_due"])
         events_by_day[d.day].append({
@@ -1703,6 +1710,17 @@ def calendar_view():
                 "state": "added",
                 "title": n["title"],
                 "sublabel": "note" if recurrence == "once" else f"note · repeats {recurrence}",
+            })
+
+    for s in shared_rows:
+        anchor = date.fromisoformat(s["linked_date"])
+        recurrence = s["recurrence"] or "once"
+        for occ in _note_occurrences_in_range(anchor, recurrence, first_of_month, last_of_month):
+            events_by_day[occ.day].append({
+                "type": "shared",
+                "state": "added",
+                "title": s["title"],
+                "sublabel": f"shared by {s['owner_email']}" if recurrence == "once" else f"shared by {s['owner_email']} · repeats {recurrence}",
             })
 
     leading_blanks = first_of_month.weekday()  # Monday = 0, matches the rest of the app
@@ -2440,7 +2458,21 @@ def notes():
     for img in image_rows:
         images_by_note.setdefault(img["note_id"], []).append(img)
 
-    return render_template("notes.html", items=items, images_by_note=images_by_note)
+    outgoing_shares = db.list_outgoing_shares(g.user_id)
+    outgoing_items = {sr["id"]: db.get_share_request_items(sr["id"], include_removed=True) for sr in outgoing_shares}
+    outgoing_links = {sr["id"]: _share_link(sr["token"]) for sr in outgoing_shares if sr["status"] == "pending"}
+    incoming_shares = db.list_incoming_shares(g.user_id)
+    incoming_items = {sr["id"]: db.get_share_request_items(sr["id"]) for sr in incoming_shares}
+
+    new_share_token = request.args.get("shared_token")
+    new_share_link = _share_link(new_share_token) if new_share_token else None
+
+    return render_template(
+        "notes.html", items=items, images_by_note=images_by_note,
+        outgoing_shares=outgoing_shares, outgoing_items=outgoing_items, outgoing_links=outgoing_links,
+        incoming_shares=incoming_shares, incoming_items=incoming_items,
+        new_share_link=new_share_link,
+    )
 
 
 def _delete_note_image_files(filenames):
@@ -2622,6 +2654,7 @@ def delete_note(note_id):
         ).fetchall()
         conn.execute("DELETE FROM note_images WHERE note_id = ? AND user_id = ?", (note_id, g.user_id))
         conn.execute("DELETE FROM notes WHERE id = ? AND user_id = ?", (note_id, g.user_id))
+    db.remove_note_from_shares(note_id)
     _delete_note_image_files([r["filename"] for r in image_rows])
     return redirect(url_for("notes"))
 
@@ -2645,9 +2678,171 @@ def bulk_delete_notes():
                 f"DELETE FROM notes WHERE user_id = ? AND id IN ({placeholders})",
                 (g.user_id, *ids),
             )
+        for note_id in ids:
+            db.remove_note_from_shares(note_id)
         _delete_note_image_files([r["filename"] for r in image_rows])
         flash(f"Deleted {len(ids)} note{'s' if len(ids) != 1 else ''}.")
     return redirect(url_for("notes"))
+
+
+# ── Shared dates ─────────────────────────────────────────────────────────
+# Share a handful of specific calendar dates (a birthday, an anniversary —
+# any dated note) with another LifeHub account, without handing over the
+# whole calendar. Flow: pick some dated notes on the Notes page → get a
+# link → send it however you like → whoever opens it (and is logged in)
+# sees a preview and can accept or decline. Accepted dates read live off
+# the source note, so an edit on the owner's side (rename, date fix,
+# recurrence change) is reflected automatically. See db.py's "Shared
+# dates" section for the underlying schema and queries.
+
+def _share_link(token: str) -> str:
+    base = config.APP_BASE_URL.rstrip("/") if config.APP_BASE_URL else request.url_root.rstrip("/")
+    return f"{base}{url_for('shared_preview', token=token)}"
+
+
+@app.route("/notes/share", methods=["POST"])
+@login_required
+def create_share():
+    note_ids = request.form.getlist("note_ids", type=int)
+    if not note_ids:
+        flash("Select at least one dated note to share.")
+        return redirect(url_for("notes"))
+
+    with db.get_conn() as conn:
+        placeholders = ",".join("?" * len(note_ids))
+        owned_dated = conn.execute(
+            f"SELECT id FROM notes WHERE user_id = ? AND id IN ({placeholders}) AND linked_date IS NOT NULL",
+            (g.user_id, *note_ids),
+        ).fetchall()
+    owned_ids = [r["id"] for r in owned_dated]
+
+    if not owned_ids:
+        flash("Select at least one dated note to share — plain notes without a date can't be shared.")
+        return redirect(url_for("notes"))
+
+    token = db.create_share_request(g.user_id, owned_ids)
+    flash("Share link ready — copy it below and send it to whoever you want.")
+    return redirect(url_for("notes", shared_token=token))
+
+
+@app.route("/shared/<token>")
+@login_required
+def shared_preview(token):
+    sr = db.get_share_request_by_token(token)
+    if not sr:
+        flash("That share link doesn't exist, or has been removed.")
+        return redirect(url_for("dashboard"))
+
+    if sr["owner_id"] == g.user_id:
+        # The owner clicking their own link — send them to the management
+        # view on Notes instead of a preview that doesn't apply to them.
+        return redirect(url_for("notes"))
+
+    items = db.get_share_request_items(sr["id"])
+    return render_template("shared_preview.html", sr=sr, items=items)
+
+
+@app.route("/shared/<token>/accept", methods=["POST"])
+@login_required
+def accept_share(token):
+    result = db.respond_to_share_request(token, g.user_id, accept=True)
+    if result == "accepted":
+        sr = db.get_share_request_by_token(token)
+        recipient_email = db.get_user_by_id(g.user_id)["email"]
+        db.create_notification(
+            sr["owner_id"], "share_accepted",
+            f"{recipient_email} accepted your shared dates",
+            link=url_for("notes"),
+        )
+        flash("Added to your calendar.")
+        return redirect(url_for("calendar_view"))
+    flash("That share link can't be accepted — it may have already been used or revoked.")
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/shared/<token>/decline", methods=["POST"])
+@login_required
+def decline_share(token):
+    sr_before = db.get_share_request_by_token(token)
+    result = db.respond_to_share_request(token, g.user_id, accept=False)
+    if result == "declined" and sr_before:
+        verb = "removed" if sr_before["status"] == "accepted" else "declined"
+        recipient_email = db.get_user_by_id(g.user_id)["email"]
+        db.create_notification(
+            sr_before["owner_id"], "share_declined",
+            f"{recipient_email} {verb} your shared dates",
+            link=url_for("notes"),
+        )
+        flash("Removed." if sr_before["status"] == "accepted" else "Declined.")
+    else:
+        flash("That share link can't be updated right now.")
+    return redirect(request.referrer or url_for("notes"))
+
+
+@app.route("/share/<int:request_id>/revoke", methods=["POST"])
+@login_required
+def revoke_share(request_id):
+    with db.get_conn() as conn:
+        sr = conn.execute("SELECT * FROM share_requests WHERE id = ?", (request_id,)).fetchone()
+    ok = db.revoke_share_request(request_id, g.user_id)
+    if ok:
+        if sr and sr["status"] == "accepted" and sr["recipient_id"]:
+            owner_email = db.get_user_by_id(g.user_id)["email"]
+            db.create_notification(
+                sr["recipient_id"], "share_revoked",
+                f"{owner_email} revoked some shared dates",
+                link=url_for("calendar_view"),
+            )
+        flash("Share link revoked.")
+    else:
+        flash("Couldn't revoke that link.")
+    return redirect(url_for("notes"))
+
+
+@app.route("/share/<int:request_id>/items/<int:item_id>/remove", methods=["POST"])
+@login_required
+def remove_share_item(request_id, item_id):
+    with db.get_conn() as conn:
+        sr = conn.execute("SELECT * FROM share_requests WHERE id = ?", (request_id,)).fetchone()
+    ok = db.remove_share_item(request_id, g.user_id, item_id)
+    if ok:
+        if sr and sr["status"] == "accepted" and sr["recipient_id"]:
+            db.create_notification(
+                sr["recipient_id"], "share_revoked",
+                f"{g.user["email"]} removed a shared date",
+                link=url_for("calendar_view"),
+            )
+        flash("Removed that date from the share.")
+    else:
+        flash("Couldn't remove that date.")
+    return redirect(url_for("notes"))
+
+
+# ── Notifications ────────────────────────────────────────────────────────
+
+@app.route("/notifications")
+@login_required
+def notifications():
+    rows = db.list_notifications(g.user_id)
+    tz = scheduler.get_tz(g.user_id)
+    items = []
+    for r in rows:
+        item = dict(r)
+        item["created_at_label"] = datetime.fromtimestamp(r["created_at"], tz=tz).strftime("%Y-%m-%d %H:%M")
+        items.append(item)
+    db.mark_all_notifications_read(g.user_id)
+    return render_template("notifications.html", items=items)
+
+
+@app.context_processor
+def inject_unread_notification_count():
+    """Makes {{ unread_notification_count }} available in every template,
+    so base.html can show a badge on the bell icon without every route
+    needing to pass it explicitly."""
+    user_id = g.get("user_id")
+    if not user_id:
+        return {}
+    return {"unread_notification_count": db.unread_notification_count(user_id)}
 
 
 # ── AI ────────────────────────────────────────────────────────────────────

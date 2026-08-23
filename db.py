@@ -252,6 +252,52 @@ CREATE TABLE IF NOT EXISTS note_images (
     created_at REAL NOT NULL
 );
 
+-- A single link a person hands to whoever they want ("here, my birthday's
+-- on here") that can carry several chosen dates at once. Nobody is named
+-- as the recipient up front — recipient_id is only filled in once someone
+-- who's logged in opens the link and accepts it, which is also the point
+-- it starts showing up on their calendar. One link can only ever be
+-- accepted by one account (status flips away from 'pending' for good).
+CREATE TABLE IF NOT EXISTS share_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id INTEGER NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    recipient_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'pending',  -- pending | accepted | declined | revoked
+    created_at REAL NOT NULL,
+    responded_at REAL
+);
+
+-- The specific dates bundled into one share_requests link. Deliberately
+-- just a pointer at the source note (note_id) rather than a copy of its
+-- title/date/recurrence — so if the owner later renames "A's Birthday" or
+-- corrects the date, everyone it's been shared with sees the update too,
+-- with nothing to keep back in sync. removed_at lets the owner un-share a
+-- single date out of an already-accepted link without revoking the whole
+-- thing.
+CREATE TABLE IF NOT EXISTS share_request_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    share_request_id INTEGER NOT NULL,
+    note_id INTEGER NOT NULL,
+    removed_at REAL
+);
+
+-- General-purpose notification inbox, first used for share-request
+-- activity (accepted/declined/revoked) but written generically enough for
+-- anything else in the app to drop a row in here later. `link` is a
+-- relative in-app path (never an absolute/external URL) the bell icon
+-- sends the user to when they click through.
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT,
+    link TEXT,
+    read_at REAL,
+    created_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS admin_audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     actor_id INTEGER,             -- admin who performed the action; NULL if their account was later deleted
@@ -333,7 +379,7 @@ _USER_SCOPED_TABLES = [
     "profile", "weight_entries", "sessions", "custom_foods", "food_log",
     "documents", "reminders", "habits", "todos", "settings",
     "budget_categories", "transactions", "recurring_transactions",
-    "savings_goals", "passwords", "notes", "note_images",
+    "savings_goals", "passwords", "notes", "note_images", "notifications",
 ]
 
 # These four tables carried a table-level constraint in the old single-user
@@ -1065,6 +1111,18 @@ def admin_delete_user(user_id: int):
         for row in goal_rows:
             conn.execute("DELETE FROM savings_contributions WHERE goal_id = ?", (row["id"],))
 
+        # share_requests hangs off two different user columns (owner_id and
+        # recipient_id), not a single user_id, so — same shape as
+        # savings_contributions above — its items need their own scoped
+        # delete before the requests themselves go.
+        share_request_rows = conn.execute(
+            "SELECT id FROM share_requests WHERE owner_id = ? OR recipient_id = ?",
+            (user_id, user_id),
+        ).fetchall()
+        for row in share_request_rows:
+            conn.execute("DELETE FROM share_request_items WHERE share_request_id = ?", (row["id"],))
+        conn.execute("DELETE FROM share_requests WHERE owner_id = ? OR recipient_id = ?", (user_id, user_id))
+
         for table in _USER_SCOPED_TABLES:
             conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
         # Not in _USER_SCOPED_TABLES since it predates it slightly and has
@@ -1077,3 +1135,217 @@ def admin_delete_user(user_id: int):
         conn.execute("DELETE FROM email_verifications WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
     return filenames
+
+
+# ── Shared dates ─────────────────────────────────────────────────────────
+# Sharing a handful of specific calendar dates (a birthday, an anniversary)
+# with another LifeHub account, without handing over the whole calendar.
+# See share_requests / share_request_items in SCHEMA above for the shape —
+# short version: one link (token) can carry several chosen dates, nobody
+# is named as the recipient until they open the link and accept it, and
+# accepted items are read live off the source note so edits/deletes on the
+# owner's side are reflected automatically rather than needing to be
+# re-shared.
+
+def create_share_request(owner_id: int, note_ids: list[int]) -> str:
+    """Bundles the given (already-ownership-checked) note ids into a new
+    pending share link and returns its token."""
+    token = secrets.token_urlsafe(20)
+    with get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO share_requests (owner_id, token, status, created_at) VALUES (?,?,?,?)",
+            (owner_id, token, "pending", now()),
+        )
+        request_id = cur.lastrowid
+        for note_id in note_ids:
+            conn.execute(
+                "INSERT INTO share_request_items (share_request_id, note_id) VALUES (?,?)",
+                (request_id, note_id),
+            )
+    return token
+
+
+def get_share_request_by_token(token: str):
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT sr.*, u.email AS owner_email "
+            "FROM share_requests sr JOIN users u ON u.id = sr.owner_id "
+            "WHERE sr.token = ?",
+            (token,),
+        ).fetchone()
+
+
+def get_share_request_items(share_request_id: int, include_removed: bool = False):
+    """The dated notes bundled into a share link, read live off the notes
+    table (title/date/recurrence) so a rename or date fix on the owner's
+    side shows up here without anything needing to be kept in sync. Only
+    the fields relevant to a calendar date are selected — never the note's
+    body or photos, which stay private to the owner."""
+    query = (
+        "SELECT sri.id AS item_id, sri.note_id, sri.removed_at, "
+        "n.title, n.linked_date, n.recurrence "
+        "FROM share_request_items sri JOIN notes n ON n.id = sri.note_id "
+        "WHERE sri.share_request_id = ?"
+    )
+    if not include_removed:
+        query += " AND sri.removed_at IS NULL"
+    query += " ORDER BY n.linked_date"
+    with get_conn() as conn:
+        return conn.execute(query, (share_request_id,)).fetchall()
+
+
+def respond_to_share_request(token: str, recipient_id: int, accept: bool) -> str | None:
+    """Accepts or declines a pending link, or — if it's already been
+    accepted by this same recipient — lets them remove it from their own
+    calendar later by declining it after the fact. Returns the resulting
+    status ('accepted'/'declined'), or None if the token doesn't exist, is
+    someone else's to answer, was shared by the person trying to accept
+    it, or has been revoked by the owner."""
+    with get_conn() as conn:
+        sr = conn.execute("SELECT * FROM share_requests WHERE token = ?", (token,)).fetchone()
+        if not sr or sr["status"] == "revoked":
+            return None
+        if sr["owner_id"] == recipient_id:
+            return None
+        if sr["status"] == "pending":
+            if not accept:
+                conn.execute(
+                    "UPDATE share_requests SET status='declined', recipient_id=?, responded_at=? WHERE id=?",
+                    (recipient_id, now(), sr["id"]),
+                )
+                return "declined"
+            conn.execute(
+                "UPDATE share_requests SET status='accepted', recipient_id=?, responded_at=? WHERE id=?",
+                (recipient_id, now(), sr["id"]),
+            )
+            return "accepted"
+        if sr["status"] == "accepted" and sr["recipient_id"] == recipient_id and not accept:
+            conn.execute(
+                "UPDATE share_requests SET status='declined', responded_at=? WHERE id=?",
+                (now(), sr["id"]),
+            )
+            return "declined"
+    return None
+
+
+def list_outgoing_shares(owner_id: int):
+    """Every link this person has generated, newest first, with the
+    recipient's email once known (NULL while still pending/unopened)."""
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT sr.*, u.email AS recipient_email "
+            "FROM share_requests sr LEFT JOIN users u ON u.id = sr.recipient_id "
+            "WHERE sr.owner_id = ? ORDER BY sr.created_at DESC",
+            (owner_id,),
+        ).fetchall()
+
+
+def list_incoming_shares(recipient_id: int):
+    """Every link this person has accepted, newest first, with the
+    owner's email so the calendar/notifications can say who it's from."""
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT sr.*, u.email AS owner_email "
+            "FROM share_requests sr JOIN users u ON u.id = sr.owner_id "
+            "WHERE sr.recipient_id = ? AND sr.status = 'accepted' "
+            "ORDER BY sr.responded_at DESC",
+            (recipient_id,),
+        ).fetchall()
+
+
+def shared_dates_for_calendar(recipient_id: int):
+    """Flat list of every live, un-removed date shared with this person —
+    exactly what calendar_view() needs to fold into its own events, one
+    row per shared note with the owner's email attached."""
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT n.id AS note_id, n.title, n.linked_date, n.recurrence, u.email AS owner_email "
+            "FROM share_requests sr "
+            "JOIN share_request_items sri ON sri.share_request_id = sr.id AND sri.removed_at IS NULL "
+            "JOIN notes n ON n.id = sri.note_id AND n.linked_date IS NOT NULL "
+            "JOIN users u ON u.id = sr.owner_id "
+            "WHERE sr.recipient_id = ? AND sr.status = 'accepted'",
+            (recipient_id,),
+        ).fetchall()
+
+
+def revoke_share_request(request_id: int, owner_id: int) -> bool:
+    """Pulls back an entire link — it stops being answerable if still
+    pending, and disappears from the recipient's calendar if it was
+    already accepted. Ownership-checked; returns whether anything changed."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id FROM share_requests WHERE id = ? AND owner_id = ? AND status != 'revoked'",
+            (request_id, owner_id),
+        ).fetchone()
+        if not row:
+            return False
+        conn.execute(
+            "UPDATE share_requests SET status='revoked', responded_at=? WHERE id=?",
+            (now(), request_id),
+        )
+    return True
+
+
+def remove_share_item(request_id: int, owner_id: int, item_id: int) -> bool:
+    """Un-shares a single date out of an already-sent link without
+    touching the rest of it. Ownership-checked; returns whether anything
+    changed."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT sri.id FROM share_request_items sri "
+            "JOIN share_requests sr ON sr.id = sri.share_request_id "
+            "WHERE sri.id = ? AND sri.share_request_id = ? AND sr.owner_id = ? AND sri.removed_at IS NULL",
+            (item_id, request_id, owner_id),
+        ).fetchone()
+        if not row:
+            return False
+        conn.execute("UPDATE share_request_items SET removed_at = ? WHERE id = ?", (now(), item_id))
+    return True
+
+
+def remove_note_from_shares(note_id: int) -> None:
+    """Called whenever a note gets deleted — any share_request_items
+    pointing at it are marked removed so it quietly drops off recipients'
+    calendars instead of leaving a dangling reference to a note that no
+    longer exists."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE share_request_items SET removed_at = ? WHERE note_id = ? AND removed_at IS NULL",
+            (now(), note_id),
+        )
+
+
+# ── Notifications ────────────────────────────────────────────────────────
+
+def create_notification(user_id: int, ntype: str, title: str, body: str = "", link: str = "") -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO notifications (user_id, type, title, body, link, created_at) VALUES (?,?,?,?,?,?)",
+            (user_id, ntype, title, body, link, now()),
+        )
+
+
+def list_notifications(user_id: int, limit: int = 50):
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+
+
+def unread_notification_count(user_id: int) -> int:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND read_at IS NULL",
+            (user_id,),
+        ).fetchone()
+    return row["c"] if row else 0
+
+
+def mark_all_notifications_read(user_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL",
+            (now(), user_id),
+        )

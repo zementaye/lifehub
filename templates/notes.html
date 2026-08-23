@@ -29,6 +29,9 @@
     <button type="button" id="notes-select-toggle" class="secondary">Select</button>
     <div id="notes-bulk-bar" class="bulk-bar" style="display:none;">
       <span id="notes-bulk-count" class="muted">0 selected</span>
+      <form method="post" action="{{ url_for('create_share') }}" id="notes-share-form">
+        <button type="submit" class="secondary" id="notes-bulk-share-btn" disabled>Share Selected</button>
+      </form>
       <form method="post" action="{{ url_for('bulk_delete_notes') }}" id="notes-bulk-form">
         <button type="submit" class="confirm-modal-danger" id="notes-bulk-delete-btn" disabled>Delete Selected</button>
       </form>
@@ -37,9 +40,20 @@
   </div>
 {% endif %}
 
+{% if new_share_link %}
+  <div class="card share-link-card">
+    <h3>🔗 Share link ready</h3>
+    <p class="muted">Copy this and send it to whoever you want — they'll need a LifeHub account (or can sign up) to accept it.</p>
+    <div class="share-link-row">
+      <input type="text" readonly value="{{ new_share_link }}" id="new-share-link-input" onclick="this.select()">
+      <button type="button" class="secondary" id="new-share-link-copy">Copy</button>
+    </div>
+  </div>
+{% endif %}
+
 <div class="grid" id="notes-grid">
   {% for n in items %}
-    <div class="card note-card" data-note-id="{{ n.id }}">
+    <div class="card note-card" data-note-id="{{ n.id }}" data-has-date="{{ '1' if n.linked_date else '0' }}">
       <div class="pw-header">
         <div class="pw-header-left">
           <label class="note-select-check">
@@ -114,6 +128,67 @@
     <p class="muted">No notes yet.</p>
   {% endfor %}
 </div>
+
+{% if outgoing_shares or incoming_shares %}
+<h2 class="section-heading">Shared Dates</h2>
+
+{% if outgoing_shares %}
+  <div class="card wide">
+    <h3>Links you've sent</h3>
+    <div class="share-request-list">
+      {% for sr in outgoing_shares %}
+        <div class="share-request-row">
+          <div class="share-request-info">
+            <span class="share-status-badge share-status-{{ sr.status }}">{{ sr.status|capitalize }}</span>
+            <span class="share-request-to">
+              {% if sr.recipient_email %}to {{ sr.recipient_email }}{% else %}link not opened yet{% endif %}
+            </span>
+            <span class="share-request-items-list muted">
+              {{ outgoing_items[sr.id] | selectattr('removed_at', 'none') | map(attribute='title') | join(', ') }}
+            </span>
+          </div>
+          <div class="share-request-actions">
+            {% if sr.status == 'pending' %}
+              <button type="button" class="secondary share-copy-link-btn" data-link="{{ outgoing_links[sr.id] }}">Copy link</button>
+            {% endif %}
+            {% if sr.status != 'revoked' %}
+              <form method="post" action="{{ url_for('revoke_share', request_id=sr.id) }}" data-confirm="Revoke this share link?">
+                <button type="submit" class="confirm-modal-danger">Revoke</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+{% if incoming_shares %}
+  <div class="card wide">
+    <h3>Shared with you</h3>
+    <div class="share-request-list">
+      {% for sr in incoming_shares %}
+        {% set items = incoming_items[sr.id] %}
+        {% if items %}
+          <div class="share-request-row">
+            <div class="share-request-info">
+              <span class="share-request-to">from {{ sr.owner_email }}</span>
+              <span class="share-request-items-list muted">
+                {% for it in items %}{{ it.title }} ({{ it.linked_date }}{% if it.recurrence and it.recurrence != 'once' %} · {{ it.recurrence }}{% endif %}){% if not loop.last %}, {% endif %}{% endfor %}
+              </span>
+            </div>
+            <div class="share-request-actions">
+              <form method="post" action="{{ url_for('decline_share', token=sr.token) }}" data-confirm="Remove these dates from your calendar?">
+                <button type="submit" class="secondary">Remove</button>
+              </form>
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -220,6 +295,8 @@ document.querySelectorAll('.note-card').forEach(card => {
   const bulkBar = document.getElementById('notes-bulk-bar');
   const bulkForm = document.getElementById('notes-bulk-form');
   const bulkBtn = document.getElementById('notes-bulk-delete-btn');
+  const shareForm = document.getElementById('notes-share-form');
+  const shareBtn = document.getElementById('notes-bulk-share-btn');
   const bulkCount = document.getElementById('notes-bulk-count');
   const cancelBtn = document.getElementById('notes-select-cancel');
   const boxes = () => Array.from(grid.querySelectorAll('.note-select-box'));
@@ -233,12 +310,18 @@ document.querySelectorAll('.note-card').forEach(card => {
   }
 
   function updateCount() {
-    const n = boxes().filter((b) => b.checked).length;
+    const checked = boxes().filter((b) => b.checked);
+    const n = checked.length;
+    const datedN = checked.filter((b) => b.closest('.note-card').dataset.hasDate === '1').length;
     bulkCount.textContent = n === 1 ? '1 selected' : `${n} selected`;
     bulkBtn.disabled = n === 0;
     bulkForm.dataset.confirm = n === 1
       ? 'Delete 1 selected note?'
       : `Delete ${n} selected notes?`;
+    // Sharing only makes sense for notes tagged with a date — a plain
+    // note has nothing for the recipient's calendar to show.
+    shareBtn.disabled = datedN === 0;
+    shareBtn.title = datedN === 0 ? 'Select at least one dated note to share' : '';
   }
 
   selectToggle.addEventListener('click', () => setSelecting(true));
@@ -274,6 +357,48 @@ document.querySelectorAll('.note-card').forEach(card => {
       input.value = id;
       bulkForm.appendChild(input);
     });
+  });
+
+  shareForm.addEventListener('submit', (e) => {
+    // Same idea as the delete form above, but only the dated notes among
+    // whatever's checked — a plain note tagged in has nothing to share.
+    shareForm.querySelectorAll('input[name="note_ids"]').forEach((el) => el.remove());
+    boxes().filter((b) => b.checked && b.closest('.note-card').dataset.hasDate === '1').forEach((b) => {
+      const id = b.closest('.note-card').dataset.noteId;
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'note_ids';
+      input.value = id;
+      shareForm.appendChild(input);
+    });
+  });
+})();
+
+// Copy-to-clipboard for share links — the freshly-generated one at the
+// top of the page, and any "Copy link" button on a still-pending
+// outgoing share further down.
+(function () {
+  function copyText(text, btn) {
+    const done = () => {
+      const original = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(done);
+    } else {
+      done();
+    }
+  }
+
+  const newLinkBtn = document.getElementById('new-share-link-copy');
+  const newLinkInput = document.getElementById('new-share-link-input');
+  if (newLinkBtn && newLinkInput) {
+    newLinkBtn.addEventListener('click', () => copyText(newLinkInput.value, newLinkBtn));
+  }
+
+  document.querySelectorAll('.share-copy-link-btn').forEach((btn) => {
+    btn.addEventListener('click', () => copyText(btn.dataset.link, btn));
   });
 })();
 </script>

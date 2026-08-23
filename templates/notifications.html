@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Notifications — Life Hub{% endblock %}
+{% block content %}
+<h1>Notifications</h1>
+
+<div class="card wide">
+  {% if items %}
+    <div class="notification-list">
+      {% for n in items %}
+        <a class="notification-row {{ 'unread' if not n.read_at }}" href="{{ n.link or '#' }}">
+          <span class="notification-title">{{ n.title }}</span>
+          {% if n.body %}<span class="notification-body">{{ n.body }}</span>{% endif %}
+          <span class="notification-time">{{ n.created_at_label }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">Nothing here yet — you'll see updates about shared dates and other activity here.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -79,6 +79,9 @@
 
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">Settings</a>
     <a href="{{ url_for('profile') }}" class="{{ 'active' if request.endpoint=='profile' }}">Profile</a>
+    <a href="{{ url_for('notifications') }}" class="nav-bell {{ 'active' if request.endpoint=='notifications' }}" aria-label="Notifications" title="Notifications">
+      🔔{% if unread_notification_count %}<span class="nav-bell-count">{{ unread_notification_count if unread_notification_count < 100 else '99+' }}</span>{% endif %}
+    </a>
   </nav>
 </header>
 
@@ -120,6 +123,7 @@
     <div class="sidebar-group-label">&nbsp;</div>
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">⚙ Settings</a>
     <a href="{{ url_for('profile') }}" class="{{ 'active' if request.endpoint=='profile' }}">👤 Profile</a>
+    <a href="{{ url_for('notifications') }}" class="{{ 'active' if request.endpoint=='notifications' }}">🔔 Notifications{% if unread_notification_count %} <span class="nav-bell-count" style="position:static; display:inline-block; margin-left:4px;">{{ unread_notification_count if unread_notification_count < 100 else '99+' }}</span>{% endif %}</a>
   </nav>
 </aside>
 

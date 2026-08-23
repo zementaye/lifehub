@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Shared Dates — Life Hub{% endblock %}
+{% block content %}
+<h1>Shared Dates</h1>
+
+<div class="card">
+  {% if sr.status == 'revoked' %}
+    <p>This share link has been revoked by {{ sr.owner_email }} and can no longer be used.</p>
+  {% elif sr.status == 'accepted' and sr.recipient_id != user.id %}
+    <p>This share link has already been accepted by someone else.</p>
+  {% elif sr.status == 'accepted' and sr.recipient_id == user.id %}
+    <p>You've already added these dates to your calendar.</p>
+    <p><a href="{{ url_for('calendar_view') }}" class="secondary">Go to Calendar</a></p>
+  {% elif sr.status == 'declined' and sr.recipient_id == user.id %}
+    <p>You declined this share link.</p>
+  {% elif not items %}
+    <p>{{ sr.owner_email }} shared some dates with you, but none of them are still available (they may have been removed or deleted).</p>
+  {% else %}
+    <h3>{{ sr.owner_email }} wants to share {{ items|length }} date{{ 's' if items|length != 1 else '' }} with you</h3>
+    <ul class="shared-preview-list">
+      {% for it in items %}
+        <li>
+          <strong>{{ it.title }}</strong>
+          <span class="muted">— {{ it.linked_date }}{% if it.recurrence and it.recurrence != 'once' %} · repeats {{ it.recurrence }}{% endif %}</span>
+        </li>
+      {% endfor %}
+    </ul>
+    <p class="muted">Accepting adds these to your calendar. They'll stay in sync — if {{ sr.owner_email }} updates the date or title, yours updates too. You can remove them at any time.</p>
+    <div class="shared-preview-actions">
+      <form method="post" action="{{ url_for('accept_share', token=sr.token) }}">
+        <button type="submit">Accept</button>
+      </form>
+      <form method="post" action="{{ url_for('decline_share', token=sr.token) }}">
+        <button type="submit" class="secondary">Decline</button>
+      </form>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
