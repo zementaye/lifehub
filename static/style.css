@@ -2424,3 +2424,62 @@ body[data-theme="light"] .calendar-note-form select { color-scheme: light; }
   gap: 10px;
   margin-top: 14px;
 }
+
+/* Dashboard "Next Up" widget — a tall vertical card showing the nearest
+   upcoming date (reminder due, dated note/birthday, shared date, or
+   document expiry), everything happening on it, and a days-left
+   countdown. */
+.next-up-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 260px;
+}
+.next-up-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 4px 0 2px;
+}
+.next-up-date-num {
+  font-size: 2.6rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--rivet);
+}
+.next-up-date-month {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.next-up-countdown {
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.next-up-events {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+.next-up-events li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.next-up-evt-icon { font-size: 1rem; line-height: 1.3; }
+.next-up-evt-text {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 1px;
+}
+.next-up-evt-text .muted { font-size: 0.75rem; }

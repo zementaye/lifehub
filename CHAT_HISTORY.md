@@ -59,3 +59,26 @@ can drop a row in without new schema.
 **Login/register now preserve a `next=` redirect.** Needed so someone who
 opens a share link without an account yet gets bounced back to it after
 signing up, instead of landing on the dashboard.
+
+**Perf follow-up on shared dates (same day).** Link creation was slow —
+each note added to a share was its own `INSERT` (its own network round
+trip on Turso), and the Notes page redraw was doing an N+1 query per past
+share to list its items. Batched the item inserts into one statement and
+rewrote `list_outgoing_shares`/`list_incoming_shares` as single joined
+queries grouped in Python. Also added a per-note-card "🔗 Share" button
+(single-date share without entering bulk-select mode — bulk select stays
+for multi-date shares) and gave the share forms their own "Loading…"
+overlay text instead of the generic "Saving…".
+
+## 2026-08-25
+
+**"Next Up" dashboard widget.** New vertical-rectangle card at the top of
+the Dashboard grid: the nearest upcoming date across reminders, dated
+notes (birthdays etc.), dates shared with you, and expiring documents —
+big date number, a days-left countdown ("Today" / "Tomorrow" / "N days
+left"), and every event that lands on that same date listed underneath
+with an icon. Deliberately excludes todos/vault-doc "added" markers
+(those describe when something was created, not something coming up).
+New `_next_up_summary()` helper in app.py, reuses the existing
+`_note_occurrences_in_range()` recurrence projection so birthdays/
+anniversaries roll forward correctly.

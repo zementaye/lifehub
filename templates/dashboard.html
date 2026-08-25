@@ -4,6 +4,41 @@
 <h1>Dashboard</h1>
 
 <div class="grid">
+  <div class="card next-up-card">
+    <h3>Next Up</h3>
+    {% if next_up %}
+      <div class="next-up-date">
+        <span class="next-up-date-num">{{ next_up.date.day }}</span>
+        <span class="next-up-date-month">{{ next_up.date.strftime('%b %Y') }}</span>
+      </div>
+      <div class="next-up-countdown">
+        {% if next_up.days_left == 0 %}Today
+        {% elif next_up.days_left == 1 %}Tomorrow
+        {% else %}{{ next_up.days_left }} days left{% endif %}
+      </div>
+      <ul class="next-up-events">
+        {% for ev in next_up.events %}
+          <li>
+            <span class="next-up-evt-icon">
+              {%- if ev.type == 'reminder' -%}📌
+              {%- elif ev.type == 'doc' -%}📄
+              {%- elif ev.type == 'shared' -%}🤝
+              {%- else -%}📝
+              {%- endif -%}
+            </span>
+            <span class="next-up-evt-text">
+              <strong>{{ ev.title }}</strong>
+              <span class="muted">{{ ev.sublabel }}</span>
+            </span>
+          </li>
+        {% endfor %}
+      </ul>
+      <a class="link" href="{{ url_for('calendar_view', month=next_up.date.strftime('%Y-%m')) }}">View on Calendar →</a>
+    {% else %}
+      <p class="muted">Nothing upcoming — reminders, dated notes, and expiring documents will show up here.</p>
+    {% endif %}
+  </div>
+
   <div class="card">
     <h3>Body</h3>
     {% if bmi %}

@@ -998,13 +998,15 @@ def dashboard():
         for k in totals:
             totals[k] += f[k] * f["servings"]
 
+    next_up = _next_up_summary(user_id)
+
     return render_template(
         "dashboard.html",
         profile=profile, latest_weight=latest_weight, bmi=bmi,
         bmi_category=bmi_category(bmi) if bmi else None,
         bmi_category_slug=bmi_category_slug(bmi) if bmi else None,
         upcoming_reminders=upcoming_reminders, habit_status=habit_status,
-        totals=totals,
+        totals=totals, next_up=next_up,
     )
 
 
@@ -1609,6 +1611,91 @@ def _note_occurrences_in_range(anchor, recurrence, start, end):
     # 'once' (or anything unrecognized) — a single occurrence on the
     # anchor date itself.
     return [anchor] if start <= anchor <= end else []
+
+
+# How far ahead to look for the dashboard's "Next Up" widget when
+# projecting recurring dates (birthdays etc.) forward. 400 days safely
+# covers a yearly recurrence even if today happens to be right after this
+# year's occurrence already passed.
+_NEXT_UP_HORIZON_DAYS = 400
+
+
+def _next_up_summary(user_id: int):
+    """The single nearest upcoming date with something on it — a due
+    reminder, a birthday/anniversary note (including ones shared with
+    you), or a document expiring — plus every event that lands on that
+    same date and how many days away it is. Backs the vertical "Next Up"
+    card on the dashboard. Deliberately leaves out todos/vault-doc
+    "added" markers from calendar_view()'s event set — those describe
+    when something was created, not something coming up. Returns None if
+    nothing is found within the look-ahead window."""
+    today = scheduler.today_local(user_id)
+    horizon = today + timedelta(days=_NEXT_UP_HORIZON_DAYS)
+
+    candidates = []  # (date, event dict) pairs; only the soonest date's events get kept
+
+    with db.get_conn() as conn:
+        due_reminders = conn.execute(
+            "SELECT title, next_due, recurrence FROM reminders "
+            "WHERE user_id = ? AND active = 1 AND next_due >= ? ORDER BY next_due LIMIT 20",
+            (user_id, today.isoformat()),
+        ).fetchall()
+        doc_rows = conn.execute(
+            "SELECT label, expiry_date FROM documents "
+            "WHERE user_id = ? AND expiry_date IS NOT NULL AND expiry_date >= ? ORDER BY expiry_date LIMIT 20",
+            (user_id, today.isoformat()),
+        ).fetchall()
+        note_rows = conn.execute(
+            "SELECT title, linked_date, recurrence FROM notes WHERE user_id = ? AND linked_date IS NOT NULL",
+            (user_id,),
+        ).fetchall()
+
+    shared_rows = db.shared_dates_for_calendar(user_id)
+
+    for r in due_reminders:
+        d = date.fromisoformat(r["next_due"])
+        candidates.append((d, {
+            "type": "reminder", "title": r["title"],
+            "sublabel": "due" if r["recurrence"] == "once" else f"due · repeats {r['recurrence']}",
+        }))
+
+    for doc in doc_rows:
+        try:
+            d = date.fromisoformat(doc["expiry_date"])
+        except ValueError:
+            continue
+        candidates.append((d, {"type": "doc", "title": doc["label"], "sublabel": "expires"}))
+
+    for n in note_rows:
+        anchor = date.fromisoformat(n["linked_date"])
+        recurrence = n["recurrence"] or "once"
+        occs = _note_occurrences_in_range(anchor, recurrence, today, horizon)
+        if occs:
+            candidates.append((occs[0], {
+                "type": "note", "title": n["title"],
+                "sublabel": "note" if recurrence == "once" else f"repeats {recurrence}",
+            }))
+
+    for s in shared_rows:
+        anchor = date.fromisoformat(s["linked_date"])
+        recurrence = s["recurrence"] or "once"
+        occs = _note_occurrences_in_range(anchor, recurrence, today, horizon)
+        if occs:
+            candidates.append((occs[0], {
+                "type": "shared", "title": s["title"],
+                "sublabel": f"shared by {s['owner_email']}" if recurrence == "once" else f"shared by {s['owner_email']} · repeats {recurrence}",
+            }))
+
+    if not candidates:
+        return None
+
+    next_date = min(d for d, _ev in candidates)
+    events = [ev for d, ev in candidates if d == next_date]
+    return {
+        "date": next_date,
+        "days_left": (next_date - today).days,
+        "events": events,
+    }
 
 
 @app.route("/calendar")
@@ -2459,18 +2546,16 @@ def notes():
         images_by_note.setdefault(img["note_id"], []).append(img)
 
     outgoing_shares = db.list_outgoing_shares(g.user_id)
-    outgoing_items = {sr["id"]: db.get_share_request_items(sr["id"], include_removed=True) for sr in outgoing_shares}
     outgoing_links = {sr["id"]: _share_link(sr["token"]) for sr in outgoing_shares if sr["status"] == "pending"}
     incoming_shares = db.list_incoming_shares(g.user_id)
-    incoming_items = {sr["id"]: db.get_share_request_items(sr["id"]) for sr in incoming_shares}
 
     new_share_token = request.args.get("shared_token")
     new_share_link = _share_link(new_share_token) if new_share_token else None
 
     return render_template(
         "notes.html", items=items, images_by_note=images_by_note,
-        outgoing_shares=outgoing_shares, outgoing_items=outgoing_items, outgoing_links=outgoing_links,
-        incoming_shares=incoming_shares, incoming_items=incoming_items,
+        outgoing_shares=outgoing_shares, outgoing_links=outgoing_links,
+        incoming_shares=incoming_shares,
         new_share_link=new_share_link,
     )
 
