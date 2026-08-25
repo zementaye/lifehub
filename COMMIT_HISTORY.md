@@ -6,10 +6,11 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-08-25 13:50
+Last updated: 2026-08-25 13:51
 
 ---
 
+- **2026-08-25** e953bc0 - Update commit history (Zemen)
 - **2026-08-23** 91ad02a - Update commit history (Zemen)
 - **2026-08-23** 9e25c02 - Add shared calendar dates feature with notifications inbox (Zemen)
 - **2026-08-23** 9a8d732 - Add shared calendar dates feature (notifications, share links) (Zemen)
