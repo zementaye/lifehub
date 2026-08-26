@@ -6,10 +6,12 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-08-25 13:55
+Last updated: 2026-08-26 10:46
 
 ---
 
+- **2026-08-26** 4104cef - Add footer to logged-in app pages (Zemen)
+- **2026-08-25** f45607e - Update commit history (Zemen)
 - **2026-08-25** 3afa24b - Add Next Up widget to dashboard (Zemen)
 - **2026-08-25** ab98b9d - Update commit history (Zemen)
 - **2026-08-25** 3405b1b - Update commit history (Zemen)
