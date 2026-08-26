@@ -142,7 +142,7 @@ def handle_upload_too_large(e):
 # Public routes: no session required. Everything else demands a logged-in
 # user, since the app is now open for anyone to sign up and use — there's
 # no longer a shared APP_ACCESS_TOKEN gate in front of it.
-_PUBLIC_ENDPOINTS = {"home", "login", "login_2fa", "register", "forgot_password", "reset_password", "verify_email", "static"}
+_PUBLIC_ENDPOINTS = {"home", "healthz", "login", "login_2fa", "register", "forgot_password", "reset_password", "verify_email", "static"}
 
 
 @app.before_request
@@ -300,6 +300,13 @@ def inject_csp_nonce():
     template somehow renders more than once per request, rather than
     caching a stale value."""
     return {"csp_nonce": lambda: g.get("csp_nonce", "")}
+
+
+@app.context_processor
+def inject_current_year():
+    """Makes {{ current_year }} available in every template — currently
+    just the app footer, so it doesn't go stale."""
+    return {"current_year": datetime.now(timezone.utc).year}
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -959,6 +966,17 @@ def home():
     (see home.html), but they're not force-redirected off this page, so the
     URL still works as a normal home page for anyone, logged in or not."""
     return render_template("home.html")
+
+
+@app.route("/healthz")
+def healthz():
+    """Bare-bones keep-alive target for an external uptime pinger (e.g.
+    cron-job.org) on Render's free tier, which spins the service down
+    after 15 minutes with no incoming HTTP traffic and takes 30-60s to
+    wake back up on the next request — the 502 a visitor would otherwise
+    hit. Deliberately does no DB work and renders no template, just a
+    plain 200, so pinging it every few minutes costs almost nothing."""
+    return "ok", 200
 
 
 # ── Dashboard ────────────────────────────────────────────────────────────

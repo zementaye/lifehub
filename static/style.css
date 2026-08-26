@@ -659,6 +659,15 @@ body.auth-page {
   padding: 24px 32px 40px;
 }
 
+.app-footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin-top: var(--gap-section);
+  padding-top: 20px;
+  border-top: 1px solid var(--border-soft);
+}
+
 .flash { margin-bottom: 16px; }
 .flash-msg {
   background: var(--surface-raised);

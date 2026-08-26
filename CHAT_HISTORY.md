@@ -82,3 +82,19 @@ with an icon. Deliberately excludes todos/vault-doc "added" markers
 New `_next_up_summary()` helper in app.py, reuses the existing
 `_note_occurrences_in_range()` recurrence projection so birthdays/
 anniversaries roll forward correctly.
+
+**Added `/healthz`.** A plain, unauthenticated, DB-free `GET /healthz` →
+`200 "ok"` endpoint, for an external uptime pinger (cron-job.org) to hit
+every few minutes so Render's free-tier spin-down (15 min idle → 30-60s
+cold start → a 502 for whoever's request lands in that gap) doesn't bite
+real visitors. Added to `_PUBLIC_ENDPOINTS` so it's exempt from the
+login-required guard.
+
+## 2026-08-26
+
+**Added an app footer.** The public landing page (`home.html`) already
+had one, but the logged-in app itself (Dashboard, Notes, Calendar, etc.)
+had none — added to `base.html` so every page that extends it picks it
+up automatically. Login/register/home stay untouched since they're
+standalone templates, not extensions of base.html. New
+`inject_current_year()` context processor so the year doesn't go stale.
