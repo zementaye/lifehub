@@ -356,6 +356,11 @@ body.auth-page {
 .topnav {
   display: none;
   align-items: stretch;
+  /* Fill the rest of the topbar (instead of shrinking to fit its
+     content) so the margin-left:auto on .nav-end below actually has
+     spare room to push Settings + the bell to the far right edge. */
+  flex: 1 1 auto;
+  min-width: 0;
   background: linear-gradient(165deg, var(--surface), var(--bg-glow));
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -396,8 +401,12 @@ body.auth-page {
    console as the rest, but visually separated at the far right — the
    usual place for account/notification controls — rather than mixed
    into the primary section links. margin-left:auto on the first of the
-   pair pushes it and everything after it (just the bell) to the end. */
-.topnav a.nav-end { margin-left: auto; }
+   pair pushes it (and the bell, right after it) all the way to the end,
+   with a divider line marking where the utility group starts. */
+.topnav a.nav-end {
+  margin-left: auto;
+  border-left: 1px solid var(--border-soft);
+}
 
 /* Grouped dropdown items in the top nav (Health, Vault, Tasks) */
 .nav-group { position: relative; }
@@ -683,11 +692,10 @@ body.auth-page {
 .app-footer {
   position: relative;
   overflow: hidden;
-  text-align: center;
   color: var(--muted);
   font-size: 0.78rem;
   margin-top: auto;
-  padding-top: 22px;
+  padding-top: 28px;
 }
 .app-footer::before {
   content: "";
@@ -699,40 +707,82 @@ body.auth-page {
   transform-origin: left;
   animation: card-scan 4s ease-in-out infinite;
 }
-.app-footer-links {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding-bottom: 14px;
-  margin-bottom: 14px;
+
+/* Multi-column footer: brand/about on the left, link groups filling the
+   rest, everything left-aligned instead of stacked in the center — plus
+   a bottom bar for the copyright line. The whole block is the last flex
+   child of .app-footer (itself margin-top:auto inside .content), so it
+   still consistently sits at the bottom of the page, never mid-screen. */
+.app-footer-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  gap: 24px;
+  padding-bottom: 22px;
+  margin-bottom: 18px;
   border-bottom: 1px solid var(--border-soft);
+  text-align: left;
 }
-.app-footer-links a {
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 600;
+.app-footer-col { display: flex; flex-direction: column; gap: 8px; }
+.app-footer-col-title {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.app-footer-col a,
+.app-footer-col span {
+  color: var(--muted);
+  font-size: 0.78rem;
   transition: color 0.2s ease;
 }
-.app-footer-links a:hover { color: var(--tab-color); text-decoration: none; }
-.app-footer-content {
-  display: flex;
+.app-footer-col a:hover { color: var(--tab-color); text-decoration: none; }
+
+.app-footer-brand-col .app-footer-brand {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  flex-wrap: wrap;
-  padding-bottom: 20px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 0.95rem;
+  color: var(--ink);
+  width: fit-content;
 }
-.app-footer-brand { color: var(--ink); font-weight: 600; }
+.app-footer-brand-col .app-footer-brand:hover { color: var(--tab-color); text-decoration: none; }
+.app-footer-tagline {
+  margin: 6px 0 0;
+  max-width: 320px;
+  line-height: 1.5;
+  color: var(--muted);
+}
 .app-footer-spark {
   display: inline-block;
   color: var(--tab-color);
   animation: brand-breathe 3s ease-in-out infinite;
 }
+
+.app-footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 22px;
+}
 .app-footer-sep { opacity: 0.35; }
+
+@media (max-width: 760px) {
+  .app-footer-grid { grid-template-columns: 1fr 1fr; }
+  .app-footer-brand-col { grid-column: 1 / -1; }
+  .app-footer-bottom { justify-content: flex-start; }
+}
+@media (max-width: 480px) {
+  .app-footer-grid { grid-template-columns: 1fr; }
+  .app-footer-brand-col { grid-column: auto; }
+}
 
 .flash { margin-bottom: 16px; }
 .flash-msg {
@@ -2445,29 +2495,33 @@ body[data-theme="light"] .calendar-note-form select { color-scheme: light; }
   display: inline-flex;
   align-items: center;
 }
-.topnav .nav-bell { padding-left: 18px; padding-right: 18px; }
+.topnav .nav-bell { padding-left: 20px; padding-right: 20px; }
 .nav-bell-icon {
   display: inline-block;
   font-size: 1.35rem;
   line-height: 1;
   transform-origin: 50% 0%;
 }
+/* Bigger, easier-to-hit bell in the desktop topbar specifically. */
+.topnav .nav-bell-icon { font-size: 1.85rem; }
 .sidebar-nav .nav-bell-icon { font-size: 1.1rem; }
 /* Bell swings like it's actually ringing on hover/focus — a quick
-   decaying swing rather than a smooth loop, so it reads as a one-off
-   "ding" each time rather than an idle animation. */
+   decaying swing (with a little pop of scale on the first beat) rather
+   than a smooth loop, so it reads as a one-off "ding" each time rather
+   than an idle animation. */
 .nav-bell:hover .nav-bell-icon,
 .nav-bell:focus-visible .nav-bell-icon {
-  animation: bell-ring 0.6s ease-in-out;
+  animation: bell-ring 0.7s ease-in-out;
 }
 @keyframes bell-ring {
-  0%, 100% { transform: rotate(0deg); }
-  15% { transform: rotate(18deg); }
-  30% { transform: rotate(-14deg); }
-  45% { transform: rotate(10deg); }
-  60% { transform: rotate(-7deg); }
-  75% { transform: rotate(4deg); }
-  90% { transform: rotate(-2deg); }
+  0% { transform: rotate(0deg) scale(1); }
+  10% { transform: rotate(24deg) scale(1.12); }
+  25% { transform: rotate(-20deg) scale(1.08); }
+  40% { transform: rotate(15deg) scale(1.05); }
+  55% { transform: rotate(-10deg) scale(1.02); }
+  70% { transform: rotate(6deg) scale(1.01); }
+  85% { transform: rotate(-3deg) scale(1); }
+  100% { transform: rotate(0deg) scale(1); }
 }
 .nav-bell-count {
   position: absolute;
@@ -2484,7 +2538,7 @@ body[data-theme="light"] .calendar-note-form select { color-scheme: light; }
   line-height: 16px;
   text-align: center;
 }
-.topnav .nav-bell .nav-bell-count { top: 6px; right: 8px; }
+.topnav .nav-bell .nav-bell-count { top: 2px; right: 10px; }
 .notification-list {
   display: flex;
   flex-direction: column;
