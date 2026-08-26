@@ -108,3 +108,28 @@ every `.card` already has on load (now looping across the footer's top
 edge, colored via `--tab-color` so it matches whatever accent color the
 current page uses), plus the same `brand-breathe` soft glow-pulse the
 sidebar logo uses, applied to a small ✦ spark next to "Made by Zemen".
+
+## 2026-08-26 (follow-up)
+
+**Footer pinned to viewport bottom + expanded.** Converted to the
+standard sticky-footer flex layout (`body` → full-height flex column,
+`.content` → `flex:1 0 auto` flex column, footer → `margin-top:auto`) so
+it sits at the bottom of the screen on short pages (e.g. an empty
+Notifications list) instead of floating mid-page, while still flowing
+naturally below content on long pages. Sidebar/backdrop are
+`position:fixed` so unaffected. Footer also gained a quick-links row
+(Dashboard/Calendar/Notes/Settings/Notifications/Contact) above the
+existing brand/tagline/copyright line.
+
+**Top nav: Settings + notification bell moved to the far right.**
+Reordered so Profile sits at the end of the primary section links, and
+Settings gets `margin-left:auto` (pushing itself and the bell after it
+to the end of the nav bar) — the usual place for account/notification
+controls, separated from primary navigation.
+
+**Bell: bigger, rings on hover.** Wrapped the 🔔 in its own span so it
+can be sized independently of nav link text and animated without
+affecting the unread-count badge; added a `bell-ring` decaying-swing
+keyframe animation (not a smooth loop — meant to read as a one-off
+"ding" each time you hover/focus, not idle motion) in both the topbar
+and mobile sidebar nav.

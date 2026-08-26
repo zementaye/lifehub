@@ -77,10 +77,11 @@
       </div>
     </div>
 
-    <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">Settings</a>
     <a href="{{ url_for('profile') }}" class="{{ 'active' if request.endpoint=='profile' }}">Profile</a>
+
+    <a href="{{ url_for('settings') }}" class="nav-end {{ 'active' if request.endpoint=='settings' }}">Settings</a>
     <a href="{{ url_for('notifications') }}" class="nav-bell {{ 'active' if request.endpoint=='notifications' }}" aria-label="Notifications" title="Notifications">
-      🔔{% if unread_notification_count %}<span class="nav-bell-count">{{ unread_notification_count if unread_notification_count < 100 else '99+' }}</span>{% endif %}
+      <span class="nav-bell-icon">🔔</span>{% if unread_notification_count %}<span class="nav-bell-count">{{ unread_notification_count if unread_notification_count < 100 else '99+' }}</span>{% endif %}
     </a>
   </nav>
 </header>
@@ -123,7 +124,7 @@
     <div class="sidebar-group-label">&nbsp;</div>
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' }}">⚙ Settings</a>
     <a href="{{ url_for('profile') }}" class="{{ 'active' if request.endpoint=='profile' }}">👤 Profile</a>
-    <a href="{{ url_for('notifications') }}" class="{{ 'active' if request.endpoint=='notifications' }}">🔔 Notifications{% if unread_notification_count %} <span class="nav-bell-count" style="position:static; display:inline-block; margin-left:4px;">{{ unread_notification_count if unread_notification_count < 100 else '99+' }}</span>{% endif %}</a>
+    <a href="{{ url_for('notifications') }}" class="{{ 'active' if request.endpoint=='notifications' }}"><span class="nav-bell-icon">🔔</span> Notifications{% if unread_notification_count %} <span class="nav-bell-count" style="position:static; display:inline-block; margin-left:4px;">{{ unread_notification_count if unread_notification_count < 100 else '99+' }}</span>{% endif %}</a>
   </nav>
 </aside>
 
@@ -150,13 +151,21 @@
   {% block content %}{% endblock %}
 
   <footer class="app-footer">
+    <div class="app-footer-links">
+      <a href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a href="{{ url_for('calendar_view') }}">Calendar</a>
+      <a href="{{ url_for('notes') }}">Notes</a>
+      <a href="{{ url_for('settings') }}">Settings</a>
+      <a href="{{ url_for('notifications') }}">Notifications</a>
+      <a href="mailto:zemexasma@gmail.com">Contact</a>
+    </div>
     <div class="app-footer-content">
       <span class="app-footer-brand">
         <span class="app-footer-spark" aria-hidden="true">✦</span>
         Made by Zemen
       </span>
       <span class="app-footer-sep" aria-hidden="true">·</span>
-      <a href="mailto:zemexasma@gmail.com" class="app-footer-contact">Contact</a>
+      <span>Addis Ababa, Ethiopia</span>
       <span class="app-footer-sep" aria-hidden="true">·</span>
       <span>Life Hub — built for one person's actual daily life.</span>
       <span class="app-footer-sep" aria-hidden="true">·</span>
