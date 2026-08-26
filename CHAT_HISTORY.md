@@ -98,3 +98,13 @@ had none — added to `base.html` so every page that extends it picks it
 up automatically. Login/register/home stay untouched since they're
 standalone templates, not extensions of base.html. New
 `inject_current_year()` context processor so the year doesn't go stale.
+
+**Footer content + animation (same day).** Expanded the footer to "Made
+by Zemen · Contact (mailto:zemexasma@gmail.com) · tagline · © year" —
+matches the plain-text convention already used on the public landing
+page's footer. Animation reuses the site's existing HUD motifs rather
+than introducing a new style: the same `card-scan` sweep-line effect
+every `.card` already has on load (now looping across the footer's top
+edge, colored via `--tab-color` so it matches whatever accent color the
+current page uses), plus the same `brand-breathe` soft glow-pulse the
+sidebar logo uses, applied to a small ✦ spark next to "Made by Zemen".

@@ -660,13 +660,45 @@ body.auth-page {
 }
 
 .app-footer {
+  position: relative;
+  overflow: hidden;
   text-align: center;
   color: var(--muted);
   font-size: 0.78rem;
   margin-top: var(--gap-section);
-  padding-top: 20px;
-  border-top: 1px solid var(--border-soft);
+  padding-top: 22px;
 }
+.app-footer::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--tab-color), transparent);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: card-scan 4s ease-in-out infinite;
+}
+.app-footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.app-footer-brand { color: var(--ink); font-weight: 600; }
+.app-footer-spark {
+  display: inline-block;
+  color: var(--tab-color);
+  animation: brand-breathe 3s ease-in-out infinite;
+}
+.app-footer-sep { opacity: 0.35; }
+.app-footer-contact {
+  color: var(--muted);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  transition: color 0.2s ease;
+}
+.app-footer-contact:hover { color: var(--tab-color); }
 
 .flash { margin-bottom: 16px; }
 .flash-msg {
