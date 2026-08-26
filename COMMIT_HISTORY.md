@@ -6,10 +6,12 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-08-26 10:53
+Last updated: 2026-08-26 12:02
 
 ---
 
+- **2026-08-26** 404276a - Sticky footer with more info, bell ring animation, nav reorder (Zemen)
+- **2026-08-26** c40b7d5 - Update commit history (Zemen)
 - **2026-08-26** 5442af4 - Add contact info and animation to app footer (Zemen)
 - **2026-08-26** 2d4a1bc - Update commit history (Zemen)
 - **2026-08-26** 4104cef - Add footer to logged-in app pages (Zemen)
