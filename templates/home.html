@@ -184,14 +184,36 @@
   }
   .reveal.in-view { opacity: 1; transform: translateY(0); filter: blur(0); }
 
-  /* Zoom variant of .reveal, used on the CTA band for a punchier,
-     springier entrance than the plain fade-up. */
+  /* Spotlight burst — used only on the CTA band. A radial glow expands
+     behind the content on reveal, plus a slow rotating gradient sheen
+     while it stays in view. A "flash" mechanism, distinct from every
+     other section's directional motion. */
   .reveal-zoom {
-    opacity: 0; transform: scale(0.75) rotate(-2deg);
-    filter: blur(8px);
-    transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.34,1.56,0.64,1), filter 0.6s ease;
+    opacity: 0; transform: scale(0.94);
+    transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.22,1,0.36,1);
   }
-  .reveal-zoom.in-view { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
+  .reveal-zoom.in-view { opacity: 1; transform: scale(1); }
+  .cta-band::before {
+    content: '';
+    position: absolute; inset: -20%; z-index: -1;
+    background: radial-gradient(circle, color-mix(in srgb, var(--accent) 35%, transparent), transparent 60%);
+    opacity: 0; transform: scale(0.4);
+    transition: opacity 0.7s ease, transform 0.9s cubic-bezier(0.22,1,0.36,1);
+    pointer-events: none;
+  }
+  .cta-band.in-view::before { opacity: 1; transform: scale(1); }
+  .cta-band::after {
+    content: '';
+    position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+    background: conic-gradient(from 0deg, transparent, color-mix(in srgb, var(--accent) 22%, transparent), transparent 35%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .cta-band.in-view::after { opacity: 1; animation: cta-sheen-rotate 7s linear infinite; }
+  @keyframes cta-sheen-rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
 
   /* style.css gives every .card a built-in "card-in" mount animation
      (opacity/translateY, animation-fill-mode: both) that fires the
@@ -206,15 +228,20 @@
 
   .feature-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px;
+    perspective: 1000px;
   }
+  /* Alternating slide-in: odd cards enter from the left, even from the
+     right, with a 3D tilt on hover — a directional mechanism, distinct
+     from the scale/rotate/blur recipe used on other sections. */
   .feature-card {
-    opacity: 0; transform: scale(0.6) rotate(-10deg) translateY(30px);
-    filter: blur(8px);
-    transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.34,1.56,0.64,1), filter 0.7s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+    opacity: 0; transform: translateX(-70px) rotate(-3deg);
+    filter: blur(5px);
+    transition: opacity 0.6s ease, transform 0.65s cubic-bezier(0.34,1.56,0.64,1), filter 0.5s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   }
-  .feature-card.in-view { opacity: 1; transform: scale(1) rotate(0deg) translateY(0); filter: blur(0); }
+  .feature-card:nth-child(even) { transform: translateX(70px) rotate(3deg); }
+  .feature-card.in-view { opacity: 1; transform: translateX(0) rotate(0deg); filter: blur(0); }
   .feature-card.in-view:hover {
-    transform: scale(1.04) translateY(-8px);
+    transform: translateY(-8px) rotateX(6deg) scale(1.04);
     box-shadow: 0 22px 40px -18px color-mix(in srgb, var(--tab-color) 55%, transparent);
     border-color: color-mix(in srgb, var(--tab-color) 55%, var(--border));
   }
@@ -223,9 +250,22 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 1.3rem; margin-bottom: 14px;
     background: color-mix(in srgb, var(--tab-color) 16%, transparent);
-    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    opacity: 0; transform: scale(0.3) rotate(-25deg);
+    transition: transform 0.5s 0.1s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s 0.1s ease;
+  }
+  /* Icon spring-pops in just after the card lands, then keeps a very
+     subtle idle glow going — texture while scrolling, not just a
+     one-time entrance. Animates `filter`, never `transform`, so it never
+     fights the hover tilt above. */
+  .feature-card.in-view .f-icon {
+    opacity: 1; transform: scale(1) rotate(0deg);
+    animation: icon-idle-glow 2.6s ease-in-out 0.6s infinite;
   }
   .feature-card:hover .f-icon { transform: rotate(-10deg) scale(1.18); }
+  @keyframes icon-idle-glow {
+    0%, 100% { filter: drop-shadow(0 0 0 transparent); }
+    50% { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--tab-color) 60%, transparent)); }
+  }
   .feature-card h3 { border-bottom: none; padding-bottom: 0; margin-bottom: 8px; color: var(--ink); font-size: 1rem; }
   .feature-card p { color: var(--muted); font-size: 0.88rem; line-height: 1.55; margin: 0; }
 
@@ -261,7 +301,11 @@
   .how-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px;
     position: relative;
+    perspective: 1200px;
   }
+  /* 3D hinge: cards tilt up out of the floor around a bottom pivot
+     (true rotateX via perspective), instead of the 2D translate+rotate
+     used on the feature grid. */
   .step-card {
     position: relative;
     padding: 28px 22px 24px;
@@ -269,12 +313,13 @@
     background: var(--surface);
     border: 1px solid var(--border);
     text-align: left;
-    opacity: 0; transform: translateY(60px) rotate(-4deg);
-    filter: blur(6px);
-    transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.34,1.56,0.64,1), filter 0.7s ease, border-color 0.3s ease;
+    transform-origin: 50% 100%;
+    opacity: 0; transform: translateY(30px) rotateX(-65deg);
+    filter: blur(4px);
+    transition: opacity 0.6s ease, transform 0.75s cubic-bezier(0.22,1,0.36,1), filter 0.5s ease, border-color 0.3s ease;
   }
-  .step-card.in-view { opacity: 1; transform: translateY(0) rotate(0deg); filter: blur(0); }
-  .step-card:hover { transform: translateY(-6px); border-color: var(--accent); }
+  .step-card.in-view { opacity: 1; transform: translateY(0) rotateX(0deg); filter: blur(0); }
+  .step-card.in-view:hover { transform: translateY(-6px) rotateX(0deg); border-color: var(--accent); }
   .step-num {
     display: inline-flex; align-items: center; justify-content: center;
     width: 34px; height: 34px; border-radius: 50%;
@@ -282,8 +327,10 @@
     color: var(--bg-glow);
     background: linear-gradient(135deg, var(--accent), var(--violet));
     margin-bottom: 14px;
-    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    opacity: 0; transform: scale(0.3) rotate(-45deg);
+    transition: transform 0.5s 0.15s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s 0.15s ease;
   }
+  .step-card.in-view .step-num { opacity: 1; transform: scale(1) rotate(0deg); }
   .step-card:hover .step-num { transform: scale(1.15) rotate(-10deg); }
   .step-card h3 { border-bottom: none; padding-bottom: 0; margin: 0 0 8px; color: var(--ink); font-size: 1rem; }
   .step-card p { color: var(--muted); font-size: 0.88rem; line-height: 1.55; margin: 0; }
@@ -294,27 +341,48 @@
       height: 1px;
       background-image: linear-gradient(90deg, var(--border) 60%, transparent 40%);
       background-size: 10px 1px; background-repeat: repeat-x;
+      opacity: 0.7;
       z-index: -1;
+      animation: line-breathe 3.5s ease-in-out infinite;
     }
+  }
+  @keyframes line-breathe {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
   }
 
   /* Dashboard preview */
+  /* Curtain/wipe reveal — clip-path sweeps left-to-right like a screen
+     powering on, instead of the scale+rotate+blur used elsewhere. */
   .preview-frame {
     max-width: 900px; margin: 0 auto;
     border-radius: 16px; overflow: hidden;
     border: 1px solid var(--border);
     background: var(--surface);
     box-shadow: var(--shadow);
-    opacity: 0; transform: scale(0.75) rotate(-3deg);
-    filter: blur(10px);
-    transition: opacity 0.7s ease, transform 0.8s cubic-bezier(0.34,1.56,0.64,1), filter 0.7s ease;
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+    transition: opacity 0.5s ease, clip-path 0.9s cubic-bezier(0.65,0,0.35,1);
   }
-  .preview-frame.in-view { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
+  .preview-frame.in-view { opacity: 1; clip-path: inset(0 0 0 0); }
   .preview-chrome {
     display: flex; align-items: center; gap: 8px;
     padding: 12px 16px;
     background: var(--surface-raised);
     border-bottom: 1px solid var(--border);
+    position: relative; overflow: hidden;
+  }
+  /* Idle shimmer sweep across the chrome bar once the frame has landed —
+     continuous detail, not just a one-shot entrance. */
+  .preview-frame.in-view .preview-chrome::after {
+    content: '';
+    position: absolute; top: 0; left: -40%; width: 40%; height: 100%;
+    background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--accent) 18%, transparent), transparent);
+    animation: chrome-shimmer 3.2s ease-in-out infinite;
+  }
+  @keyframes chrome-shimmer {
+    0% { left: -40%; }
+    100% { left: 120%; }
   }
   .preview-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
   .preview-dot.d1 { background: var(--danger); }
@@ -329,17 +397,19 @@
   .mini-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px;
   }
+  /* Scale-only stagger — no position or rotate change, just a landing
+     pop. Distinct from the frame's clip-path wipe and every other
+     section's directional motion. */
   .mini-card {
     padding: 16px; border-radius: 12px;
     background: var(--surface-raised);
     border: 1px solid var(--border-soft);
     border-left: 2px solid var(--tab-color);
-    opacity: 0; transform: scale(0.4) rotate(8deg);
-    filter: blur(4px);
-    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34,1.56,0.64,1), filter 0.6s ease, box-shadow 0.25s ease;
+    opacity: 0; transform: scale(0.5);
+    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease;
   }
-  .mini-card.in-view { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
-  .mini-card:hover {
+  .mini-card.in-view { opacity: 1; transform: scale(1); }
+  .mini-card.in-view:hover {
     transform: scale(1.05);
     box-shadow: 0 12px 26px -14px color-mix(in srgb, var(--tab-color) 55%, transparent);
   }
@@ -354,6 +424,11 @@
   .mini-stat-row { display: flex; gap: 18px; flex-wrap: wrap; }
   .mini-stat { display: flex; flex-direction: column; }
   .mini-stat-value { font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; color: var(--ink); }
+  .mini-card.in-view .mini-stat-value { animation: value-flash 0.7s ease-out 0.25s both; }
+  @keyframes value-flash {
+    0% { text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 70%, transparent); }
+    100% { text-shadow: 0 0 0 transparent; }
+  }
   .mini-stat-value small { font-size: 0.65rem; color: var(--muted); font-weight: 500; }
   .mini-stat-label { font-size: 0.7rem; color: var(--muted); }
   .mini-tag { color: var(--success); }
@@ -369,17 +444,24 @@
     display: flex; flex-wrap: wrap; justify-content: center; gap: 40px;
     padding: 8px 0 26px;
   }
+  /* Spring/overshoot bounce (vertical) — a punchier elastic curve than
+     the feature grid's slide, paired with a JS count-up on the numbers
+     (see script below). */
   .proof-stat {
     text-align: center;
-    opacity: 0; transform: scale(0.3) rotate(-18deg);
-    filter: blur(4px);
-    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34,1.56,0.64,1), filter 0.6s ease;
+    opacity: 0; transform: translateY(45px);
+    transition: opacity 0.5s ease, transform 0.7s cubic-bezier(0.68,-0.55,0.27,1.55);
   }
-  .proof-stat.in-view { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
+  .proof-stat.in-view { opacity: 1; transform: translateY(0); }
   .proof-num {
     display: block; font-family: var(--font-display); font-size: 2.1rem; font-weight: 700;
     background: linear-gradient(100deg, var(--accent), var(--violet));
     -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .proof-stat.in-view .proof-num { animation: proof-glow-breathe 2.8s ease-in-out 0.6s infinite; }
+  @keyframes proof-glow-breathe {
+    0%, 100% { filter: drop-shadow(0 0 0 transparent); }
+    50% { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 45%, transparent)); }
   }
   .proof-label { font-size: 0.8rem; color: var(--muted); }
   .proof-note {
@@ -389,15 +471,17 @@
 
   /* FAQ */
   .faq-list { max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+  /* Unfold — items scale up vertically from the top edge, like an
+     accordion literally unfolding, instead of sliding in sideways. */
   .faq-item {
     border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
     padding: 4px 20px;
-    opacity: 0; transform: translateX(-50px) rotate(-2deg);
-    filter: blur(4px);
-    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34,1.56,0.64,1), filter 0.6s ease, border-color 0.25s ease;
+    transform-origin: top center;
+    opacity: 0; transform: scaleY(0.35);
+    transition: opacity 0.4s ease, transform 0.55s cubic-bezier(0.34,1.56,0.64,1);
   }
-  .faq-item.in-view { opacity: 1; transform: translateX(0) rotate(0deg); filter: blur(0); }
-  .faq-item:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+  .faq-item.in-view { opacity: 1; transform: scaleY(1); }
+  .faq-item.in-view:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); transform: scaleY(1) scale(1.008); }
   .faq-item summary {
     cursor: pointer; list-style: none; padding: 16px 0;
     font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; color: var(--ink);
@@ -409,6 +493,11 @@
     transition: transform 0.25s ease;
   }
   .faq-item[open] summary::after { transform: rotate(45deg); }
+  .faq-item.in-view summary::after { animation: faq-icon-breathe 2.4s ease-in-out infinite; }
+  @keyframes faq-icon-breathe {
+    0%, 100% { opacity: 0.75; }
+    50% { opacity: 1; }
+  }
   .faq-item p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; margin: 0 0 18px; }
 
   /* Rich footer (mirrors base.html's .app-footer classes so the logged-out
@@ -416,12 +505,24 @@
      landing-appropriate links instead of auth-gated app routes). */
   .landing-footer { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 0 24px; }
   .landing-footer .app-footer { margin-top: 0; }
+  .footer-reveal {
+    opacity: 0; transform: translateY(24px);
+    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22,1,0.36,1);
+  }
+  .footer-reveal.in-view { opacity: 1; transform: translateY(0); }
 
   @media (prefers-reduced-motion: reduce) {
     .hero-blob, .orbit-icon, .hero-eyebrow .dot { animation: none !important; }
     .blob-parallax, .orbit-parallax { transform: none !important; }
-    .feature-card, .reveal, .reveal-zoom, .step-card, .preview-frame, .mini-card, .proof-stat, .faq-item {
-      opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important;
+    .hero-inner { opacity: 1 !important; transform: none !important; }
+    .feature-card, .reveal, .reveal-zoom, .step-card, .preview-frame, .mini-card, .proof-stat, .faq-item, .footer-reveal {
+      opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important; clip-path: none !important;
+    }
+    .f-icon, .step-num, .mini-stat-value, .proof-num, .faq-item summary::after, .how-grid::before {
+      opacity: 1 !important; transform: none !important; animation: none !important; filter: none !important; text-shadow: none !important;
+    }
+    .preview-chrome::after, .cta-band::before, .cta-band::after {
+      display: none !important;
     }
   }
 </style>
@@ -595,9 +696,9 @@
 
 <section class="landing-section proof-section" id="proof">
   <div class="proof-band">
-    <div class="proof-stat"><span class="proof-num">7</span><span class="proof-label">tools, one login</span></div>
-    <div class="proof-stat"><span class="proof-num">1</span><span class="proof-label">person it's built for — you</span></div>
-    <div class="proof-stat"><span class="proof-num">0</span><span class="proof-label">ads, trackers, or data sold</span></div>
+    <div class="proof-stat"><span class="proof-num" data-count-to="7">7</span><span class="proof-label">tools, one login</span></div>
+    <div class="proof-stat"><span class="proof-num" data-count-to="1">1</span><span class="proof-label">person it's built for — you</span></div>
+    <div class="proof-stat"><span class="proof-num" data-count-to="0">0</span><span class="proof-label">ads, trackers, or data sold</span></div>
   </div>
   <p class="proof-note reveal">Built and used every day by a solo developer solving his own scattered-app problem — <a href="mailto:zemexasma@gmail.com">say hi</a> if you have feedback.</p>
 </section>
@@ -644,19 +745,19 @@
 <footer class="landing-footer">
   <div class="app-footer">
     <div class="app-footer-grid">
-      <div class="app-footer-col app-footer-brand-col">
+      <div class="app-footer-col app-footer-brand-col footer-reveal">
         <a href="{{ url_for('home') }}" class="app-footer-brand">
           <span class="app-footer-spark" aria-hidden="true">✦</span> LIFEHUB
         </a>
         <p class="app-footer-tagline">A personal life-management console — health, vault, budget, and tasks kept in one place.</p>
       </div>
-      <div class="app-footer-col">
+      <div class="app-footer-col footer-reveal">
         <span class="app-footer-col-title">Product</span>
         <a href="#features">Features</a>
         <a href="#how-it-works">How it works</a>
         <a href="#faq">FAQ</a>
       </div>
-      <div class="app-footer-col">
+      <div class="app-footer-col footer-reveal">
         <span class="app-footer-col-title">Get Started</span>
         {% if g.user_id %}
           <a href="{{ url_for('dashboard') }}">Go to Dashboard</a>
@@ -665,7 +766,7 @@
           <a href="{{ url_for('login') }}">Log In</a>
         {% endif %}
       </div>
-      <div class="app-footer-col">
+      <div class="app-footer-col footer-reveal">
         <span class="app-footer-col-title">Info</span>
         <span>Addis Ababa, Ethiopia</span>
         <a href="mailto:zemexasma@gmail.com">zemexasma@gmail.com</a>
@@ -705,7 +806,8 @@
     var nav = document.getElementById('landingNav');
     var blobEls = reduced ? [] : document.querySelectorAll('.blob-parallax');
     var orbitEls = reduced ? [] : document.querySelectorAll('.orbit-parallax');
-    if (!progress && !nav && !blobEls.length && !orbitEls.length) return;
+    var heroInner = reduced ? null : document.querySelector('.hero-inner');
+    if (!progress && !nav && !blobEls.length && !orbitEls.length && !heroInner) return;
 
     var ticking = false;
     function update() {
@@ -727,6 +829,14 @@
         var speed = parseFloat(el.dataset.speed) || 0.06;
         el.style.transform = 'translate3d(0,' + (y * speed).toFixed(1) + 'px,0)';
       });
+      // Scroll-linked (not IntersectionObserver) fade+scale of the hero
+      // copy as it scrolls past — a continuous function of scroll
+      // position, so it's inherently reversible in both directions.
+      if (heroInner) {
+        var heroFade = Math.max(0, 1 - y / 420);
+        heroInner.style.opacity = heroFade.toFixed(3);
+        heroInner.style.transform = 'translateY(' + (y * 0.12).toFixed(1) + 'px) scale(' + (0.96 + heroFade * 0.04).toFixed(3) + ')';
+      }
 
       ticking = false;
     }
@@ -751,7 +861,7 @@
 
     if (reduced || !('IntersectionObserver' in window)) {
       document.querySelectorAll(
-        singleSelectors + ', .feature-card, .step-card, .mini-card, .proof-stat, .faq-item'
+        singleSelectors + ', .feature-card, .step-card, .mini-card, .proof-stat, .faq-item, .footer-reveal'
       ).forEach(function (el) { el.classList.add('in-view'); });
       return;
     }
@@ -800,6 +910,47 @@
     revealGroup('.preview-frame', '.mini-card', 90);
     revealGroup('.proof-band', '.proof-stat', 120);
     revealGroup('.faq-list', '.faq-item', 90);
+    revealGroup('.app-footer-grid', '.footer-reveal', 80);
+  })();
+
+  // Count-up for the social-proof numbers, synced with their bounce-in
+  // reveal. Resets on scroll-out so it replays if you scroll back up
+  // and down again, matching the reversible design above.
+  (function () {
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var nums = document.querySelectorAll('.proof-num[data-count-to]');
+    if (!nums.length) return;
+
+    if (reduced || !('IntersectionObserver' in window)) {
+      nums.forEach(function (el) { el.textContent = el.dataset.countTo; });
+      return;
+    }
+
+    function animateCount(el) {
+      var target = parseInt(el.dataset.countTo, 10) || 0;
+      var start = performance.now();
+      var duration = 900;
+      function frame(now) {
+        var p = Math.min(1, (now - start) / duration);
+        var eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(eased * target);
+        if (p < 1) window.requestAnimationFrame(frame);
+      }
+      window.requestAnimationFrame(frame);
+    }
+
+    var band = document.querySelector('.proof-band');
+    if (!band) return;
+    var countObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          nums.forEach(function (el) { animateCount(el); });
+        } else {
+          nums.forEach(function (el) { el.textContent = '0'; });
+        }
+      });
+    }, { threshold: 0.3 });
+    countObserver.observe(band);
   })();
 </script>
 </body>
