@@ -6,10 +6,17 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-08-26 12:02
+Last updated: 2026-08-27 12:02
 
 ---
 
+- **2026-08-27** d00bb00 - Add how-it-works, dashboard preview, social proof, FAQ, and rich footer to landing page (Zemen)
+- **2026-08-27** 3d687aa - Revert dashboard redesign back to original ΓÇö keep footer/nav/bell changes (Zemen)
+- **2026-08-27** f1d64d6 - Redesign dashboard: hero, spotlight, trio/duo sections, weekly recap, quick actions ΓÇö bidirectional scroll-reveal engine (left/right/up/down/zoom-in/zoom-out/fade) (Zemen)
+- **2026-08-27** b2283c2 - Dashboard: diagonal alternating card reveal + horizontal highlight ticker (Zemen)
+- **2026-08-27** ee5ab2b - Dashboard: scroll-triggered card reveal instead of load-time-only animation (Zemen)
+- **2026-08-26** bb5cf92 - Redesign footer as multi-column grid, push Settings/bell to nav's far right, enlarge bell hover animation (Zemen)
+- **2026-08-26** 016681a - Update commit history (Zemen)
 - **2026-08-26** 404276a - Sticky footer with more info, bell ring animation, nav reorder (Zemen)
 - **2026-08-26** c40b7d5 - Update commit history (Zemen)
 - **2026-08-26** 5442af4 - Add contact info and animation to app footer (Zemen)
