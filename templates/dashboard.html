@@ -3,6 +3,36 @@
 {% block content %}
 <h1>Dashboard</h1>
 
+{% set ticker_items = [] %}
+{% if next_up and next_up.events %}
+  {% set _ = ticker_items.append('📌 Next: ' ~ next_up.events[0].title ~ (' — today' if next_up.days_left == 0 else (' — tomorrow' if next_up.days_left == 1 else ' — ' ~ next_up.days_left ~ ' days'))) %}
+{% endif %}
+{% if habit_status %}
+  {% set done_habits = habit_status | selectattr('done') | list | length %}
+  {% set _ = ticker_items.append('✅ ' ~ done_habits ~ '/' ~ habit_status|length ~ ' habits done today') %}
+{% endif %}
+{% if totals.calories %}
+  {% set _ = ticker_items.append('🍽 ' ~ (totals.calories | round | int) ~ ' cal logged today') %}
+{% endif %}
+{% if upcoming_reminders %}
+  {% set _ = ticker_items.append('🗓 ' ~ upcoming_reminders|length ~ ' to-do' ~ ('s' if upcoming_reminders|length != 1 else '') ~ ' upcoming') %}
+{% endif %}
+{% if bmi %}
+  {% set _ = ticker_items.append('⚖ BMI ' ~ bmi ~ ' · ' ~ bmi_category) %}
+{% endif %}
+{% if ticker_items %}
+  <div class="dash-ticker" aria-hidden="true">
+    <div class="dash-ticker-track">
+      {% for _ in range(2) %}
+        {% for item in ticker_items %}
+          <span class="dash-ticker-item">{{ item }}</span>
+          <span class="dash-ticker-dot">◆</span>
+        {% endfor %}
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
 <div class="grid">
   <div class="card next-up-card">
     <h3>Next Up</h3>

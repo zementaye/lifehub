@@ -617,19 +617,22 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
   const cards = Array.from(document.querySelectorAll('.grid > .card'));
   if (!cards.length) return;
 
-  cards.forEach((card) => {
+  cards.forEach((card, i) => {
     card.style.animation = 'none'; // don't fight the scroll-driven reveal
-    card.classList.add('pre-reveal');
+    card.classList.add('pre-reveal', i % 2 === 0 ? 'pre-reveal-left' : 'pre-reveal-right');
   });
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (!entry.isIntersecting) return;
       const card = entry.target;
-      const delay = cards.indexOf(card) * 70;
+      const delay = cards.indexOf(card) * 80;
+      // Opacity eases in smoothly; the position/scale/rotate settle with a
+      // slight overshoot ("back out" easing) for a snappier, more dramatic
+      // swoop than a plain ease-out.
       card.style.transition =
-        `opacity 0.6s cubic-bezier(0.22,1,0.36,1) ${delay}ms, transform 0.6s cubic-bezier(0.22,1,0.36,1) ${delay}ms`;
-      requestAnimationFrame(() => card.classList.remove('pre-reveal'));
+        `opacity 0.7s cubic-bezier(0.22,1,0.36,1) ${delay}ms, transform 0.8s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms`;
+      requestAnimationFrame(() => card.classList.remove('pre-reveal', 'pre-reveal-left', 'pre-reveal-right'));
       // Clear the inline transition once the reveal finishes so it
       // doesn't linger and dull the hover-tilt's instant tracking above.
       card.addEventListener('transitionend', () => { card.style.transition = ''; }, { once: true });

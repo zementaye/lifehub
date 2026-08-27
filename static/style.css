@@ -127,6 +127,10 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  /* The dashboard's diagonal card entrance (see .pre-reveal-left/-right
+     below) starts cards translated off to the side; this stops that
+     from ever producing a horizontal scrollbar mid-animation. */
+  overflow-x: hidden;
 }
 
 /* HUD ambient backdrop: faint schematic grid + twin glow washes, fixed
@@ -892,18 +896,64 @@ body.auth-page {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Dashboard only: cards fade/rise/scale in as they cross into view while
-   scrolling, instead of the site-wide once-on-load version above — a
-   toned-down nod to scroll-reveal marketing sites (zero.university-style)
-   without the pinned sections/marquee/parallax that make those extreme.
-   JS (app.js) adds/removes .pre-reveal and sets the transition inline so
-   it doesn't fight the hover-tilt's own transform updates. */
-body.page-dashboard .card.pre-reveal {
-  opacity: 0;
-  transform: translateY(26px) scale(0.97);
+/* Dashboard only: cards swoop in diagonally as they cross into view while
+   scrolling — alternating left/right (horizontal) combined with a rise
+   (vertical), plus a bit of scale and rotation for punch — instead of the
+   site-wide once-on-load version above. A toned-down nod to the
+   scroll-reveal style on sites like zero.university, minus the pinned
+   sections/parallax that make those extreme. JS (app.js) adds/removes
+   .pre-reveal-left/-right and sets the transition inline so it doesn't
+   fight the hover-tilt's own transform updates. */
+body.page-dashboard .card.pre-reveal { opacity: 0; }
+body.page-dashboard .card.pre-reveal-left {
+  transform: translate(-60px, 34px) scale(0.94) rotate(-3deg);
+}
+body.page-dashboard .card.pre-reveal-right {
+  transform: translate(60px, 34px) scale(0.94) rotate(3deg);
 }
 @media (prefers-reduced-motion: reduce) {
-  body.page-dashboard .card.pre-reveal { opacity: 1; transform: none; }
+  body.page-dashboard .card.pre-reveal,
+  body.page-dashboard .card.pre-reveal-left,
+  body.page-dashboard .card.pre-reveal-right { opacity: 1; transform: none; }
+}
+
+/* Dashboard highlight ticker: a thin band under the H1 that scrolls its
+   contents horizontally on a continuous loop — the direct "horizontal
+   movement" counterpart to the cards' vertical/diagonal entrance, echoing
+   the marquee bands on zero.university. Pauses on hover so it's readable,
+   and the edges fade via a mask instead of hard-cutting mid-word. */
+.dash-ticker {
+  position: relative;
+  overflow: hidden;
+  margin: 4px 0 var(--gap-section);
+  padding: 10px 0;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.dash-ticker-track {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: max-content;
+  animation: dash-ticker-scroll 26s linear infinite;
+}
+.dash-ticker:hover .dash-ticker-track { animation-play-state: paused; }
+.dash-ticker-item {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.dash-ticker-dot { color: var(--tab-color); opacity: 0.6; font-size: 0.55rem; }
+@keyframes dash-ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-ticker-track { animation: none; overflow-x: auto; }
 }
 .content > h1 { animation: card-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .grid > .card:nth-of-type(1), .content > .card:nth-of-type(1) { animation-delay: 0.04s; }
