@@ -6,10 +6,12 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-08-27 12:02
+Last updated: 2026-08-27 12:13
 
 ---
 
+- **2026-08-27** 183319c - Make landing page scroll animations reversible with fade/zoom variety (Zemen)
+- **2026-08-27** 803a130 - Update commit history (Zemen)
 - **2026-08-27** d00bb00 - Add how-it-works, dashboard preview, social proof, FAQ, and rich footer to landing page (Zemen)
 - **2026-08-27** 3d687aa - Revert dashboard redesign back to original ΓÇö keep footer/nav/bell changes (Zemen)
 - **2026-08-27** f1d64d6 - Redesign dashboard: hero, spotlight, trio/duo sections, weekly recap, quick actions ΓÇö bidirectional scroll-reveal engine (left/right/up/down/zoom-in/zoom-out/fade) (Zemen)
