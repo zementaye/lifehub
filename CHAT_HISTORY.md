@@ -133,3 +133,24 @@ affecting the unread-count badge; added a `bell-ring` decaying-swing
 keyframe animation (not a smooth loop — meant to read as a one-off
 "ding" each time you hover/focus, not idle motion) in both the topbar
 and mobile sidebar nav.
+
+## 2026-08-27
+
+**Landing page: fixed the "huge gap" bug on the public homepage.**
+`body` is `display:flex; flex-direction:column` site-wide (sticky-footer
+trick), and every landing-page section (`#features`, `#how-it-works`,
+`#preview`, `#proof`, `#faq`, the CTA band, the footer) is a direct
+child of it, centered with `max-width:1080px; margin:0 auto;` but no
+explicit `width`. Horizontal auto-margins on a flex item cancel the
+default cross-axis stretch, so each section was shrinking to fit only
+its own content instead of filling up to 1080px — a different, too-
+narrow width per section (measured as low as 480px for the dashboard
+preview frame vs. its intended 900px). That squeezed the "A peek at
+your dashboard" mini-cards into extra wrapped rows, inflated section
+heights, and threw off the scroll-reveal `IntersectionObserver`
+thresholds, producing a large blank gap while scrolling. Fix: added
+`width: 100%;` to `.landing-section` and `.landing-footer` in
+`home.html` (and reordered `.cta-band`'s width/max-width) so they
+stretch to the row before centering, same as intended. Verified with a
+headless-browser render: total page height dropped ~430px and every
+section now measures the full 1080px.
