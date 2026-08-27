@@ -6,10 +6,12 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-08-27 12:46
+Last updated: 2026-08-27 12:49
 
 ---
 
+- **2026-08-27** 1a1204c - Give each landing-page section its own distinct scroll animation identity (Zemen)
+- **2026-08-27** 9479a68 - Update commit history (Zemen)
 - **2026-08-27** 34b815c - Update commit history (Zemen)
 - **2026-08-27** db2a562 - Update commit history (Zemen)
 - **2026-08-27** 5da3a00 - Add dramatic entrances, hover interactions, parallax, and scroll-progress accent to landing page (Zemen)
