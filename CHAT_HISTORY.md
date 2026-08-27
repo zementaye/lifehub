@@ -221,3 +221,15 @@ plays around the new spot so it doesn't go dead-still. Verified with a
 headless-browser drag simulation: dragged icon lands at the expected
 offset and is still there, unmoved, after a scroll-down/scroll-up
 round trip — the other 5 icons keep drifting with scroll as before.
+
+**Landing page: replaced the dashboard preview's fake-browser-chrome
+title bar.** `.preview-chrome` was a generic macOS-style bar — 3
+traffic-light dots (red/amber/green) plus a pill showing
+"lifehub.app/dashboard" like a URL bar — a common SaaS-marketing
+cliché the owner didn't want. Replaced it with an actual app titlebar:
+the same brand mark SVG used in the site nav (small bar-chart icon)
+plus "Dashboard" in `font-display` on the left, and a pulsing green
+dot + "Live preview" label on the right (`@keyframes live-pulse`, a
+soft expanding-ring pulse rather than a static dot) instead of a fake
+URL. Kept the existing idle shimmer sweep across the bar unchanged.
+Verified with a headless-browser render.
