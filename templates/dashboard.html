@@ -1,80 +1,45 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — Life Hub{% endblock %}
 {% block content %}
+<h1>Dashboard</h1>
 
-<section class="dash-hero" data-reveal="fade">
-  <p class="dash-hero-eyebrow" data-hero-greeting>Welcome back</p>
-  <h1 class="dash-hero-title">Dashboard</h1>
-  <p class="dash-hero-date" data-hero-date></p>
-</section>
-
-{% set ticker_items = [] %}
-{% if next_up and next_up.events %}
-  {% set _ = ticker_items.append('📌 Next: ' ~ next_up.events[0].title ~ (' — today' if next_up.days_left == 0 else (' — tomorrow' if next_up.days_left == 1 else ' — ' ~ next_up.days_left ~ ' days'))) %}
-{% endif %}
-{% if habit_status %}
-  {% set done_habits = habit_status | selectattr('done') | list | length %}
-  {% set _ = ticker_items.append('✅ ' ~ done_habits ~ '/' ~ habit_status|length ~ ' habits done today') %}
-{% endif %}
-{% if totals.calories %}
-  {% set _ = ticker_items.append('🍽 ' ~ (totals.calories | round | int) ~ ' cal logged today') %}
-{% endif %}
-{% if upcoming_reminders %}
-  {% set _ = ticker_items.append('🗓 ' ~ upcoming_reminders|length ~ ' to-do' ~ ('s' if upcoming_reminders|length != 1 else '') ~ ' upcoming') %}
-{% endif %}
-{% if bmi %}
-  {% set _ = ticker_items.append('⚖ BMI ' ~ bmi ~ ' · ' ~ bmi_category) %}
-{% endif %}
-{% if ticker_items %}
-  <div class="dash-ticker" data-reveal="down" aria-hidden="true">
-    <div class="dash-ticker-track">
-      {% for _ in range(2) %}
-        {% for item in ticker_items %}
-          <span class="dash-ticker-item">{{ item }}</span>
-          <span class="dash-ticker-dot">◆</span>
+<div class="grid">
+  <div class="card next-up-card">
+    <h3>Next Up</h3>
+    {% if next_up %}
+      <div class="next-up-date">
+        <span class="next-up-date-num">{{ next_up.date.day }}</span>
+        <span class="next-up-date-month">{{ next_up.date.strftime('%b %Y') }}</span>
+      </div>
+      <div class="next-up-countdown">
+        {% if next_up.days_left == 0 %}Today
+        {% elif next_up.days_left == 1 %}Tomorrow
+        {% else %}{{ next_up.days_left }} days left{% endif %}
+      </div>
+      <ul class="next-up-events">
+        {% for ev in next_up.events %}
+          <li>
+            <span class="next-up-evt-icon">
+              {%- if ev.type == 'reminder' -%}📌
+              {%- elif ev.type == 'doc' -%}📄
+              {%- elif ev.type == 'shared' -%}🤝
+              {%- else -%}📝
+              {%- endif -%}
+            </span>
+            <span class="next-up-evt-text">
+              <strong>{{ ev.title }}</strong>
+              <span class="muted">{{ ev.sublabel }}</span>
+            </span>
+          </li>
         {% endfor %}
-      {% endfor %}
-    </div>
+      </ul>
+      <a class="link" href="{{ url_for('calendar_view', month=next_up.date.strftime('%Y-%m')) }}">View on Calendar →</a>
+    {% else %}
+      <p class="muted">Nothing upcoming — reminders, dated notes, and expiring documents will show up here.</p>
+    {% endif %}
   </div>
-{% endif %}
 
-<section class="card dash-spotlight" data-reveal="left">
-  <h3>Next Up</h3>
-  {% if next_up %}
-    <div class="next-up-date">
-      <span class="next-up-date-num">{{ next_up.date.day }}</span>
-      <span class="next-up-date-month">{{ next_up.date.strftime('%b %Y') }}</span>
-    </div>
-    <div class="next-up-countdown">
-      {% if next_up.days_left == 0 %}Today
-      {% elif next_up.days_left == 1 %}Tomorrow
-      {% else %}{{ next_up.days_left }} days left{% endif %}
-    </div>
-    <ul class="next-up-events">
-      {% for ev in next_up.events %}
-        <li>
-          <span class="next-up-evt-icon">
-            {%- if ev.type == 'reminder' -%}📌
-            {%- elif ev.type == 'doc' -%}📄
-            {%- elif ev.type == 'shared' -%}🤝
-            {%- else -%}📝
-            {%- endif -%}
-          </span>
-          <span class="next-up-evt-text">
-            <strong>{{ ev.title }}</strong>
-            <span class="muted">{{ ev.sublabel }}</span>
-          </span>
-        </li>
-      {% endfor %}
-    </ul>
-    <a class="link" href="{{ url_for('calendar_view', month=next_up.date.strftime('%Y-%m')) }}">View on Calendar →</a>
-  {% else %}
-    <p class="muted">Nothing upcoming — reminders, dated notes, and expiring documents will show up here.</p>
-  {% endif %}
-</section>
-
-<div class="dash-trio">
-  <div class="card" data-reveal="zoom-in">
+  <div class="card">
     <h3>Body</h3>
     {% if bmi %}
       <div class="stat-row">
@@ -87,7 +52,7 @@
     <a class="link" href="{{ url_for('health') }}">Go to Health →</a>
   </div>
 
-  <div class="card" data-reveal="right">
+  <div class="card">
     <h3>Today's Nutrition</h3>
     <div class="stat-row">
       <div class="stat"><span class="stat-value" data-countup="{{ totals.calories | round | int }}">0</span><span class="stat-label">calories</span></div>
@@ -98,7 +63,7 @@
     <a class="link" href="{{ url_for('nutrition') }}">Log food →</a>
   </div>
 
-  <div class="card" data-reveal="up">
+  <div class="card">
     <h3>Today's Habits</h3>
     {% if habit_status %}
       <ul class="checklist">
@@ -111,10 +76,8 @@
     {% endif %}
     <a class="link" href="{{ url_for('habits') }}">Go to Habits →</a>
   </div>
-</div>
 
-<div class="dash-duo">
-  <div class="card" data-reveal="zoom-out">
+  <div class="card">
     <h3>Focus</h3>
     <div class="orbit-wrap">
       <div class="orbit-ring r3"><span class="orbit-sat"></span></div>
@@ -125,10 +88,10 @@
     <div class="orbit-cap"><b>{{ (habit_status | rejectattr('done') | list | length) + (upcoming_reminders | length) }}</b> active tracks</div>
   </div>
 
-  <div class="card" data-reveal="up">
+  <div class="card">
     <h3>Upcoming To-Dos</h3>
     {% if upcoming_reminders %}
-      <ul class="plain-list dash-stagger-list">
+      <ul class="plain-list">
         {% for r in upcoming_reminders %}
           <li><strong>{{ r.title }}</strong><span class="muted"> — {{ r.next_due }}</span></li>
         {% endfor %}
@@ -139,28 +102,4 @@
     <a class="link" href="{{ url_for('reminders') }}">Manage to-dos →</a>
   </div>
 </div>
-
-{% if habit_status %}
-  {% set ns = namespace(combined_streak=0, active_count=0) %}
-  {% for hs in habit_status %}
-    {% set ns.combined_streak = ns.combined_streak + hs.streak %}
-    {% if hs.streak > 0 %}{% set ns.active_count = ns.active_count + 1 %}{% endif %}
-  {% endfor %}
-  <section class="card dash-recap" data-reveal="fade">
-    <h3>This Week</h3>
-    <div class="stat-row">
-      <div class="stat"><span class="stat-value">{{ ns.combined_streak }}</span><span class="stat-label">combined streak days</span></div>
-      <div class="stat"><span class="stat-value">{{ ns.active_count }}/{{ habit_status | length }}</span><span class="stat-label">habits on a streak</span></div>
-    </div>
-    <p class="muted">Keep today's habits going to add to these numbers.</p>
-  </section>
-{% endif %}
-
-<section class="dash-quick-actions" data-reveal="zoom-in">
-  <a class="dash-qa-btn" href="{{ url_for('nutrition') }}">🍽 Log food</a>
-  <a class="dash-qa-btn" href="{{ url_for('habits') }}">✅ Manage habits</a>
-  <a class="dash-qa-btn" href="{{ url_for('reminders') }}">🗓 Add to-do</a>
-  <a class="dash-qa-btn" href="{{ url_for('health') }}">⚖ Log weight</a>
-</section>
-
 {% endblock %}
