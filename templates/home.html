@@ -151,6 +151,14 @@
   }
   .reveal.in-view { opacity: 1; transform: translateY(0); }
 
+  /* Zoom variant of .reveal, used on the CTA band for a punchier
+     entrance than the plain fade-up. */
+  .reveal-zoom {
+    opacity: 0; transform: scale(0.9);
+    transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1);
+  }
+  .reveal-zoom.in-view { opacity: 1; transform: scale(1); }
+
   /* style.css gives every .card a built-in "card-in" mount animation
      (opacity/translateY, animation-fill-mode: both) that fires the
      instant the page paints, independent of scroll position. CSS
@@ -166,10 +174,10 @@
     display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px;
   }
   .feature-card {
-    opacity: 0; transform: translateY(24px);
-    transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1);
+    opacity: 0; transform: scale(0.86) translateY(14px);
+    transition: opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1);
   }
-  .feature-card.in-view { opacity: 1; transform: translateY(0); }
+  .feature-card.in-view { opacity: 1; transform: scale(1) translateY(0); }
   .feature-card .f-icon {
     width: 42px; height: 42px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
@@ -245,10 +253,10 @@
     border: 1px solid var(--border);
     background: var(--surface);
     box-shadow: var(--shadow);
-    opacity: 0; transform: translateY(24px);
+    opacity: 0; transform: scale(0.92);
     transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1);
   }
-  .preview-frame.in-view { opacity: 1; transform: translateY(0); }
+  .preview-frame.in-view { opacity: 1; transform: scale(1); }
   .preview-chrome {
     display: flex; align-items: center; gap: 8px;
     padding: 12px 16px;
@@ -273,10 +281,10 @@
     background: var(--surface-raised);
     border: 1px solid var(--border-soft);
     border-left: 2px solid var(--tab-color);
-    opacity: 0; transform: translateY(16px);
+    opacity: 0; transform: scale(0.88);
     transition: opacity 0.5s cubic-bezier(0.22,1,0.36,1), transform 0.5s cubic-bezier(0.22,1,0.36,1);
   }
-  .mini-card.in-view { opacity: 1; transform: translateY(0); }
+  .mini-card.in-view { opacity: 1; transform: scale(1); }
   .mini-card:nth-child(1) { --tab-color: var(--accent); }
   .mini-card:nth-child(2) { --tab-color: var(--success); }
   .mini-card:nth-child(3) { --tab-color: var(--danger); }
@@ -303,7 +311,12 @@
     display: flex; flex-wrap: wrap; justify-content: center; gap: 40px;
     padding: 8px 0 26px;
   }
-  .proof-stat { text-align: center; }
+  .proof-stat {
+    text-align: center;
+    opacity: 0; transform: scale(0.7);
+    transition: opacity 0.5s cubic-bezier(0.22,1,0.36,1), transform 0.5s cubic-bezier(0.22,1,0.36,1);
+  }
+  .proof-stat.in-view { opacity: 1; transform: scale(1); }
   .proof-num {
     display: block; font-family: var(--font-display); font-size: 2.1rem; font-weight: 700;
     background: linear-gradient(100deg, var(--accent), var(--violet));
@@ -320,7 +333,10 @@
   .faq-item {
     border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
     padding: 4px 20px;
+    opacity: 0; transform: translateY(16px);
+    transition: opacity 0.5s cubic-bezier(0.22,1,0.36,1), transform 0.5s cubic-bezier(0.22,1,0.36,1);
   }
+  .faq-item.in-view { opacity: 1; transform: translateY(0); }
   .faq-item summary {
     cursor: pointer; list-style: none; padding: 16px 0;
     font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; color: var(--ink);
@@ -342,7 +358,9 @@
 
   @media (prefers-reduced-motion: reduce) {
     .hero-blob, .orbit-icon, .hero-eyebrow .dot { animation: none !important; }
-    .feature-card, .reveal, .step-card, .preview-frame, .mini-card { opacity: 1 !important; transform: none !important; transition: none !important; }
+    .feature-card, .reveal, .reveal-zoom, .step-card, .preview-frame, .mini-card, .proof-stat, .faq-item {
+      opacity: 1 !important; transform: none !important; transition: none !important;
+    }
   }
 </style>
 </head>
@@ -512,19 +530,19 @@
   </div>
 </section>
 
-<section class="landing-section proof-section reveal" id="proof">
+<section class="landing-section proof-section" id="proof">
   <div class="proof-band">
     <div class="proof-stat"><span class="proof-num">7</span><span class="proof-label">tools, one login</span></div>
     <div class="proof-stat"><span class="proof-num">1</span><span class="proof-label">person it's built for — you</span></div>
     <div class="proof-stat"><span class="proof-num">0</span><span class="proof-label">ads, trackers, or data sold</span></div>
   </div>
-  <p class="proof-note">Built and used every day by a solo developer solving his own scattered-app problem — <a href="mailto:zemexasma@gmail.com">say hi</a> if you have feedback.</p>
+  <p class="proof-note reveal">Built and used every day by a solo developer solving his own scattered-app problem — <a href="mailto:zemexasma@gmail.com">say hi</a> if you have feedback.</p>
 </section>
 
 <section class="landing-section" id="faq">
   <h2 class="reveal">Frequently asked questions</h2>
   <p class="section-sub reveal">Still deciding? Here's what people usually ask.</p>
-  <div class="faq-list reveal">
+  <div class="faq-list">
     <details class="faq-item">
       <summary>Is my data private?</summary>
       <p>Yes. Life Hub is built for one person's data at a time — everything you log is scoped to your account only, and stored passwords are encrypted rather than kept as plain text.</p>
@@ -548,7 +566,7 @@
   </div>
 </section>
 
-<section class="cta-band landing-section reveal">
+<section class="cta-band landing-section reveal-zoom">
   {% if g.user_id %}
     <h2>Welcome back.</h2>
     <p>Pick up right where you left off.</p>
@@ -615,38 +633,59 @@
     }
   })();
 
-  // Scroll-reveal for feature cards, section headings, and the CTA band.
+  // Scroll animations for section headings, cards, and bands. Every
+  // element here toggles its "in-view" class in BOTH directions — added
+  // when it scrolls into the viewport, removed when it scrolls back out
+  // (up or down) — so scrolling back up visibly reverses the entrance
+  // animation, and scrolling down again replays it. This is why none of
+  // the observers below ever call unobserve(): a one-shot reveal (add
+  // the class once, then stop watching) can't reverse, because nothing
+  // is left listening once the element leaves view again.
   (function () {
-    var reveals = document.querySelectorAll('.reveal');
-    if (!('IntersectionObserver' in window)) {
-      document.querySelectorAll('.feature-card, .step-card, .mini-card, .preview-frame').forEach(function (c) {
-        c.classList.add('in-view');
-      });
-      reveals.forEach(function (r) { r.classList.add('in-view'); });
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var singleSelectors = '.reveal, .reveal-zoom, .preview-frame';
+
+    if (reduced || !('IntersectionObserver' in window)) {
+      document.querySelectorAll(
+        singleSelectors + ', .feature-card, .step-card, .mini-card, .proof-stat, .faq-item'
+      ).forEach(function (el) { el.classList.add('in-view'); });
       return;
     }
 
-    // Watching each card individually meant most of them were already
-    // 15% visible (and so already faded in) the instant the section
-    // scrolled into view on a typical laptop-height screen — only the
-    // last, lowest card genuinely started off-screen, so it was the only
-    // one anyone actually saw animate. Watching the grid as a whole and
-    // staggering every card together the moment the grid starts entering
-    // view fixes that: every card in the group now visibly animates
-    // together, regardless of how many happened to already be in the
-    // viewport. Reused below for the feature grid, the how-it-works
-    // steps, and the dashboard preview's mini-cards.
+    // Single elements (headings, subtext, the CTA band, the preview
+    // frame shell): fade/zoom in and out as a unit, no stagger.
+    var singleObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        entry.target.classList.toggle('in-view', entry.isIntersecting);
+      });
+    }, { threshold: 0.15 });
+    document.querySelectorAll(singleSelectors).forEach(function (el) {
+      singleObserver.observe(el);
+    });
+
+    // Grouped elements (feature cards, how-it-works steps, dashboard
+    // preview mini-cards, proof stats, FAQ items): staggered entrance
+    // when the group scrolls into view, and — since watching is never
+    // switched off — an immediate reset back to hidden the moment the
+    // group leaves the viewport, ready to stagger in again next time.
     function revealGroup(gridSelector, itemSelector, staggerMs) {
       var grid = document.querySelector(gridSelector);
       var items = document.querySelectorAll(itemSelector);
       if (!grid || !items.length) return;
+      var timers = [];
+      function clearTimers() {
+        timers.forEach(function (t) { clearTimeout(t); });
+        timers = [];
+      }
       var gridObserver = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {
+          clearTimers();
           if (entry.isIntersecting) {
             items.forEach(function (el, i) {
-              setTimeout(function () { el.classList.add('in-view'); }, i * staggerMs);
+              timers.push(setTimeout(function () { el.classList.add('in-view'); }, i * staggerMs));
             });
-            gridObserver.unobserve(entry.target);
+          } else {
+            items.forEach(function (el) { el.classList.remove('in-view'); });
           }
         });
       }, { threshold: 0.1 });
@@ -655,32 +694,8 @@
     revealGroup('.feature-grid', '.feature-card', 70);
     revealGroup('.how-grid', '.step-card', 100);
     revealGroup('.preview-frame', '.mini-card', 90);
-
-    // The preview frame itself (the browser-chrome shell) fades in as a
-    // single element rather than through revealGroup, which only handles
-    // the cards inside it.
-    var previewFrame = document.querySelector('.preview-frame');
-    if (previewFrame) {
-      var frameObserver = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('in-view');
-            frameObserver.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.1 });
-      frameObserver.observe(previewFrame);
-    }
-
-    var revealObserver = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('in-view');
-          revealObserver.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.15 });
-    reveals.forEach(function (r) { revealObserver.observe(r); });
+    revealGroup('.proof-band', '.proof-stat', 120);
+    revealGroup('.faq-list', '.faq-item', 90);
   })();
 </script>
 </body>
