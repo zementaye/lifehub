@@ -6,10 +6,12 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-08-27 12:13
+Last updated: 2026-08-27 12:20
 
 ---
 
+- **2026-08-27** 5da3a00 - Add dramatic entrances, hover interactions, parallax, and scroll-progress accent to landing page (Zemen)
+- **2026-08-27** 09c0a1c - Update commit history (Zemen)
 - **2026-08-27** 183319c - Make landing page scroll animations reversible with fade/zoom variety (Zemen)
 - **2026-08-27** 803a130 - Update commit history (Zemen)
 - **2026-08-27** d00bb00 - Add how-it-works, dashboard preview, social proof, FAQ, and rich footer to landing page (Zemen)
