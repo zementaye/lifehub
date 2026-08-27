@@ -610,37 +610,65 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
 // that same load animation if the browser lacks IntersectionObserver or
 // the user prefers reduced motion.
 (function () {
-  if (!document.body.classList.contains('page-dashboard')) return;
+  const els = Array.from(document.querySelectorAll('[data-reveal]'));
+  if (!els.length) return;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if (!('IntersectionObserver' in window)) return;
 
-  const cards = Array.from(document.querySelectorAll('.grid > .card'));
-  if (!cards.length) return;
-
-  cards.forEach((card, i) => {
-    card.style.animation = 'none'; // don't fight the scroll-driven reveal
-    card.classList.add('pre-reveal', i % 2 === 0 ? 'pre-reveal-left' : 'pre-reveal-right');
+  // Generic scroll-reveal engine. Any element with a data-reveal
+  // attribute (left/right/up/down/zoom-in/zoom-out/fade — see the
+  // matching CSS in style.css) fades/slides/scales into place as it
+  // enters the viewport, and reverses back out if it scrolls back out
+  // of view, so the motion re-triggers both ways as you scroll up and
+  // down rather than only ever playing once on load. Bidirectional
+  // toggling is what makes this feel closer to a scroll-driven page
+  // (zero.university-style) instead of a one-shot entrance animation.
+  //
+  // The opacity/transform transition is only applied for the duration of
+  // each toggle (armed right before the class change, disarmed on
+  // transitionend) rather than left on permanently — otherwise it would
+  // fight the hover-tilt effect above, which sets `transform` directly
+  // on mousemove and expects that to be instant, not eased.
+  els.forEach((el, i) => {
+    el.classList.add('pre-reveal');
+    el.dataset.revealDelay = (i % 6) * 70; // ms stagger for elements entering together
   });
+
+  function arm(el) {
+    const delay = el.dataset.revealDelay || 0;
+    el.style.transition =
+      `opacity 0.7s cubic-bezier(0.22,1,0.36,1) ${delay}ms, transform 0.7s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms`;
+  }
+  function disarm(el) { el.style.transition = ''; }
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
-      if (!entry.isIntersecting) return;
-      const card = entry.target;
-      const delay = cards.indexOf(card) * 80;
-      // Opacity eases in smoothly; the position/scale/rotate settle with a
-      // slight overshoot ("back out" easing) for a snappier, more dramatic
-      // swoop than a plain ease-out.
-      card.style.transition =
-        `opacity 0.7s cubic-bezier(0.22,1,0.36,1) ${delay}ms, transform 0.8s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms`;
-      requestAnimationFrame(() => card.classList.remove('pre-reveal', 'pre-reveal-left', 'pre-reveal-right'));
-      // Clear the inline transition once the reveal finishes so it
-      // doesn't linger and dull the hover-tilt's instant tracking above.
-      card.addEventListener('transitionend', () => { card.style.transition = ''; }, { once: true });
-      observer.unobserve(card);
+      const el = entry.target;
+      arm(el);
+      el.classList.toggle('pre-reveal', !entry.isIntersecting);
+      el.addEventListener('transitionend', () => disarm(el), { once: true });
     });
-  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+  }, { threshold: 0.18, rootMargin: '0px 0px -10% 0px' });
 
-  cards.forEach((card) => observer.observe(card));
+  els.forEach((el) => observer.observe(el));
+})();
+
+// Dashboard hero: greeting + today's date are filled in client-side (the
+// visitor's own local time is the honest source for "good morning" than
+// anything the server could compute), with plain server-rendered
+// fallback text already in the markup for no-JS.
+(function () {
+  const greetingEl = document.querySelector('[data-hero-greeting]');
+  const dateEl = document.querySelector('[data-hero-date]');
+  if (!greetingEl && !dateEl) return;
+  const now = new Date();
+  if (greetingEl) {
+    const h = now.getHours();
+    greetingEl.textContent = h < 5 ? 'Still up' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  }
+  if (dateEl) {
+    dateEl.textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  }
 })();
 
 

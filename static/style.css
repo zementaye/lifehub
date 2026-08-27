@@ -127,9 +127,10 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  /* The dashboard's diagonal card entrance (see .pre-reveal-left/-right
-     below) starts cards translated off to the side; this stops that
-     from ever producing a horizontal scrollbar mid-animation. */
+  /* The dashboard's data-reveal entrances (see the generic scroll-reveal
+     engine further down) can start cards translated off to the side;
+     this stops that from ever producing a horizontal scrollbar mid-
+     animation. */
   overflow-x: hidden;
 }
 
@@ -891,30 +892,112 @@ body.auth-page {
   border-right-color: color-mix(in srgb, var(--danger) 55%, transparent);
 }
 .chart-error-card h3 { color: var(--danger); }
+/* Generic scroll-reveal engine: any element carrying a data-reveal
+   attribute (left / right / up / down / zoom-in / zoom-out / fade)
+   fades + slides/scales into place as it crosses into the viewport —
+   and reverses back to hidden if scrolled back out, so the motion keeps
+   re-triggering both ways instead of firing once and being done. This
+   is what actually makes "different things happen" as you scroll up vs
+   down, echoing the scroll-storytelling feel of sites like
+   zero.university. Applied wherever a data-reveal attribute is used;
+   today that's the dashboard (see dashboard.html), but any page can opt
+   in the same way. JS (app.js) toggles .pre-reveal per element.
+   .card[data-reveal] disables the site-wide once-on-load .card-in
+   keyframe so the two systems don't fight each other. */
+[data-reveal].pre-reveal { opacity: 0; }
+[data-reveal="left"].pre-reveal { transform: translateX(-70px); }
+[data-reveal="right"].pre-reveal { transform: translateX(70px); }
+[data-reveal="up"].pre-reveal { transform: translateY(50px); }
+[data-reveal="down"].pre-reveal { transform: translateY(-50px); }
+[data-reveal="zoom-in"].pre-reveal { transform: scale(0.8); }
+[data-reveal="zoom-out"].pre-reveal { transform: scale(1.22); }
+[data-reveal="fade"].pre-reveal { transform: none; }
+.card[data-reveal] { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal],
+  [data-reveal].pre-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* Dashboard layout: hero header, a 3-up stats row, a 2-up focus/to-dos
+   row, and a quick-actions row — replacing the old single uniform grid
+   so different sections can carry different data-reveal directions. */
+.dash-hero {
+  text-align: center;
+  margin: 4px 0 22px;
+}
+.dash-hero-eyebrow {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.74rem;
+  color: var(--tab-color);
+  margin: 0 0 6px;
+}
+.dash-hero-title { margin: 0 0 6px; }
+.dash-hero-date { color: var(--muted); font-size: 0.85rem; margin: 0; }
+
+.dash-trio, .dash-duo {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px 16px;
+  margin: var(--gap-section) 0;
+}
+@media (min-width: 700px) {
+  .dash-duo { grid-template-columns: repeat(2, 1fr); }
+  .dash-trio { grid-template-columns: repeat(3, 1fr); }
+}
+
+.dash-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: var(--gap-section) 0 0;
+}
+.dash-qa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: linear-gradient(165deg, var(--surface), var(--bg-glow));
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.dash-qa-btn:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--tab-color) 45%, var(--border));
+  box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--tab-color) 30%, transparent);
+  text-decoration: none;
+}
+
+/* Upcoming to-dos list inside its card stays hidden/offset in lockstep
+   with the card's own data-reveal state (pure CSS, no extra JS): each
+   <li> fades/rises in with its own stagger once the ancestor loses
+   .pre-reveal, and reverts with it if the card scrolls back out. */
+.dash-stagger-list li {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+[data-reveal]:not(.pre-reveal) .dash-stagger-list li { opacity: 1; transform: none; }
+.dash-stagger-list li:nth-child(1) { transition-delay: 0.05s; }
+.dash-stagger-list li:nth-child(2) { transition-delay: 0.12s; }
+.dash-stagger-list li:nth-child(3) { transition-delay: 0.19s; }
+.dash-stagger-list li:nth-child(4) { transition-delay: 0.26s; }
+.dash-stagger-list li:nth-child(5) { transition-delay: 0.33s; }
+
 @keyframes card-in {
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-/* Dashboard only: cards swoop in diagonally as they cross into view while
-   scrolling — alternating left/right (horizontal) combined with a rise
-   (vertical), plus a bit of scale and rotation for punch — instead of the
-   site-wide once-on-load version above. A toned-down nod to the
-   scroll-reveal style on sites like zero.university, minus the pinned
-   sections/parallax that make those extreme. JS (app.js) adds/removes
-   .pre-reveal-left/-right and sets the transition inline so it doesn't
-   fight the hover-tilt's own transform updates. */
-body.page-dashboard .card.pre-reveal { opacity: 0; }
-body.page-dashboard .card.pre-reveal-left {
-  transform: translate(-60px, 34px) scale(0.94) rotate(-3deg);
-}
-body.page-dashboard .card.pre-reveal-right {
-  transform: translate(60px, 34px) scale(0.94) rotate(3deg);
-}
-@media (prefers-reduced-motion: reduce) {
-  body.page-dashboard .card.pre-reveal,
-  body.page-dashboard .card.pre-reveal-left,
-  body.page-dashboard .card.pre-reveal-right { opacity: 1; transform: none; }
 }
 
 /* Dashboard highlight ticker: a thin band under the H1 that scrolls its
