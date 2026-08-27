@@ -601,6 +601,45 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
   });
 })();
 
+// Dashboard scroll-reveal. Cards fade/rise/scale in as they cross into the
+// viewport while scrolling, rather than all at once on load — a toned-down
+// version of the scroll-triggered reveal used on sites like
+// zero.university (no pinned sections, no marquee, just a subtle staged
+// entrance). Scoped to the dashboard only; every other page keeps the
+// simple once-on-load .card-in animation from style.css. Falls back to
+// that same load animation if the browser lacks IntersectionObserver or
+// the user prefers reduced motion.
+(function () {
+  if (!document.body.classList.contains('page-dashboard')) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!('IntersectionObserver' in window)) return;
+
+  const cards = Array.from(document.querySelectorAll('.grid > .card'));
+  if (!cards.length) return;
+
+  cards.forEach((card) => {
+    card.style.animation = 'none'; // don't fight the scroll-driven reveal
+    card.classList.add('pre-reveal');
+  });
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      const card = entry.target;
+      const delay = cards.indexOf(card) * 70;
+      card.style.transition =
+        `opacity 0.6s cubic-bezier(0.22,1,0.36,1) ${delay}ms, transform 0.6s cubic-bezier(0.22,1,0.36,1) ${delay}ms`;
+      requestAnimationFrame(() => card.classList.remove('pre-reveal'));
+      // Clear the inline transition once the reveal finishes so it
+      // doesn't linger and dull the hover-tilt's instant tracking above.
+      card.addEventListener('transitionend', () => { card.style.transition = ''; }, { once: true });
+      observer.unobserve(card);
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+
+  cards.forEach((card) => observer.observe(card));
+})();
+
 
 // Floating AI assistant popup (Ask / Quick Add). Replaces the old "AI" nav
 // dropdown — the markup lives in base.html (#ai-fab / #ai-popup), only

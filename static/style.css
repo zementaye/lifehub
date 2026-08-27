@@ -891,6 +891,20 @@ body.auth-page {
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Dashboard only: cards fade/rise/scale in as they cross into view while
+   scrolling, instead of the site-wide once-on-load version above — a
+   toned-down nod to scroll-reveal marketing sites (zero.university-style)
+   without the pinned sections/marquee/parallax that make those extreme.
+   JS (app.js) adds/removes .pre-reveal and sets the transition inline so
+   it doesn't fight the hover-tilt's own transform updates. */
+body.page-dashboard .card.pre-reveal {
+  opacity: 0;
+  transform: translateY(26px) scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  body.page-dashboard .card.pre-reveal { opacity: 1; transform: none; }
+}
 .content > h1 { animation: card-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .grid > .card:nth-of-type(1), .content > .card:nth-of-type(1) { animation-delay: 0.04s; }
 .grid > .card:nth-of-type(2), .content > .card:nth-of-type(2) { animation-delay: 0.09s; }
