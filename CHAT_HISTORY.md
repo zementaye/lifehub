@@ -176,3 +176,48 @@ instead of sharing the 0.15-threshold observer, and same for the
 defaulting to the existing `0.1` for every other group so nothing else
 changed). Verified with a headless-browser render: `.preview-frame`
 and all 4 mini-cards now flip to `.in-view` on scroll.
+
+**Landing page: restyled the dashboard preview mini-cards (looked too
+"built-for-a-coder") and made the hero's floating module icons
+draggable.** Two separate asks, same session.
+
+*Mini-cards:* titles were `font-mono`, uppercase, letter-spaced —
+terminal-label styling that reads as a dev tool rather than a friendly
+consumer dashboard. Swapped to `font-display`, sentence case, bolder
+weight; added a small colored icon badge (❤️ 🍎 🔥 💰, matching the
+feature-grid icons) next to each title; switched the accent from a
+thin `border-left` to a `border-top` + a subtle tab-color gradient
+wash on the card background; bumped stat-value size/weight; turned
+`.mini-tag` ("Healthy") into an actual pill badge instead of plain
+colored text; replaced the habit list's plain dots with checkbox-style
+squares that show a ✓ when done, and turned the streak count into a
+pill; added a slim progress bar to the Budget card (spent vs. left).
+Grid was `auto-fit, minmax(200px,1fr)` which let the new icon+title
+header's intrinsic content width force it down to 3-across-then-wrap
+at the frame's own max-width — changed to explicit `repeat(4,
+minmax(0,1fr))` with `min-width:0` on the card (plus a `max-width:
+639px` override back to 2 columns for mobile) and `text-overflow:
+ellipsis` on titles/checklist labels so a long label truncates instead
+of wrapping the card taller. Verified with a headless-browser render:
+all 4 cards sit in one row at the frame's 900px width.
+
+*Hero icons:* the 6 floating module glyphs (`.orbit-icon` inside
+`.orbit-parallax`) were purely decorative — `pointer-events: none` on
+the whole `.hero-orbit` wrapper, position driven only by resting
+top/left-or-right percentages plus a scroll-linked parallax
+`translate3d` and an idle CSS drift keyframe. Made them draggable:
+`.orbit-icon` gets `pointer-events: auto; cursor: grab; touch-action:
+none` (the wrapper stays `pointer-events: none` so empty space around
+them still doesn't intercept clicks); a new pointerdown/pointermove/
+pointerup handler per icon freezes the wrapper's current on-screen
+position into explicit `left/top` px (clearing whatever mix of
+top/left/right/transform was positioning it), tracks the pointer with
+clamping to the hero section's bounds, and stops there on release. A
+`data-user-placed` flag on the wrapper tells the existing scroll-
+parallax loop to skip that element from then on, so a dragged icon
+stays exactly where it's dropped instead of the next scroll tick
+snapping it back onto its parallax path; the idle drift keyframe still
+plays around the new spot so it doesn't go dead-still. Verified with a
+headless-browser drag simulation: dragged icon lands at the expected
+offset and is still there, unmoved, after a scroll-down/scroll-up
+round trip — the other 5 icons keep drifting with scroll as before.

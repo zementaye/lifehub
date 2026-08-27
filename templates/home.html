@@ -151,6 +151,19 @@
     font-size: 1.3rem;
     opacity: 0.85;
     animation: orbit-drift 9s ease-in-out infinite;
+    pointer-events: auto;
+    cursor: grab;
+    touch-action: none;
+    transition: box-shadow 0.2s ease, opacity 0.2s ease;
+  }
+  .orbit-icon:hover { opacity: 1; box-shadow: 0 10px 26px -10px color-mix(in srgb, var(--accent) 45%, transparent); }
+  .orbit-icon.dragging {
+    cursor: grabbing;
+    animation-play-state: paused;
+    opacity: 1;
+    transform: scale(1.15) !important;
+    box-shadow: 0 18px 34px -12px rgba(0,0,0,.4);
+    z-index: 5;
   }
   .orbit-parallax:nth-child(1) .orbit-icon { animation-delay: 0s; }
   .orbit-parallax:nth-child(2) .orbit-icon { animation-delay: -1.5s; }
@@ -402,51 +415,91 @@
     background: var(--surface); border: 1px solid var(--border-soft); border-radius: 999px;
     padding: 3px 12px;
   }
-  .preview-body { padding: 22px; }
+  .preview-body { padding: 26px; }
   .mini-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;
+  }
+  @media (max-width: 639px) {
+    .mini-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   /* Scale-only stagger — no position or rotate change, just a landing
      pop. Distinct from the frame's clip-path wipe and every other
      section's directional motion. */
   .mini-card {
-    padding: 16px; border-radius: 12px;
-    background: var(--surface-raised);
+    padding: 18px 20px 20px; border-radius: 16px;
+    background: linear-gradient(165deg, var(--surface-raised), color-mix(in srgb, var(--tab-color) 7%, var(--surface-raised)));
     border: 1px solid var(--border-soft);
-    border-left: 2px solid var(--tab-color);
+    border-top: 3px solid var(--tab-color);
+    box-shadow: 0 10px 24px -18px color-mix(in srgb, var(--tab-color) 60%, transparent);
+    min-width: 0;
     opacity: 0; transform: scale(0.5);
     transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease;
   }
   .mini-card.in-view { opacity: 1; transform: scale(1); }
   .mini-card.in-view:hover {
-    transform: scale(1.05);
-    box-shadow: 0 12px 26px -14px color-mix(in srgb, var(--tab-color) 55%, transparent);
+    transform: scale(1.05) translateY(-2px);
+    box-shadow: 0 16px 30px -16px color-mix(in srgb, var(--tab-color) 55%, transparent);
   }
   .mini-card:nth-child(1) { --tab-color: var(--accent); }
   .mini-card:nth-child(2) { --tab-color: var(--success); }
   .mini-card:nth-child(3) { --tab-color: var(--danger); }
   .mini-card:nth-child(4) { --tab-color: var(--primary); }
-  .mini-card-title {
-    display: block; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 600;
-    letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+  .mini-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .mini-card-icon {
+    width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.95rem;
+    background: color-mix(in srgb, var(--tab-color) 20%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--tab-color) 40%, var(--border));
   }
-  .mini-stat-row { display: flex; gap: 18px; flex-wrap: wrap; }
-  .mini-stat { display: flex; flex-direction: column; }
-  .mini-stat-value { font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; color: var(--ink); }
+  .mini-card-title {
+    font-family: var(--font-display); font-size: 0.8rem; font-weight: 600;
+    letter-spacing: -0.01em; color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .mini-stat-row { display: flex; gap: 20px; flex-wrap: wrap; }
+  .mini-stat { display: flex; flex-direction: column; gap: 2px; }
+  .mini-stat-value { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: var(--ink); }
   .mini-card.in-view .mini-stat-value { animation: value-flash 0.7s ease-out 0.25s both; }
   @keyframes value-flash {
     0% { text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 70%, transparent); }
     100% { text-shadow: 0 0 0 transparent; }
   }
   .mini-stat-value small { font-size: 0.65rem; color: var(--muted); font-weight: 500; }
-  .mini-stat-label { font-size: 0.7rem; color: var(--muted); }
-  .mini-tag { color: var(--success); }
-  .mini-checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+  .mini-stat-label { font-size: 0.72rem; color: var(--muted); }
+  .mini-tag {
+    display: inline-block; margin-top: 2px; padding: 1px 9px; border-radius: 999px;
+    background: color-mix(in srgb, var(--success) 18%, transparent);
+    color: var(--success); font-weight: 600; font-size: 0.66rem;
+  }
+  .mini-checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
   .mini-checklist li { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--ink); }
+  .mini-checklist .mini-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini-streak { flex-shrink: 0; }
   .mini-checklist li.done { color: var(--muted); text-decoration: line-through; }
-  .mini-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--border); flex-shrink: 0; }
-  .mini-dot.done { background: var(--success); border-color: var(--success); }
-  .mini-streak { margin-left: auto; font-size: 0.72rem; }
+  .mini-dot {
+    width: 17px; height: 17px; border-radius: 6px; flex-shrink: 0;
+    border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.62rem; color: transparent; line-height: 1;
+  }
+  .mini-dot.done { background: var(--success); border-color: var(--success); color: #fff; }
+  .mini-dot.done::after { content: '✓'; }
+  .mini-streak {
+    margin-left: auto; font-size: 0.72rem; font-weight: 600;
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 16%, transparent);
+    padding: 2px 9px; border-radius: 999px;
+  }
+  .mini-progress {
+    height: 6px; border-radius: 999px; margin-top: 16px; overflow: hidden;
+    background: var(--border-soft);
+  }
+  .mini-progress-bar {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--tab-color), color-mix(in srgb, var(--tab-color) 60%, white));
+  }
+
 
   /* Social proof */
   .proof-band {
@@ -670,33 +723,46 @@
     <div class="preview-body">
       <div class="mini-grid">
         <div class="mini-card">
-          <span class="mini-card-title">Body</span>
+          <div class="mini-card-head">
+            <span class="mini-card-icon">❤️</span>
+            <span class="mini-card-title">Body</span>
+          </div>
           <div class="mini-stat-row">
             <div class="mini-stat"><span class="mini-stat-value">71.4<small>kg</small></span><span class="mini-stat-label">Latest weight</span></div>
-            <div class="mini-stat"><span class="mini-stat-value">22.1</span><span class="mini-stat-label">BMI · <span class="mini-tag">Healthy</span></span></div>
+            <div class="mini-stat"><span class="mini-stat-value">22.1</span><span class="mini-stat-label">BMI</span><span class="mini-tag">Healthy</span></div>
           </div>
         </div>
         <div class="mini-card">
-          <span class="mini-card-title">Today's Nutrition</span>
+          <div class="mini-card-head">
+            <span class="mini-card-icon">🍎</span>
+            <span class="mini-card-title">Today's Nutrition</span>
+          </div>
           <div class="mini-stat-row">
             <div class="mini-stat"><span class="mini-stat-value">1,840</span><span class="mini-stat-label">calories</span></div>
             <div class="mini-stat"><span class="mini-stat-value">96<small>g</small></span><span class="mini-stat-label">protein</span></div>
           </div>
         </div>
         <div class="mini-card">
-          <span class="mini-card-title">Today's Habits</span>
+          <div class="mini-card-head">
+            <span class="mini-card-icon">🔥</span>
+            <span class="mini-card-title">Today's Habits</span>
+          </div>
           <ul class="mini-checklist">
-            <li class="done"><span class="mini-dot done"></span> Morning walk</li>
-            <li><span class="mini-dot"></span> Read 20 min <span class="mini-streak">🔥 12</span></li>
-            <li class="done"><span class="mini-dot done"></span> Drink water</li>
+            <li class="done"><span class="mini-dot done"></span><span class="mini-label">Morning walk</span></li>
+            <li><span class="mini-dot"></span><span class="mini-label">Read 20 min</span><span class="mini-streak">🔥 12</span></li>
+            <li class="done"><span class="mini-dot done"></span><span class="mini-label">Drink water</span></li>
           </ul>
         </div>
         <div class="mini-card">
-          <span class="mini-card-title">Budget</span>
+          <div class="mini-card-head">
+            <span class="mini-card-icon">💰</span>
+            <span class="mini-card-title">Budget</span>
+          </div>
           <div class="mini-stat-row">
             <div class="mini-stat"><span class="mini-stat-value">$1,240</span><span class="mini-stat-label">spent this month</span></div>
             <div class="mini-stat"><span class="mini-stat-value">$260</span><span class="mini-stat-label">left in budget</span></div>
           </div>
+          <div class="mini-progress"><div class="mini-progress-bar" style="width: 83%"></div></div>
         </div>
       </div>
     </div>
@@ -835,6 +901,7 @@
         el.style.transform = 'translate3d(0,' + (y * speed).toFixed(1) + 'px,0)';
       });
       orbitEls.forEach(function (el) {
+        if (el.dataset.userPlaced === '1') return; // dragged icons stay put, not scroll-parallaxed
         var speed = parseFloat(el.dataset.speed) || 0.06;
         el.style.transform = 'translate3d(0,' + (y * speed).toFixed(1) + 'px,0)';
       });
@@ -854,6 +921,71 @@
     }, { passive: true });
     window.addEventListener('resize', update);
     update();
+  })();
+
+  // Draggable hero orbit icons — grab any of the floating module glyphs
+  // and drop it wherever. Dragging the icon repositions its wrapper
+  // (.orbit-parallax) directly via left/top in px, converting it out of
+  // the top/left-or-right percentage layout used for its resting spot.
+  // Once dropped, the wrapper is flagged data-user-placed so the scroll
+  // parallax loop above leaves it alone instead of fighting the manual
+  // position; the idle drift keyframe animation resumes around the new
+  // spot so it still feels alive rather than pinned dead-still.
+  (function () {
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var container = document.querySelector('.hero-orbit');
+    if (reduced || !container) return;
+
+    document.querySelectorAll('.orbit-icon').forEach(function (icon) {
+      var wrapper = icon.parentElement;
+      var dragging = false;
+      var startX, startY, wrapLeft, wrapTop;
+
+      icon.addEventListener('pointerdown', function (e) {
+        dragging = true;
+        icon.setPointerCapture(e.pointerId);
+        icon.classList.add('dragging');
+
+        var containerRect = container.getBoundingClientRect();
+        var wrapRect = wrapper.getBoundingClientRect();
+        // Freeze current on-screen position as explicit left/top px,
+        // clearing whatever combination of top/left/right/transform
+        // was placing it a moment ago (resting spot or mid-parallax).
+        wrapLeft = wrapRect.left - containerRect.left;
+        wrapTop = wrapRect.top - containerRect.top;
+        wrapper.style.left = wrapLeft + 'px';
+        wrapper.style.top = wrapTop + 'px';
+        wrapper.style.right = 'auto';
+        wrapper.style.transform = 'none';
+        wrapper.dataset.userPlaced = '1';
+
+        startX = e.clientX;
+        startY = e.clientY;
+        e.preventDefault();
+      });
+
+      icon.addEventListener('pointermove', function (e) {
+        if (!dragging) return;
+        var containerRect = container.getBoundingClientRect();
+        var newLeft = wrapLeft + (e.clientX - startX);
+        var newTop = wrapTop + (e.clientY - startY);
+        // Keep it within the hero section instead of letting it drift
+        // off into neighboring content.
+        newLeft = Math.max(0, Math.min(newLeft, containerRect.width - wrapper.offsetWidth));
+        newTop = Math.max(0, Math.min(newTop, containerRect.height - wrapper.offsetHeight));
+        wrapper.style.left = newLeft + 'px';
+        wrapper.style.top = newTop + 'px';
+      });
+
+      function endDrag(e) {
+        if (!dragging) return;
+        dragging = false;
+        icon.classList.remove('dragging');
+        try { icon.releasePointerCapture(e.pointerId); } catch (err) {}
+      }
+      icon.addEventListener('pointerup', endDrag);
+      icon.addEventListener('pointercancel', endDrag);
+    });
   })();
 
   // Scroll animations for section headings, cards, and bands. Every
