@@ -233,3 +233,20 @@ dot + "Live preview" label on the right (`@keyframes live-pulse`, a
 soft expanding-ring pulse rather than a static dot) instead of a fake
 URL. Kept the existing idle shimmer sweep across the bar unchanged.
 Verified with a headless-browser render.
+
+**Notes page: fixed a 500 on every load — `outgoing_items` was
+undefined.** `notes.html`'s "Links you've sent" list reads
+`outgoing_items[sr.id]` to show which note titles are bundled into
+each share link, but the `notes()` view in `app.py` only ever built
+and passed `outgoing_shares`, `outgoing_links`, and `incoming_shares`
+— never `outgoing_items` — so any visit to `/notes` raised
+`jinja2.exceptions.UndefinedError: 'outgoing_items' is undefined` and
+the page 500'd unconditionally, whether or not the person had ever
+shared anything. `db.py` already had the exact function needed for
+this (`get_share_request_items`, used the same way for the calendar
+share-preview page) — it just wasn't being called here. Fix: build
+`outgoing_items = {sr["id"]: db.get_share_request_items(sr["id"],
+include_removed=True) for sr in outgoing_shares}` and pass it into
+the template alongside the others. Verified the exact Jinja
+expression against real `sqlite3.Row` data (including a removed item
+and an empty share) — filters and joins correctly, no error.

@@ -2565,6 +2565,7 @@ def notes():
 
     outgoing_shares = db.list_outgoing_shares(g.user_id)
     outgoing_links = {sr["id"]: _share_link(sr["token"]) for sr in outgoing_shares if sr["status"] == "pending"}
+    outgoing_items = {sr["id"]: db.get_share_request_items(sr["id"], include_removed=True) for sr in outgoing_shares}
     incoming_shares = db.list_incoming_shares(g.user_id)
 
     new_share_token = request.args.get("shared_token")
@@ -2573,7 +2574,7 @@ def notes():
     return render_template(
         "notes.html", items=items, images_by_note=images_by_note,
         outgoing_shares=outgoing_shares, outgoing_links=outgoing_links,
-        incoming_shares=incoming_shares,
+        outgoing_items=outgoing_items, incoming_shares=incoming_shares,
         new_share_link=new_share_link,
     )
 
