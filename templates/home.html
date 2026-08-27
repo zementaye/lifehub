@@ -20,6 +20,11 @@
     background: color-mix(in srgb, var(--surface) 82%, transparent);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border-soft);
+    transition: box-shadow 0.35s ease, border-color 0.35s ease;
+  }
+  .landing-nav.scrolled {
+    box-shadow: 0 8px 24px -14px color-mix(in srgb, var(--accent) 45%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--accent) 35%, var(--border-soft));
   }
   .landing-nav .brand { font-size: 1.05rem; }
   .landing-nav-actions { display: flex; align-items: center; gap: 10px; }
@@ -32,6 +37,18 @@
     padding: 9px 18px; font-size: 0.78rem;
   }
 
+  /* Scroll-progress accent: a thin bar pinned above the sticky nav that
+     fills left-to-right as the page scrolls (0 at the top, full at the
+     bottom). Updated via transform (not width) in the scroll handler
+     below so it's compositor-friendly. */
+  .scroll-progress {
+    position: fixed; top: 0; left: 0; width: 100%; height: 3px;
+    z-index: 30; pointer-events: none;
+    background: linear-gradient(90deg, var(--accent), var(--violet));
+    box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 55%, transparent);
+    transform: scaleX(0); transform-origin: left center;
+  }
+
   /* Hero */
   .hero {
     position: relative;
@@ -40,6 +57,12 @@
     overflow: hidden;
   }
   .hero-blobs { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  /* Parallax wrapper: carries the scroll-driven translateY set by JS.
+     It has no animation of its own, so setting its transform inline
+     never fights the .hero-blob's blob-float keyframe animation below —
+     CSS animations always win over inline styles on the same element,
+     which is why the parallax offset has to live one level up. */
+  .blob-parallax { position: absolute; inset: 0; will-change: transform; }
   .hero-blob {
     position: absolute;
     border-radius: 50%;
@@ -108,8 +131,17 @@
 
   /* Floating module glyphs drifting behind the hero copy */
   .hero-orbit { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  /* Same wrapper split as .blob-parallax above: the wrapper takes the
+     scroll parallax offset and the position (top/left/right per icon),
+     the inner .orbit-icon keeps its own drift keyframe animation. */
+  .orbit-parallax { position: absolute; will-change: transform; }
+  .orbit-parallax:nth-child(1) { top: 8%;  left: 6%; }
+  .orbit-parallax:nth-child(2) { top: 16%; right: 8%; }
+  .orbit-parallax:nth-child(3) { top: 62%; left: 3%; }
+  .orbit-parallax:nth-child(4) { top: 70%; right: 5%; }
+  .orbit-parallax:nth-child(5) { top: 40%; left: 14%; }
+  .orbit-parallax:nth-child(6) { top: 38%; right: 15%; }
   .orbit-icon {
-    position: absolute;
     width: 46px; height: 46px;
     display: flex; align-items: center; justify-content: center;
     border-radius: 12px;
@@ -120,12 +152,12 @@
     opacity: 0.85;
     animation: orbit-drift 9s ease-in-out infinite;
   }
-  .orbit-icon:nth-child(1) { top: 8%;  left: 6%;  animation-delay: 0s; }
-  .orbit-icon:nth-child(2) { top: 16%; right: 8%; animation-delay: -1.5s; }
-  .orbit-icon:nth-child(3) { top: 62%; left: 3%;  animation-delay: -3s; }
-  .orbit-icon:nth-child(4) { top: 70%; right: 5%; animation-delay: -4.5s; }
-  .orbit-icon:nth-child(5) { top: 40%; left: 14%; animation-delay: -6s; }
-  .orbit-icon:nth-child(6) { top: 38%; right: 15%; animation-delay: -7.5s; }
+  .orbit-parallax:nth-child(1) .orbit-icon { animation-delay: 0s; }
+  .orbit-parallax:nth-child(2) .orbit-icon { animation-delay: -1.5s; }
+  .orbit-parallax:nth-child(3) .orbit-icon { animation-delay: -3s; }
+  .orbit-parallax:nth-child(4) .orbit-icon { animation-delay: -4.5s; }
+  .orbit-parallax:nth-child(5) .orbit-icon { animation-delay: -6s; }
+  .orbit-parallax:nth-child(6) .orbit-icon { animation-delay: -7.5s; }
   @keyframes orbit-drift {
     0%, 100% { transform: translateY(0) rotate(0deg); }
     50% { transform: translateY(-16px) rotate(4deg); }
@@ -146,18 +178,20 @@
      CTA band. .feature-card below has its own copy of this (plus a
      per-card stagger), so it isn't switched over to this shared class. */
   .reveal {
-    opacity: 0; transform: translateY(24px);
-    transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1);
+    opacity: 0; transform: translateY(40px);
+    filter: blur(6px);
+    transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.22,1,0.36,1), filter 0.7s ease;
   }
-  .reveal.in-view { opacity: 1; transform: translateY(0); }
+  .reveal.in-view { opacity: 1; transform: translateY(0); filter: blur(0); }
 
-  /* Zoom variant of .reveal, used on the CTA band for a punchier
-     entrance than the plain fade-up. */
+  /* Zoom variant of .reveal, used on the CTA band for a punchier,
+     springier entrance than the plain fade-up. */
   .reveal-zoom {
-    opacity: 0; transform: scale(0.9);
-    transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1);
+    opacity: 0; transform: scale(0.75) rotate(-2deg);
+    filter: blur(8px);
+    transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.34,1.56,0.64,1), filter 0.6s ease;
   }
-  .reveal-zoom.in-view { opacity: 1; transform: scale(1); }
+  .reveal-zoom.in-view { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
 
   /* style.css gives every .card a built-in "card-in" mount animation
      (opacity/translateY, animation-fill-mode: both) that fires the
@@ -174,16 +208,24 @@
     display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px;
   }
   .feature-card {
-    opacity: 0; transform: scale(0.86) translateY(14px);
-    transition: opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1);
+    opacity: 0; transform: scale(0.6) rotate(-10deg) translateY(30px);
+    filter: blur(8px);
+    transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.34,1.56,0.64,1), filter 0.7s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   }
-  .feature-card.in-view { opacity: 1; transform: scale(1) translateY(0); }
+  .feature-card.in-view { opacity: 1; transform: scale(1) rotate(0deg) translateY(0); filter: blur(0); }
+  .feature-card.in-view:hover {
+    transform: scale(1.04) translateY(-8px);
+    box-shadow: 0 22px 40px -18px color-mix(in srgb, var(--tab-color) 55%, transparent);
+    border-color: color-mix(in srgb, var(--tab-color) 55%, var(--border));
+  }
   .feature-card .f-icon {
     width: 42px; height: 42px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
     font-size: 1.3rem; margin-bottom: 14px;
     background: color-mix(in srgb, var(--tab-color) 16%, transparent);
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
   }
+  .feature-card:hover .f-icon { transform: rotate(-10deg) scale(1.18); }
   .feature-card h3 { border-bottom: none; padding-bottom: 0; margin-bottom: 8px; color: var(--ink); font-size: 1rem; }
   .feature-card p { color: var(--muted); font-size: 0.88rem; line-height: 1.55; margin: 0; }
 
@@ -209,6 +251,12 @@
   .cta-band p { color: var(--muted); margin-bottom: 26px; }
   .cta-band button { padding: 13px 28px; font-size: 0.85rem; }
 
+  /* Extra hover punch on the landing page's own CTAs, on top of the
+     lift/glow style.css already gives every button. */
+  .hero-ctas button:hover, .cta-band button:hover, .landing-nav-actions button:hover {
+    transform: translateY(-3px) scale(1.05);
+  }
+
   /* How it works */
   .how-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px;
@@ -221,10 +269,12 @@
     background: var(--surface);
     border: 1px solid var(--border);
     text-align: left;
-    opacity: 0; transform: translateY(24px);
-    transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1);
+    opacity: 0; transform: translateY(60px) rotate(-4deg);
+    filter: blur(6px);
+    transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.34,1.56,0.64,1), filter 0.7s ease, border-color 0.3s ease;
   }
-  .step-card.in-view { opacity: 1; transform: translateY(0); }
+  .step-card.in-view { opacity: 1; transform: translateY(0) rotate(0deg); filter: blur(0); }
+  .step-card:hover { transform: translateY(-6px); border-color: var(--accent); }
   .step-num {
     display: inline-flex; align-items: center; justify-content: center;
     width: 34px; height: 34px; border-radius: 50%;
@@ -232,7 +282,9 @@
     color: var(--bg-glow);
     background: linear-gradient(135deg, var(--accent), var(--violet));
     margin-bottom: 14px;
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
   }
+  .step-card:hover .step-num { transform: scale(1.15) rotate(-10deg); }
   .step-card h3 { border-bottom: none; padding-bottom: 0; margin: 0 0 8px; color: var(--ink); font-size: 1rem; }
   .step-card p { color: var(--muted); font-size: 0.88rem; line-height: 1.55; margin: 0; }
   @media (min-width: 700px) {
@@ -253,10 +305,11 @@
     border: 1px solid var(--border);
     background: var(--surface);
     box-shadow: var(--shadow);
-    opacity: 0; transform: scale(0.92);
-    transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1);
+    opacity: 0; transform: scale(0.75) rotate(-3deg);
+    filter: blur(10px);
+    transition: opacity 0.7s ease, transform 0.8s cubic-bezier(0.34,1.56,0.64,1), filter 0.7s ease;
   }
-  .preview-frame.in-view { opacity: 1; transform: scale(1); }
+  .preview-frame.in-view { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
   .preview-chrome {
     display: flex; align-items: center; gap: 8px;
     padding: 12px 16px;
@@ -281,10 +334,15 @@
     background: var(--surface-raised);
     border: 1px solid var(--border-soft);
     border-left: 2px solid var(--tab-color);
-    opacity: 0; transform: scale(0.88);
-    transition: opacity 0.5s cubic-bezier(0.22,1,0.36,1), transform 0.5s cubic-bezier(0.22,1,0.36,1);
+    opacity: 0; transform: scale(0.4) rotate(8deg);
+    filter: blur(4px);
+    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34,1.56,0.64,1), filter 0.6s ease, box-shadow 0.25s ease;
   }
-  .mini-card.in-view { opacity: 1; transform: scale(1); }
+  .mini-card.in-view { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
+  .mini-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 12px 26px -14px color-mix(in srgb, var(--tab-color) 55%, transparent);
+  }
   .mini-card:nth-child(1) { --tab-color: var(--accent); }
   .mini-card:nth-child(2) { --tab-color: var(--success); }
   .mini-card:nth-child(3) { --tab-color: var(--danger); }
@@ -313,10 +371,11 @@
   }
   .proof-stat {
     text-align: center;
-    opacity: 0; transform: scale(0.7);
-    transition: opacity 0.5s cubic-bezier(0.22,1,0.36,1), transform 0.5s cubic-bezier(0.22,1,0.36,1);
+    opacity: 0; transform: scale(0.3) rotate(-18deg);
+    filter: blur(4px);
+    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34,1.56,0.64,1), filter 0.6s ease;
   }
-  .proof-stat.in-view { opacity: 1; transform: scale(1); }
+  .proof-stat.in-view { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
   .proof-num {
     display: block; font-family: var(--font-display); font-size: 2.1rem; font-weight: 700;
     background: linear-gradient(100deg, var(--accent), var(--violet));
@@ -333,10 +392,12 @@
   .faq-item {
     border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
     padding: 4px 20px;
-    opacity: 0; transform: translateY(16px);
-    transition: opacity 0.5s cubic-bezier(0.22,1,0.36,1), transform 0.5s cubic-bezier(0.22,1,0.36,1);
+    opacity: 0; transform: translateX(-50px) rotate(-2deg);
+    filter: blur(4px);
+    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34,1.56,0.64,1), filter 0.6s ease, border-color 0.25s ease;
   }
-  .faq-item.in-view { opacity: 1; transform: translateY(0); }
+  .faq-item.in-view { opacity: 1; transform: translateX(0) rotate(0deg); filter: blur(0); }
+  .faq-item:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
   .faq-item summary {
     cursor: pointer; list-style: none; padding: 16px 0;
     font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; color: var(--ink);
@@ -358,16 +419,18 @@
 
   @media (prefers-reduced-motion: reduce) {
     .hero-blob, .orbit-icon, .hero-eyebrow .dot { animation: none !important; }
+    .blob-parallax, .orbit-parallax { transform: none !important; }
     .feature-card, .reveal, .reveal-zoom, .step-card, .preview-frame, .mini-card, .proof-stat, .faq-item {
-      opacity: 1 !important; transform: none !important; transition: none !important;
+      opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important;
     }
   }
 </style>
 </head>
 <body class="landing-page" data-theme="light" data-palette="amber">
+<div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
 <div id="hud-stars" aria-hidden="true"></div>
 
-<nav class="landing-nav">
+<nav class="landing-nav" id="landingNav">
   <a href="{{ url_for('home') }}" class="brand">
     <svg class="brand-mark" viewBox="0 0 28 28" width="24" height="24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <rect x="1" y="1" width="26" height="26" rx="7" fill="var(--surface-raised)" stroke="var(--border)"/>
@@ -390,17 +453,17 @@
 
 <section class="hero">
   <div class="hero-blobs" aria-hidden="true">
-    <div class="hero-blob b1"></div>
-    <div class="hero-blob b2"></div>
-    <div class="hero-blob b3"></div>
+    <div class="blob-parallax" data-speed="0.18"><div class="hero-blob b1"></div></div>
+    <div class="blob-parallax" data-speed="0.28"><div class="hero-blob b2"></div></div>
+    <div class="blob-parallax" data-speed="0.12"><div class="hero-blob b3"></div></div>
   </div>
   <div class="hero-orbit" aria-hidden="true">
-    <div class="orbit-icon">💰</div>
-    <div class="orbit-icon">🔥</div>
-    <div class="orbit-icon">🍎</div>
-    <div class="orbit-icon">🔒</div>
-    <div class="orbit-icon">📝</div>
-    <div class="orbit-icon">⏰</div>
+    <div class="orbit-parallax" data-speed="0.05"><div class="orbit-icon">💰</div></div>
+    <div class="orbit-parallax" data-speed="0.08"><div class="orbit-icon">🔥</div></div>
+    <div class="orbit-parallax" data-speed="0.06"><div class="orbit-icon">🍎</div></div>
+    <div class="orbit-parallax" data-speed="0.09"><div class="orbit-icon">🔒</div></div>
+    <div class="orbit-parallax" data-speed="0.07"><div class="orbit-icon">📝</div></div>
+    <div class="orbit-parallax" data-speed="0.10"><div class="orbit-icon">⏰</div></div>
   </div>
   <div class="hero-inner">
     <span class="hero-eyebrow"><span class="dot"></span> One private dashboard for your whole life</span>
@@ -631,6 +694,47 @@
       s.style.animationDelay = (Math.random() * 4) + 's';
       container.appendChild(s);
     }
+  })();
+
+  // Scroll-progress bar + nav "scrolled" glow + hero parallax, all driven
+  // off one rAF-throttled scroll handler to avoid layout thrash from
+  // three separate listeners.
+  (function () {
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var progress = document.getElementById('scrollProgress');
+    var nav = document.getElementById('landingNav');
+    var blobEls = reduced ? [] : document.querySelectorAll('.blob-parallax');
+    var orbitEls = reduced ? [] : document.querySelectorAll('.orbit-parallax');
+    if (!progress && !nav && !blobEls.length && !orbitEls.length) return;
+
+    var ticking = false;
+    function update() {
+      var y = window.scrollY || window.pageYOffset || 0;
+
+      if (progress) {
+        var docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        var pct = docHeight > 0 ? Math.min(1, Math.max(0, y / docHeight)) : 0;
+        progress.style.transform = 'scaleX(' + pct.toFixed(4) + ')';
+      }
+      if (nav) {
+        nav.classList.toggle('scrolled', y > 40);
+      }
+      blobEls.forEach(function (el) {
+        var speed = parseFloat(el.dataset.speed) || 0.15;
+        el.style.transform = 'translate3d(0,' + (y * speed).toFixed(1) + 'px,0)';
+      });
+      orbitEls.forEach(function (el) {
+        var speed = parseFloat(el.dataset.speed) || 0.06;
+        el.style.transform = 'translate3d(0,' + (y * speed).toFixed(1) + 'px,0)';
+      });
+
+      ticking = false;
+    }
+    window.addEventListener('scroll', function () {
+      if (!ticking) { window.requestAnimationFrame(update); ticking = true; }
+    }, { passive: true });
+    window.addEventListener('resize', update);
+    update();
   })();
 
   // Scroll animations for section headings, cards, and bands. Every
