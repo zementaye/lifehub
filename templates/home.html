@@ -866,17 +866,19 @@
   // is left listening once the element leaves view again.
   (function () {
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var singleSelectors = '.reveal, .reveal-zoom, .preview-frame';
+    // .preview-frame is handled by its own observer below (see note),
+    // so it's excluded from this shared selector.
+    var singleSelectors = '.reveal, .reveal-zoom';
 
     if (reduced || !('IntersectionObserver' in window)) {
       document.querySelectorAll(
-        singleSelectors + ', .feature-card, .step-card, .mini-card, .proof-stat, .faq-item, .footer-reveal'
+        singleSelectors + ', .preview-frame, .feature-card, .step-card, .mini-card, .proof-stat, .faq-item, .footer-reveal'
       ).forEach(function (el) { el.classList.add('in-view'); });
       return;
     }
 
-    // Single elements (headings, subtext, the CTA band, the preview
-    // frame shell): fade/zoom in and out as a unit, no stagger.
+    // Single elements (headings, subtext, the CTA band): fade/zoom in
+    // and out as a unit, no stagger.
     var singleObserver = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         entry.target.classList.toggle('in-view', entry.isIntersecting);
@@ -886,12 +888,29 @@
       singleObserver.observe(el);
     });
 
+    // .preview-frame starts clipped to zero visible width (clip-path
+    // curtain wipe) until it gets .in-view. That means its own
+    // intersectionRatio is stuck at 0 the whole time it's hidden, so a
+    // non-zero threshold (like the 0.15 used above) can never be
+    // crossed — the reveal would depend on the element already being
+    // visible. Use threshold 0 here so "any pixel of its (unclipped)
+    // box enters the viewport" is enough to trigger it.
+    var previewFrame = document.querySelector('.preview-frame');
+    if (previewFrame) {
+      var previewObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          entry.target.classList.toggle('in-view', entry.isIntersecting);
+        });
+      }, { threshold: 0 });
+      previewObserver.observe(previewFrame);
+    }
+
     // Grouped elements (feature cards, how-it-works steps, dashboard
     // preview mini-cards, proof stats, FAQ items): staggered entrance
     // when the group scrolls into view, and — since watching is never
     // switched off — an immediate reset back to hidden the moment the
     // group leaves the viewport, ready to stagger in again next time.
-    function revealGroup(gridSelector, itemSelector, staggerMs) {
+    function revealGroup(gridSelector, itemSelector, staggerMs, threshold) {
       var grid = document.querySelector(gridSelector);
       var items = document.querySelectorAll(itemSelector);
       if (!grid || !items.length) return;
@@ -911,12 +930,16 @@
             items.forEach(function (el) { el.classList.remove('in-view'); });
           }
         });
-      }, { threshold: 0.1 });
+      }, { threshold: threshold === undefined ? 0.1 : threshold });
       gridObserver.observe(grid);
     }
     revealGroup('.feature-grid', '.feature-card', 70);
     revealGroup('.how-grid', '.step-card', 100);
-    revealGroup('.preview-frame', '.mini-card', 90);
+    // threshold 0: the grid here is .preview-frame, which is clipped to
+    // zero visible width until it has .in-view (see the dedicated
+    // observer above) — its intersectionRatio can't cross a non-zero
+    // threshold, so this group would otherwise never reveal either.
+    revealGroup('.preview-frame', '.mini-card', 90, 0);
     revealGroup('.proof-band', '.proof-stat', 120);
     revealGroup('.faq-list', '.faq-item', 90);
     revealGroup('.app-footer-grid', '.footer-reveal', 80);

@@ -154,3 +154,25 @@ thresholds, producing a large blank gap while scrolling. Fix: added
 stretch to the row before centering, same as intended. Verified with a
 headless-browser render: total page height dropped ~430px and every
 section now measures the full 1080px.
+
+**Landing page: fixed a second, still-present cause of the same "huge
+gap" symptom — the dashboard preview mockup never revealing.**
+`.preview-frame` starts hidden via `clip-path: inset(0 100% 0 0)`
+(clipped to zero visible width, curtain-wipe reveal) and is meant to
+un-clip via `IntersectionObserver` once scrolled into view. But the
+observers watching it used a non-zero `threshold` (`0.15` for the
+frame itself, `0.1` for the `.mini-card` stagger group) — and because
+the element is clipped to zero width, its `intersectionRatio` is
+permanently stuck at `0`, so it can never cross a non-zero threshold.
+The reveal condition depended on the element already being visible: a
+permanent deadlock. `.in-view` never got added, so the mockup (and its
+4 stat cards) rendered as nothing — an empty ~236px box — while
+everything else on the page revealed normally. Confirmed directly in a
+headless browser: `intersectionRatio` stayed `0` with the clip-path in
+place, jumped to `1` the instant it was stripped. Fix: gave
+`.preview-frame` its own `IntersectionObserver` with `threshold: 0`
+instead of sharing the 0.15-threshold observer, and same for the
+`.mini-card` `revealGroup` call (added an optional `threshold` param,
+defaulting to the existing `0.1` for every other group so nothing else
+changed). Verified with a headless-browser render: `.preview-frame`
+and all 4 mini-cards now flip to `.in-view` on scroll.
