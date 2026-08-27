@@ -201,16 +201,148 @@
   .cta-band p { color: var(--muted); margin-bottom: 26px; }
   .cta-band button { padding: 13px 28px; font-size: 0.85rem; }
 
-  .landing-footer {
-    text-align: center; padding: 28px 24px 40px;
-    color: var(--muted); font-size: 0.78rem;
-    position: relative; z-index: 1;
+  /* How it works */
+  .how-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px;
+    position: relative;
   }
-  .landing-footer a { color: var(--muted); }
+  .step-card {
+    position: relative;
+    padding: 28px 22px 24px;
+    border-radius: var(--radius, 14px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    text-align: left;
+    opacity: 0; transform: translateY(24px);
+    transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1);
+  }
+  .step-card.in-view { opacity: 1; transform: translateY(0); }
+  .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 50%;
+    font-family: var(--font-mono); font-weight: 700; font-size: 0.95rem;
+    color: var(--bg-glow);
+    background: linear-gradient(135deg, var(--accent), var(--violet));
+    margin-bottom: 14px;
+  }
+  .step-card h3 { border-bottom: none; padding-bottom: 0; margin: 0 0 8px; color: var(--ink); font-size: 1rem; }
+  .step-card p { color: var(--muted); font-size: 0.88rem; line-height: 1.55; margin: 0; }
+  @media (min-width: 700px) {
+    .how-grid { align-items: start; }
+    .how-grid::before {
+      content: ''; position: absolute; top: 17px; left: calc(16.5% + 17px); right: calc(16.5% + 17px);
+      height: 1px;
+      background-image: linear-gradient(90deg, var(--border) 60%, transparent 40%);
+      background-size: 10px 1px; background-repeat: repeat-x;
+      z-index: -1;
+    }
+  }
+
+  /* Dashboard preview */
+  .preview-frame {
+    max-width: 900px; margin: 0 auto;
+    border-radius: 16px; overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    opacity: 0; transform: translateY(24px);
+    transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1);
+  }
+  .preview-frame.in-view { opacity: 1; transform: translateY(0); }
+  .preview-chrome {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px;
+    background: var(--surface-raised);
+    border-bottom: 1px solid var(--border);
+  }
+  .preview-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .preview-dot.d1 { background: var(--danger); }
+  .preview-dot.d2 { background: var(--primary); }
+  .preview-dot.d3 { background: var(--success); }
+  .preview-url {
+    margin-left: 10px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--border-soft); border-radius: 999px;
+    padding: 3px 12px;
+  }
+  .preview-body { padding: 22px; }
+  .mini-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px;
+  }
+  .mini-card {
+    padding: 16px; border-radius: 12px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border-soft);
+    border-left: 2px solid var(--tab-color);
+    opacity: 0; transform: translateY(16px);
+    transition: opacity 0.5s cubic-bezier(0.22,1,0.36,1), transform 0.5s cubic-bezier(0.22,1,0.36,1);
+  }
+  .mini-card.in-view { opacity: 1; transform: translateY(0); }
+  .mini-card:nth-child(1) { --tab-color: var(--accent); }
+  .mini-card:nth-child(2) { --tab-color: var(--success); }
+  .mini-card:nth-child(3) { --tab-color: var(--danger); }
+  .mini-card:nth-child(4) { --tab-color: var(--primary); }
+  .mini-card-title {
+    display: block; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+  }
+  .mini-stat-row { display: flex; gap: 18px; flex-wrap: wrap; }
+  .mini-stat { display: flex; flex-direction: column; }
+  .mini-stat-value { font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; color: var(--ink); }
+  .mini-stat-value small { font-size: 0.65rem; color: var(--muted); font-weight: 500; }
+  .mini-stat-label { font-size: 0.7rem; color: var(--muted); }
+  .mini-tag { color: var(--success); }
+  .mini-checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+  .mini-checklist li { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--ink); }
+  .mini-checklist li.done { color: var(--muted); text-decoration: line-through; }
+  .mini-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--border); flex-shrink: 0; }
+  .mini-dot.done { background: var(--success); border-color: var(--success); }
+  .mini-streak { margin-left: auto; font-size: 0.72rem; }
+
+  /* Social proof */
+  .proof-band {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 40px;
+    padding: 8px 0 26px;
+  }
+  .proof-stat { text-align: center; }
+  .proof-num {
+    display: block; font-family: var(--font-display); font-size: 2.1rem; font-weight: 700;
+    background: linear-gradient(100deg, var(--accent), var(--violet));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .proof-label { font-size: 0.8rem; color: var(--muted); }
+  .proof-note {
+    text-align: center; max-width: 480px; margin: 0 auto; color: var(--muted); font-size: 0.88rem;
+  }
+  .proof-note a { color: var(--accent); }
+
+  /* FAQ */
+  .faq-list { max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+  .faq-item {
+    border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+    padding: 4px 20px;
+  }
+  .faq-item summary {
+    cursor: pointer; list-style: none; padding: 16px 0;
+    font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; color: var(--ink);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .faq-item summary::-webkit-details-marker { display: none; }
+  .faq-item summary::after {
+    content: '+'; font-size: 1.3rem; font-weight: 400; color: var(--accent); flex-shrink: 0;
+    transition: transform 0.25s ease;
+  }
+  .faq-item[open] summary::after { transform: rotate(45deg); }
+  .faq-item p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; margin: 0 0 18px; }
+
+  /* Rich footer (mirrors base.html's .app-footer classes so the logged-out
+     landing page and logged-in app share one footer language, but with
+     landing-appropriate links instead of auth-gated app routes). */
+  .landing-footer { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .landing-footer .app-footer { margin-top: 0; }
 
   @media (prefers-reduced-motion: reduce) {
     .hero-blob, .orbit-icon, .hero-eyebrow .dot { animation: none !important; }
-    .feature-card, .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+    .feature-card, .reveal, .step-card, .preview-frame, .mini-card { opacity: 1 !important; transform: none !important; transition: none !important; }
   }
 </style>
 </head>
@@ -272,7 +404,7 @@
   </div>
 </section>
 
-<section class="landing-section">
+<section class="landing-section" id="features">
   <h2 class="reveal">Everything, in one place</h2>
   <p class="section-sub reveal">Seven small tools that together cover the whole day — swap the sticky notes, spreadsheets, and five other apps for one.</p>
   <div class="feature-grid">
@@ -314,6 +446,108 @@
   </div>
 </section>
 
+<section class="landing-section" id="how-it-works">
+  <h2 class="reveal">How it works</h2>
+  <p class="section-sub reveal">Three steps, then it just runs quietly in the background.</p>
+  <div class="how-grid">
+    <div class="step-card">
+      <span class="step-num">1</span>
+      <h3>Sign up free</h3>
+      <p>No credit card, no setup wizard — just an email and a password, and you're in.</p>
+    </div>
+    <div class="step-card">
+      <span class="step-num">2</span>
+      <h3>Turn on what you need</h3>
+      <p>Pick from habits, health, budget, nutrition, notes, to-dos, and vault — use one or all seven.</p>
+    </div>
+    <div class="step-card">
+      <span class="step-num">3</span>
+      <h3>Check one dashboard</h3>
+      <p>From then on, a single glance each day replaces the five other apps you used to open.</p>
+    </div>
+  </div>
+</section>
+
+<section class="landing-section" id="preview">
+  <h2 class="reveal">A peek at your dashboard</h2>
+  <p class="section-sub reveal">Sample data shown below — this is the view that replaces the sticky notes and spreadsheets.</p>
+  <div class="preview-frame">
+    <div class="preview-chrome" aria-hidden="true">
+      <span class="preview-dot d1"></span><span class="preview-dot d2"></span><span class="preview-dot d3"></span>
+      <span class="preview-url">lifehub.app/dashboard</span>
+    </div>
+    <div class="preview-body">
+      <div class="mini-grid">
+        <div class="mini-card">
+          <span class="mini-card-title">Body</span>
+          <div class="mini-stat-row">
+            <div class="mini-stat"><span class="mini-stat-value">71.4<small>kg</small></span><span class="mini-stat-label">Latest weight</span></div>
+            <div class="mini-stat"><span class="mini-stat-value">22.1</span><span class="mini-stat-label">BMI · <span class="mini-tag">Healthy</span></span></div>
+          </div>
+        </div>
+        <div class="mini-card">
+          <span class="mini-card-title">Today's Nutrition</span>
+          <div class="mini-stat-row">
+            <div class="mini-stat"><span class="mini-stat-value">1,840</span><span class="mini-stat-label">calories</span></div>
+            <div class="mini-stat"><span class="mini-stat-value">96<small>g</small></span><span class="mini-stat-label">protein</span></div>
+          </div>
+        </div>
+        <div class="mini-card">
+          <span class="mini-card-title">Today's Habits</span>
+          <ul class="mini-checklist">
+            <li class="done"><span class="mini-dot done"></span> Morning walk</li>
+            <li><span class="mini-dot"></span> Read 20 min <span class="mini-streak">🔥 12</span></li>
+            <li class="done"><span class="mini-dot done"></span> Drink water</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <span class="mini-card-title">Budget</span>
+          <div class="mini-stat-row">
+            <div class="mini-stat"><span class="mini-stat-value">$1,240</span><span class="mini-stat-label">spent this month</span></div>
+            <div class="mini-stat"><span class="mini-stat-value">$260</span><span class="mini-stat-label">left in budget</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="landing-section proof-section reveal" id="proof">
+  <div class="proof-band">
+    <div class="proof-stat"><span class="proof-num">7</span><span class="proof-label">tools, one login</span></div>
+    <div class="proof-stat"><span class="proof-num">1</span><span class="proof-label">person it's built for — you</span></div>
+    <div class="proof-stat"><span class="proof-num">0</span><span class="proof-label">ads, trackers, or data sold</span></div>
+  </div>
+  <p class="proof-note">Built and used every day by a solo developer solving his own scattered-app problem — <a href="mailto:zemexasma@gmail.com">say hi</a> if you have feedback.</p>
+</section>
+
+<section class="landing-section" id="faq">
+  <h2 class="reveal">Frequently asked questions</h2>
+  <p class="section-sub reveal">Still deciding? Here's what people usually ask.</p>
+  <div class="faq-list reveal">
+    <details class="faq-item">
+      <summary>Is my data private?</summary>
+      <p>Yes. Life Hub is built for one person's data at a time — everything you log is scoped to your account only, and stored passwords are encrypted rather than kept as plain text.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Is it really free? What's the catch?</summary>
+      <p>It's free to sign up and use — no credit card required. There's no hidden tier or trial clock; this is a tool built for personal daily use, not a funnel.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Do I have to use all seven tools?</summary>
+      <p>No. Habits, health, budget, nutrition, notes, to-dos, and vault are all independent — use one, use all of them, or ignore the rest.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Can I use it on my phone?</summary>
+      <p>Yes — Life Hub is a responsive web app, so it works in any mobile browser without installing anything.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Can I get my data out, or delete my account?</summary>
+      <p>Yes to both — Settings has a one-click JSON backup download, and Profile has a Delete Account option if you ever want to leave.</p>
+    </details>
+  </div>
+</section>
+
 <section class="cta-band landing-section reveal">
   {% if g.user_id %}
     <h2>Welcome back.</h2>
@@ -327,7 +561,42 @@
 </section>
 
 <footer class="landing-footer">
-  Life Hub — built for one person's actual daily life.
+  <div class="app-footer">
+    <div class="app-footer-grid">
+      <div class="app-footer-col app-footer-brand-col">
+        <a href="{{ url_for('home') }}" class="app-footer-brand">
+          <span class="app-footer-spark" aria-hidden="true">✦</span> LIFEHUB
+        </a>
+        <p class="app-footer-tagline">A personal life-management console — health, vault, budget, and tasks kept in one place.</p>
+      </div>
+      <div class="app-footer-col">
+        <span class="app-footer-col-title">Product</span>
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div class="app-footer-col">
+        <span class="app-footer-col-title">Get Started</span>
+        {% if g.user_id %}
+          <a href="{{ url_for('dashboard') }}">Go to Dashboard</a>
+        {% else %}
+          <a href="{{ url_for('register') }}">Sign Up Free</a>
+          <a href="{{ url_for('login') }}">Log In</a>
+        {% endif %}
+      </div>
+      <div class="app-footer-col">
+        <span class="app-footer-col-title">Info</span>
+        <span>Addis Ababa, Ethiopia</span>
+        <a href="mailto:zemexasma@gmail.com">zemexasma@gmail.com</a>
+        <span>Built solo by Zemen</span>
+      </div>
+    </div>
+    <div class="app-footer-bottom">
+      <span>© {{ current_year }} LifeHub. All rights reserved.</span>
+      <span class="app-footer-sep" aria-hidden="true">·</span>
+      <span>Built for one person's actual daily life.</span>
+    </div>
+  </div>
 </footer>
 
 <script nonce="{{ csp_nonce() }}">
@@ -348,12 +617,11 @@
 
   // Scroll-reveal for feature cards, section headings, and the CTA band.
   (function () {
-    var cards = document.querySelectorAll('.feature-card');
     var reveals = document.querySelectorAll('.reveal');
-    var grid = document.querySelector('.feature-grid');
-    if (!cards.length && !reveals.length) return;
     if (!('IntersectionObserver' in window)) {
-      cards.forEach(function (c) { c.classList.add('in-view'); });
+      document.querySelectorAll('.feature-card, .step-card, .mini-card, .preview-frame').forEach(function (c) {
+        c.classList.add('in-view');
+      });
       reveals.forEach(function (r) { r.classList.add('in-view'); });
       return;
     }
@@ -364,20 +632,44 @@
     // last, lowest card genuinely started off-screen, so it was the only
     // one anyone actually saw animate. Watching the grid as a whole and
     // staggering every card together the moment the grid starts entering
-    // view fixes that: all 7 now visibly animate as a group, regardless
-    // of how many happened to already be in the viewport.
-    if (grid && cards.length) {
+    // view fixes that: every card in the group now visibly animates
+    // together, regardless of how many happened to already be in the
+    // viewport. Reused below for the feature grid, the how-it-works
+    // steps, and the dashboard preview's mini-cards.
+    function revealGroup(gridSelector, itemSelector, staggerMs) {
+      var grid = document.querySelector(gridSelector);
+      var items = document.querySelectorAll(itemSelector);
+      if (!grid || !items.length) return;
       var gridObserver = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {
           if (entry.isIntersecting) {
-            cards.forEach(function (c, i) {
-              setTimeout(function () { c.classList.add('in-view'); }, i * 70);
+            items.forEach(function (el, i) {
+              setTimeout(function () { el.classList.add('in-view'); }, i * staggerMs);
             });
             gridObserver.unobserve(entry.target);
           }
         });
       }, { threshold: 0.1 });
       gridObserver.observe(grid);
+    }
+    revealGroup('.feature-grid', '.feature-card', 70);
+    revealGroup('.how-grid', '.step-card', 100);
+    revealGroup('.preview-frame', '.mini-card', 90);
+
+    // The preview frame itself (the browser-chrome shell) fades in as a
+    // single element rather than through revealGroup, which only handles
+    // the cards inside it.
+    var previewFrame = document.querySelector('.preview-frame');
+    if (previewFrame) {
+      var frameObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in-view');
+            frameObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1 });
+      frameObserver.observe(previewFrame);
     }
 
     var revealObserver = new IntersectionObserver(function (entries) {
