@@ -196,6 +196,22 @@
      scroll parallax offset and the position (top/left/right per icon),
      the inner .orbit-icon keeps its own drift keyframe animation. */
   .orbit-parallax { position: absolute; will-change: transform; }
+  /* Drag layer, sandwiched between the scroll-parallax wrapper (which
+     writes its own transform on every scroll tick) and the icon (whose
+     transform is owned by the orbit-drift keyframe animation). Neither
+     of those can also carry the drag offset without one overwriting
+     the other, so dragging gets its own element in the middle. Snaps
+     back to (0,0) via the transition below once released; the
+     "dragging" class (added for the duration of the drag) turns the
+     transition off so the icon tracks the pointer 1:1 with no lag. */
+  .orbit-drag {
+    display: inline-block;
+    cursor: grab;
+    touch-action: none;
+    pointer-events: auto;
+    transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .orbit-drag.dragging { cursor: grabbing; transition: none; }
   .orbit-parallax:nth-child(1) { top: 8%;  left: 6%; }
   .orbit-parallax:nth-child(2) { top: 16%; right: 8%; }
   .orbit-parallax:nth-child(3) { top: 62%; left: 3%; }
@@ -616,6 +632,7 @@
       animation: none !important;
     }
     .blob-parallax, .orbit-parallax { transform: none !important; }
+    .orbit-drag { transition: none !important; }
     .heading-reveal { letter-spacing: -0.01em !important; transition: none !important; }
     .feature-card, .reveal, .reveal-zoom, .step-card, .proof-stat, .faq-item {
       opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important;
@@ -660,12 +677,12 @@
     <div class="blob-parallax" data-speed="0.12"><div class="hero-blob b3"></div></div>
   </div>
   <div class="hero-orbit" aria-hidden="true">
-    <div class="orbit-parallax" data-speed="0.05"><div class="orbit-icon">💰</div></div>
-    <div class="orbit-parallax" data-speed="0.08"><div class="orbit-icon">🔥</div></div>
-    <div class="orbit-parallax" data-speed="0.06"><div class="orbit-icon">🍎</div></div>
-    <div class="orbit-parallax" data-speed="0.09"><div class="orbit-icon">🔒</div></div>
-    <div class="orbit-parallax" data-speed="0.07"><div class="orbit-icon">📝</div></div>
-    <div class="orbit-parallax" data-speed="0.10"><div class="orbit-icon">⏰</div></div>
+    <div class="orbit-parallax" data-speed="0.05"><div class="orbit-drag"><div class="orbit-icon">💰</div></div></div>
+    <div class="orbit-parallax" data-speed="0.08"><div class="orbit-drag"><div class="orbit-icon">🔥</div></div></div>
+    <div class="orbit-parallax" data-speed="0.06"><div class="orbit-drag"><div class="orbit-icon">🍎</div></div></div>
+    <div class="orbit-parallax" data-speed="0.09"><div class="orbit-drag"><div class="orbit-icon">🔒</div></div></div>
+    <div class="orbit-parallax" data-speed="0.07"><div class="orbit-drag"><div class="orbit-icon">📝</div></div></div>
+    <div class="orbit-parallax" data-speed="0.10"><div class="orbit-drag"><div class="orbit-icon">⏰</div></div></div>
   </div>
   <div class="hero-inner" id="heroInner">
     <span class="hero-eyebrow"><span class="dot"></span> One private dashboard for your whole life</span>
@@ -967,6 +984,38 @@
     }, { passive: true });
     window.addEventListener('resize', update);
     update();
+  })();
+
+  // Floating hero module icons: draggable with the pointer, snapping
+  // back to their original spot on release. Lives on .orbit-drag, a
+  // dedicated middle layer between the scroll-parallax wrapper and the
+  // drift-animated icon (see CSS comment) so none of the three
+  // transform writers clobber each other.
+  (function () {
+    document.querySelectorAll('.orbit-drag').forEach(function (el) {
+      var startX = 0, startY = 0, dragging = false;
+      el.addEventListener('pointerdown', function (e) {
+        dragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        el.classList.add('dragging');
+        el.setPointerCapture(e.pointerId);
+      });
+      el.addEventListener('pointermove', function (e) {
+        if (!dragging) return;
+        var dx = e.clientX - startX;
+        var dy = e.clientY - startY;
+        el.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0)';
+      });
+      function release(e) {
+        if (!dragging) return;
+        dragging = false;
+        el.classList.remove('dragging');
+        el.style.transform = 'translate3d(0,0,0)';
+      }
+      el.addEventListener('pointerup', release);
+      el.addEventListener('pointercancel', release);
+    });
   })();
 
   // CTA band cursor-spotlight: the glow position (--mx/--my) tracks the
