@@ -6,10 +6,12 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-08-28 09:10
+Last updated: 2026-08-28 09:16
 
 ---
 
+- **2026-08-28** 7e04b9c - Add SEO/social meta tags (canonical, Open Graph, Twitter Card) and a generated OG preview image (Zemen)
+- **2026-08-28** 9b38b39 - Update commit history (Zemen)
 - **2026-08-28** 5fd29cc - Mobile tuning: soften 3D effects, skip parallax, tighten nav below 700/600/420px (Zemen)
 - **2026-08-28** 7b7fb55 - Update commit history (Zemen)
 - **2026-08-28** a703c27 - Accessibility pass: skip link, focus states, hide decorative dashboard mockup from AT (Zemen)
