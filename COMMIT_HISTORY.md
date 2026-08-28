@@ -6,10 +6,12 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-08-28 08:46
+Last updated: 2026-08-28 09:02
 
 ---
 
+- **2026-08-28** a703c27 - Accessibility pass: skip link, focus states, hide decorative dashboard mockup from AT (Zemen)
+- **2026-08-28** edeeda6 - Update commit history (Zemen)
 - **2026-08-28** fcf420d - Replace CTA band's pulsing glow with a cursor-following spotlight (Zemen)
 - **2026-08-27** 2ce964c - Fix 500 on /notes: outgoing_items was never passed to the template (Zemen)
 - **2026-08-27** 6714f8c - Replace dashboard preview's fake-browser-chrome bar with an app titlebar (Zemen)
