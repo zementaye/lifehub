@@ -13,6 +13,19 @@
   /* ── Landing page only: hero, feature showcase, scroll-reveal ──────── */
   body.landing-page { min-height: 100vh; overflow-x: hidden; }
 
+  /* Skip link: visually hidden until keyboard-focused, so keyboard users
+     can jump past the nav straight into the page content. */
+  .skip-link {
+    position: absolute; top: -60px; left: 12px; z-index: 100;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 18px;
+    font-family: var(--font-mono); font-size: 0.82rem; font-weight: 600;
+    text-decoration: none;
+    transition: top 0.25s ease;
+  }
+  .skip-link:focus { top: 12px; }
+
   .landing-nav {
     position: sticky; top: 0; z-index: 20;
     display: flex; align-items: center; justify-content: space-between;
@@ -33,6 +46,13 @@
     padding: 8px 4px;
   }
   .landing-nav-actions a.link-btn:hover { color: var(--ink); }
+  .landing-nav-actions a.link-btn:focus-visible,
+  .landing-footer .app-footer-col a:focus-visible,
+  .landing-footer .app-footer-brand:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+    border-radius: 4px;
+  }
   .landing-nav-actions button, .landing-nav-actions .btn {
     padding: 9px 18px; font-size: 0.78rem;
   }
@@ -482,6 +502,11 @@
     cursor: pointer; list-style: none; padding: 16px 0;
     font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; color: var(--ink);
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    outline: none;
+  }
+  .faq-item summary:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+    border-radius: 6px;
   }
   .faq-item summary::-webkit-details-marker { display: none; }
   .faq-item summary::after {
@@ -514,6 +539,7 @@
 </style>
 </head>
 <body class="landing-page" data-theme="light" data-palette="amber">
+<a href="#main-content" class="skip-link">Skip to main content</a>
 <div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
 <div id="hud-stars" aria-hidden="true"></div>
 
@@ -538,7 +564,7 @@
   </div>
 </nav>
 
-<section class="hero">
+<section class="hero" id="main-content">
   <div class="hero-blobs" aria-hidden="true">
     <div class="blob-parallax" data-speed="0.18"><div class="hero-blob b1"></div></div>
     <div class="blob-parallax" data-speed="0.28"><div class="hero-blob b2"></div></div>
@@ -639,7 +665,7 @@
 <section class="landing-section" id="preview">
   <h2 class="reveal heading-reveal">A peek at your dashboard</h2>
   <p class="section-sub reveal">Sample data shown below — this is the view that replaces the sticky notes and spreadsheets.</p>
-  <div class="preview-frame">
+  <div class="preview-frame" aria-hidden="true">
     <div class="preview-chrome" aria-hidden="true">
       <span class="preview-dot d1"></span><span class="preview-dot d2"></span><span class="preview-dot d3"></span>
       <span class="preview-url">lifehub.app/dashboard</span>
