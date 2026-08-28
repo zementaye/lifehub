@@ -235,20 +235,27 @@
   .orbit-leg {
     position: absolute; top: 0; left: 50%;
     width: 2px; height: 11px;
-    background: var(--ink);
+    background: var(--muted);
     border-radius: 2px;
     transform-origin: top center;
-    opacity: 0.75;
+    opacity: 0.6;
   }
   /* Legs hold still (a plain "sticking out" pose) during the popping
-     beat, and only start scissoring once the run actually begins. */
-  .orbit-drag.running .orbit-leg.l { animation: leg-swing 0.22s ease-in-out infinite; }
-  .orbit-drag.running .orbit-leg.r { animation: leg-swing 0.22s ease-in-out infinite reverse; }
+     beat, and only start scissoring once the run actually begins.
+     Both legs share the same symmetric keyframe (out-and-back), but a
+     triangle wave like that is identical whether played forward or in
+     reverse — so `animation-direction: reverse` alone (a previous
+     attempt) left both legs moving in perfect lockstep, a hop rather
+     than a stride. A real alternating gait needs one leg started
+     mid-cycle instead: a negative animation-delay of half the period
+     shifts it 180° out of phase with the other. */
+  .orbit-drag.running .orbit-leg.l { animation: leg-swing 0.32s ease-in-out infinite; }
+  .orbit-drag.running .orbit-leg.r { animation: leg-swing 0.32s ease-in-out infinite; animation-delay: -0.16s; }
   .orbit-leg.l { margin-left: -4px; transform: rotate(-16deg); }
   .orbit-leg.r { margin-left: 2px; transform: rotate(16deg); }
   @keyframes leg-swing {
-    0%, 100% { transform: rotate(-28deg); }
-    50% { transform: rotate(28deg); }
+    0%, 100% { transform: rotate(-26deg); }
+    50% { transform: rotate(26deg); }
   }
   /* The icon itself stays put (no drift) during the popping beat, and
      picks up a running bob once the travel starts. */
@@ -1082,7 +1089,7 @@
         // drag gets a quick trot home, a long one gets several visible
         // running strides — clamped so it's never instant or sluggish.
         var distance = Math.sqrt(dx * dx + dy * dy);
-        var duration = Math.min(1.4, Math.max(0.6, distance / 180));
+        var duration = Math.min(2.4, Math.max(1.1, distance / 110));
         el.classList.add('popping'); // beat 1: a leg pops out, icon stays put
         popTimer = setTimeout(function () {
           el.classList.remove('popping');
