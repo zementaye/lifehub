@@ -6,10 +6,12 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-08-28 09:19
+Last updated: 2026-08-28 10:40
 
 ---
 
+- **2026-08-28** c2181c9 - Fix dashboard preview frame getting stuck invisible (duplicate IntersectionObservers race) (Zemen)
+- **2026-08-28** dc69533 - Update commit history (Zemen)
 - **2026-08-28** c47f74b - Add sticky mobile CTA bar that appears past the hero and hides near the CTA band/footer (Zemen)
 - **2026-08-28** f5c1a55 - Update commit history (Zemen)
 - **2026-08-28** 7e04b9c - Add SEO/social meta tags (canonical, Open Graph, Twitter Card) and a generated OG preview image (Zemen)
