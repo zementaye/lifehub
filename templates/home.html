@@ -206,12 +206,50 @@
      transition off so the icon tracks the pointer 1:1 with no lag. */
   .orbit-drag {
     display: inline-block;
+    position: relative;
     cursor: grab;
     touch-action: none;
     pointer-events: auto;
     transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
   }
   .orbit-drag.dragging { cursor: grabbing; transition: none; }
+
+  /* "Grow legs and run back": while .orbit-drag is animating home after
+     release, a pair of little scissoring legs fades/scales in beneath
+     the icon and the icon itself gets a running bob+lean, both driven
+     by the "running" class (added on release, removed on transitionend
+     once the transform animation above finishes). */
+  .orbit-legs {
+    position: absolute; left: 50%; bottom: -3px;
+    width: 14px; height: 12px;
+    transform: translateX(-50%) scaleY(0);
+    transform-origin: top center;
+    opacity: 0;
+    transition: transform 0.12s ease, opacity 0.12s ease;
+    pointer-events: none;
+  }
+  .orbit-drag.running .orbit-legs { opacity: 1; transform: translateX(-50%) scaleY(1); }
+  .orbit-leg {
+    position: absolute; top: 0; left: 50%;
+    width: 2px; height: 11px;
+    background: var(--ink);
+    border-radius: 2px;
+    transform-origin: top center;
+    opacity: 0.75;
+  }
+  .orbit-leg.l { margin-left: -4px; animation: leg-swing 0.22s ease-in-out infinite; }
+  .orbit-leg.r { margin-left: 2px; animation: leg-swing 0.22s ease-in-out infinite reverse; }
+  @keyframes leg-swing {
+    0%, 100% { transform: rotate(-28deg); }
+    50% { transform: rotate(28deg); }
+  }
+  .orbit-drag.running .orbit-icon {
+    animation: run-bob 0.22s ease-in-out infinite !important;
+  }
+  @keyframes run-bob {
+    0%, 100% { transform: translateY(0) rotate(-5deg); }
+    50% { transform: translateY(-3px) rotate(5deg); }
+  }
   .orbit-parallax:nth-child(1) { top: 8%;  left: 6%; }
   .orbit-parallax:nth-child(2) { top: 16%; right: 8%; }
   .orbit-parallax:nth-child(3) { top: 62%; left: 3%; }
@@ -633,6 +671,7 @@
     }
     .blob-parallax, .orbit-parallax { transform: none !important; }
     .orbit-drag { transition: none !important; }
+    .orbit-legs, .orbit-leg { animation: none !important; opacity: 0 !important; }
     .heading-reveal { letter-spacing: -0.01em !important; transition: none !important; }
     .feature-card, .reveal, .reveal-zoom, .step-card, .proof-stat, .faq-item {
       opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important;
@@ -677,12 +716,12 @@
     <div class="blob-parallax" data-speed="0.12"><div class="hero-blob b3"></div></div>
   </div>
   <div class="hero-orbit" aria-hidden="true">
-    <div class="orbit-parallax" data-speed="0.05"><div class="orbit-drag"><div class="orbit-icon">💰</div></div></div>
-    <div class="orbit-parallax" data-speed="0.08"><div class="orbit-drag"><div class="orbit-icon">🔥</div></div></div>
-    <div class="orbit-parallax" data-speed="0.06"><div class="orbit-drag"><div class="orbit-icon">🍎</div></div></div>
-    <div class="orbit-parallax" data-speed="0.09"><div class="orbit-drag"><div class="orbit-icon">🔒</div></div></div>
-    <div class="orbit-parallax" data-speed="0.07"><div class="orbit-drag"><div class="orbit-icon">📝</div></div></div>
-    <div class="orbit-parallax" data-speed="0.10"><div class="orbit-drag"><div class="orbit-icon">⏰</div></div></div>
+    <div class="orbit-parallax" data-speed="0.05"><div class="orbit-drag"><div class="orbit-icon">💰</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
+    <div class="orbit-parallax" data-speed="0.08"><div class="orbit-drag"><div class="orbit-icon">🔥</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
+    <div class="orbit-parallax" data-speed="0.06"><div class="orbit-drag"><div class="orbit-icon">🍎</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
+    <div class="orbit-parallax" data-speed="0.09"><div class="orbit-drag"><div class="orbit-icon">🔒</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
+    <div class="orbit-parallax" data-speed="0.07"><div class="orbit-drag"><div class="orbit-icon">📝</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
+    <div class="orbit-parallax" data-speed="0.10"><div class="orbit-drag"><div class="orbit-icon">⏰</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
   </div>
   <div class="hero-inner" id="heroInner">
     <span class="hero-eyebrow"><span class="dot"></span> One private dashboard for your whole life</span>
@@ -986,16 +1025,19 @@
     update();
   })();
 
-  // Floating hero module icons: draggable with the pointer, snapping
-  // back to their original spot on release. Lives on .orbit-drag, a
-  // dedicated middle layer between the scroll-parallax wrapper and the
-  // drift-animated icon (see CSS comment) so none of the three
-  // transform writers clobber each other.
+  // Floating hero module icons: draggable with the pointer. On release
+  // they grow little scissoring legs and run back to their original
+  // spot (instead of just sliding/springing back) — the "running"
+  // class drives the leg animation + a running bob on the icon (see
+  // CSS), and gets removed once the transform transition that carries
+  // it home actually finishes, via transitionend.
   (function () {
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     document.querySelectorAll('.orbit-drag').forEach(function (el) {
       var startX = 0, startY = 0, dragging = false;
       el.addEventListener('pointerdown', function (e) {
         dragging = true;
+        el.classList.remove('running');
         startX = e.clientX;
         startY = e.clientY;
         el.classList.add('dragging');
@@ -1011,10 +1053,21 @@
         if (!dragging) return;
         dragging = false;
         el.classList.remove('dragging');
+        if (reduced) {
+          el.style.transform = 'translate3d(0,0,0)';
+          return;
+        }
+        el.classList.add('running');
+        void el.offsetWidth; // force reflow so the transform change below transitions
         el.style.transform = 'translate3d(0,0,0)';
       }
       el.addEventListener('pointerup', release);
       el.addEventListener('pointercancel', release);
+      el.addEventListener('transitionend', function (e) {
+        if (e.propertyName === 'transform' && !dragging) {
+          el.classList.remove('running');
+        }
+      });
     });
   })();
 
