@@ -222,8 +222,8 @@
      added/removed in sequence by JS, each gated on its own timer/
      transitionend so they can't race each other. */
   .orbit-legs {
-    position: absolute; left: 50%; bottom: -3px;
-    width: 14px; height: 12px;
+    position: absolute; left: 50%; bottom: -5px;
+    width: 22px; height: 18px;
     transform: translateX(-50%) scaleY(0);
     transform-origin: top center;
     opacity: 0;
@@ -234,9 +234,9 @@
   .orbit-drag.running .orbit-legs { opacity: 1; transform: translateX(-50%) scaleY(1); }
   .orbit-leg {
     position: absolute; top: 0; left: 50%;
-    width: 2px; height: 11px;
+    width: 4px; height: 17px;
     background: var(--muted);
-    border-radius: 2px;
+    border-radius: 3px;
     transform-origin: top center;
     opacity: 0.6;
   }
@@ -251,8 +251,8 @@
      shifts it 180° out of phase with the other. */
   .orbit-drag.running .orbit-leg.l { animation: leg-swing 0.32s ease-in-out infinite; }
   .orbit-drag.running .orbit-leg.r { animation: leg-swing 0.32s ease-in-out infinite; animation-delay: -0.16s; }
-  .orbit-leg.l { margin-left: -4px; transform: rotate(-16deg); }
-  .orbit-leg.r { margin-left: 2px; transform: rotate(16deg); }
+  .orbit-leg.l { margin-left: -7px; transform: rotate(-16deg); }
+  .orbit-leg.r { margin-left: 3px; transform: rotate(16deg); }
   @keyframes leg-swing {
     0%, 100% { transform: rotate(-26deg); }
     50% { transform: rotate(26deg); }
@@ -266,6 +266,37 @@
   @keyframes run-bob {
     0%, 100% { transform: translateY(0) rotate(-5deg); }
     50% { transform: translateY(-3px) rotate(5deg); }
+  }
+
+  /* Theatrical finish: the instant the run lands home, "landing" takes
+     over for one beat — the icon does a squash-and-stretch bounce and
+     an expanding ring "poof"s out from underneath it, like a cartoon
+     skid to a stop. JS adds this right in the transitionend handler
+     that used to just remove "running", and clears it again after the
+     bounce's own duration. */
+  .orbit-impact {
+    position: absolute; left: 50%; top: 50%;
+    width: 46px; height: 46px;
+    transform: translate(-50%,-50%) scale(0.3);
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .orbit-drag.landing .orbit-impact { animation: impact-ring 0.5s ease-out 1; }
+  @keyframes impact-ring {
+    0% { opacity: 0.85; transform: translate(-50%,-50%) scale(0.3); }
+    100% { opacity: 0; transform: translate(-50%,-50%) scale(1.7); }
+  }
+  .orbit-drag.landing .orbit-icon {
+    animation: land-squash 0.42s cubic-bezier(0.34,1.56,0.64,1) 1 !important;
+  }
+  @keyframes land-squash {
+    0% { transform: scale(1,1) rotate(0deg); }
+    30% { transform: scale(1.3,0.7) rotate(-4deg); }
+    55% { transform: scale(0.88,1.14) rotate(3deg); }
+    80% { transform: scale(1.05,0.97) rotate(-1deg); }
+    100% { transform: scale(1,1) rotate(0deg); }
   }
   .orbit-parallax:nth-child(1) { top: 8%;  left: 6%; }
   .orbit-parallax:nth-child(2) { top: 16%; right: 8%; }
@@ -733,11 +764,11 @@
     <div class="blob-parallax" data-speed="0.12"><div class="hero-blob b3"></div></div>
   </div>
   <div class="hero-orbit" aria-hidden="true">
-    <div class="orbit-parallax" data-speed="0.05"><div class="orbit-drag" data-run="legs"><div class="orbit-icon">💰</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
+    <div class="orbit-parallax" data-speed="0.05"><div class="orbit-drag" data-run="legs"><div class="orbit-icon">💰</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span><span class="orbit-impact"></span></div></div>
     <div class="orbit-parallax" data-speed="0.08"><div class="orbit-drag"><div class="orbit-icon">🔥</div></div></div>
-    <div class="orbit-parallax" data-speed="0.06"><div class="orbit-drag" data-run="legs"><div class="orbit-icon">🍎</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
+    <div class="orbit-parallax" data-speed="0.06"><div class="orbit-drag" data-run="legs"><div class="orbit-icon">🍎</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span><span class="orbit-impact"></span></div></div>
     <div class="orbit-parallax" data-speed="0.09"><div class="orbit-drag"><div class="orbit-icon">🔒</div></div></div>
-    <div class="orbit-parallax" data-speed="0.07"><div class="orbit-drag" data-run="legs"><div class="orbit-icon">📝</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
+    <div class="orbit-parallax" data-speed="0.07"><div class="orbit-drag" data-run="legs"><div class="orbit-icon">📝</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span><span class="orbit-impact"></span></div></div>
     <div class="orbit-parallax" data-speed="0.10"><div class="orbit-drag"><div class="orbit-icon">⏰</div></div></div>
   </div>
   <div class="hero-inner" id="heroInner">
@@ -1054,11 +1085,12 @@
     var RUN_EASE = 'cubic-bezier(0.55,0.05,0.85,0.35)'; // starts slow, accelerates
     document.querySelectorAll('.orbit-drag').forEach(function (el) {
       var hasLegs = el.dataset.run === 'legs';
-      var startX = 0, startY = 0, dx = 0, dy = 0, dragging = false, popTimer = null;
+      var startX = 0, startY = 0, dx = 0, dy = 0, dragging = false, popTimer = null, landTimer = null;
       el.addEventListener('pointerdown', function (e) {
         dragging = true;
         clearTimeout(popTimer);
-        el.classList.remove('popping', 'running');
+        clearTimeout(landTimer);
+        el.classList.remove('popping', 'running', 'landing');
         el.style.transitionDuration = ''; // clear any leftover run-duration override
         el.style.transitionTimingFunction = '';
         startX = e.clientX;
@@ -1112,6 +1144,13 @@
           el.classList.remove('running');
           el.style.transitionDuration = '';
           el.style.transitionTimingFunction = '';
+          if (hasLegs) {
+            // Theatrical finish: the moment it lands, do a squash-and-
+            // stretch bounce with an expanding "impact ring", then
+            // clear it once that bounce's own animation has finished.
+            el.classList.add('landing');
+            landTimer = setTimeout(function () { el.classList.remove('landing'); }, 500);
+          }
         }
       });
     });
