@@ -6,10 +6,17 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-08-27 12:49
+Last updated: 2026-08-28 08:46
 
 ---
 
+- **2026-08-28** fcf420d - Replace CTA band's pulsing glow with a cursor-following spotlight (Zemen)
+- **2026-08-27** 2ce964c - Fix 500 on /notes: outgoing_items was never passed to the template (Zemen)
+- **2026-08-27** 6714f8c - Replace dashboard preview's fake-browser-chrome bar with an app titlebar (Zemen)
+- **2026-08-27** 63f4779 - Restyle dashboard preview cards, make hero module icons draggable (Zemen)
+- **2026-08-27** 2d0464f - Fix dashboard preview never revealing (clip-path zeroed intersectionRatio, deadlocking the 0.15/0.1 IntersectionObserver thresholds) (Zemen)
+- **2026-08-27** fa546b7 - Fix landing page: sections were shrink-to-fit width instead of 1080px, causing scroll-reveal gaps (Zemen)
+- **2026-08-27** 7196b40 - Update commit history (Zemen)
 - **2026-08-27** 1a1204c - Give each landing-page section its own distinct scroll animation identity (Zemen)
 - **2026-08-27** 9479a68 - Update commit history (Zemen)
 - **2026-08-27** 34b815c - Update commit history (Zemen)
