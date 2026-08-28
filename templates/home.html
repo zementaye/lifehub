@@ -1000,7 +1000,15 @@
   // is left listening once the element leaves view again.
   (function () {
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var singleSelectors = '.reveal, .reveal-zoom, .preview-frame, .cta-band';
+    // .preview-frame is deliberately NOT in this list: it's already
+    // watched by its own revealGroup() call below (which toggles the
+    // same "in-view" class as part of staggering its mini-cards). Two
+    // separate IntersectionObservers toggling one class on one element,
+    // at two different thresholds, is a race — whichever one's callback
+    // lands last wins, and it can settle on "not in view" even while the
+    // element is clearly on screen, leaving the whole preview frame
+    // permanently invisible (clip-path never opens).
+    var singleSelectors = '.reveal, .reveal-zoom, .cta-band';
 
     // Dashboard-preview stat numbers count up from 0 to their target
     // when the mini-card group lands, and reset instantly when it
@@ -1039,7 +1047,7 @@
 
     if (reduced || !('IntersectionObserver' in window)) {
       document.querySelectorAll(
-        singleSelectors + ', .feature-card, .step-card, .mini-card, .proof-stat, .faq-item, .feature-grid, .how-grid, .faq-list'
+        singleSelectors + ', .feature-card, .step-card, .mini-card, .proof-stat, .faq-item, .feature-grid, .how-grid, .faq-list, .preview-frame'
       ).forEach(function (el) { el.classList.add('in-view'); });
       document.querySelectorAll('.count-target').forEach(setFinalCount);
       return;
