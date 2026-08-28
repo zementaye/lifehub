@@ -214,20 +214,23 @@
   }
   .orbit-drag.dragging { cursor: grabbing; transition: none; }
 
-  /* "Grow legs and run back": while .orbit-drag is animating home after
-     release, a pair of little scissoring legs fades/scales in beneath
-     the icon and the icon itself gets a running bob+lean, both driven
-     by the "running" class (added on release, removed on transitionend
-     once the transform animation above finishes). */
+  /* "Pull out a leg, then run": on release, .orbit-drag[data-run="legs"]
+     goes through two distinct beats: "popping" (a single still moment
+     where the legs extend out but the icon hasn't moved yet) and then
+     "running" (the actual travel back to (0,0), with a matching
+     scissoring-legs + bobbing-icon animation). The two classes are
+     added/removed in sequence by JS, each gated on its own timer/
+     transitionend so they can't race each other. */
   .orbit-legs {
     position: absolute; left: 50%; bottom: -3px;
     width: 14px; height: 12px;
     transform: translateX(-50%) scaleY(0);
     transform-origin: top center;
     opacity: 0;
-    transition: transform 0.12s ease, opacity 0.12s ease;
+    transition: transform 0.16s cubic-bezier(0.34,1.56,0.64,1), opacity 0.16s ease;
     pointer-events: none;
   }
+  .orbit-drag.popping .orbit-legs,
   .orbit-drag.running .orbit-legs { opacity: 1; transform: translateX(-50%) scaleY(1); }
   .orbit-leg {
     position: absolute; top: 0; left: 50%;
@@ -237,12 +240,19 @@
     transform-origin: top center;
     opacity: 0.75;
   }
-  .orbit-leg.l { margin-left: -4px; animation: leg-swing 0.22s ease-in-out infinite; }
-  .orbit-leg.r { margin-left: 2px; animation: leg-swing 0.22s ease-in-out infinite reverse; }
+  /* Legs hold still (a plain "sticking out" pose) during the popping
+     beat, and only start scissoring once the run actually begins. */
+  .orbit-drag.running .orbit-leg.l { animation: leg-swing 0.22s ease-in-out infinite; }
+  .orbit-drag.running .orbit-leg.r { animation: leg-swing 0.22s ease-in-out infinite reverse; }
+  .orbit-leg.l { margin-left: -4px; transform: rotate(-16deg); }
+  .orbit-leg.r { margin-left: 2px; transform: rotate(16deg); }
   @keyframes leg-swing {
     0%, 100% { transform: rotate(-28deg); }
     50% { transform: rotate(28deg); }
   }
+  /* The icon itself stays put (no drift) during the popping beat, and
+     picks up a running bob once the travel starts. */
+  .orbit-drag.popping .orbit-icon { animation: none !important; }
   .orbit-drag.running .orbit-icon {
     animation: run-bob 0.22s ease-in-out infinite !important;
   }
@@ -716,12 +726,12 @@
     <div class="blob-parallax" data-speed="0.12"><div class="hero-blob b3"></div></div>
   </div>
   <div class="hero-orbit" aria-hidden="true">
-    <div class="orbit-parallax" data-speed="0.05"><div class="orbit-drag"><div class="orbit-icon">💰</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
-    <div class="orbit-parallax" data-speed="0.08"><div class="orbit-drag"><div class="orbit-icon">🔥</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
-    <div class="orbit-parallax" data-speed="0.06"><div class="orbit-drag"><div class="orbit-icon">🍎</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
-    <div class="orbit-parallax" data-speed="0.09"><div class="orbit-drag"><div class="orbit-icon">🔒</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
-    <div class="orbit-parallax" data-speed="0.07"><div class="orbit-drag"><div class="orbit-icon">📝</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
-    <div class="orbit-parallax" data-speed="0.10"><div class="orbit-drag"><div class="orbit-icon">⏰</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
+    <div class="orbit-parallax" data-speed="0.05"><div class="orbit-drag" data-run="legs"><div class="orbit-icon">💰</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
+    <div class="orbit-parallax" data-speed="0.08"><div class="orbit-drag"><div class="orbit-icon">🔥</div></div></div>
+    <div class="orbit-parallax" data-speed="0.06"><div class="orbit-drag" data-run="legs"><div class="orbit-icon">🍎</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
+    <div class="orbit-parallax" data-speed="0.09"><div class="orbit-drag"><div class="orbit-icon">🔒</div></div></div>
+    <div class="orbit-parallax" data-speed="0.07"><div class="orbit-drag" data-run="legs"><div class="orbit-icon">📝</div><span class="orbit-legs"><span class="orbit-leg l"></span><span class="orbit-leg r"></span></span></div></div>
+    <div class="orbit-parallax" data-speed="0.10"><div class="orbit-drag"><div class="orbit-icon">⏰</div></div></div>
   </div>
   <div class="hero-inner" id="heroInner">
     <span class="hero-eyebrow"><span class="dot"></span> One private dashboard for your whole life</span>
@@ -1025,20 +1035,25 @@
     update();
   })();
 
-  // Floating hero module icons: draggable with the pointer. On release
-  // they grow little scissoring legs and run back to their original
-  // spot (instead of just sliding/springing back) — the "running"
-  // class drives the leg animation + a running bob on the icon (see
-  // CSS), and gets removed once the transform transition that carries
-  // it home actually finishes, via transitionend.
+  // Floating hero module icons: draggable with the pointer. On release,
+  // the 3 icons marked data-run="legs" (💰 🍎 📝) go through a two-beat
+  // "pull out a leg, then run" sequence: a brief still "popping" beat
+  // where the legs extend but the icon hasn't moved, followed by the
+  // actual "running" travel back to (0,0) on an accelerating (ease-in)
+  // curve. The other 3 icons keep the plain spring-back from before.
   (function () {
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var POP_MS = 220; // fixed still-beat before the run starts
+    var RUN_EASE = 'cubic-bezier(0.55,0.05,0.85,0.35)'; // starts slow, accelerates
     document.querySelectorAll('.orbit-drag').forEach(function (el) {
-      var startX = 0, startY = 0, dx = 0, dy = 0, dragging = false;
+      var hasLegs = el.dataset.run === 'legs';
+      var startX = 0, startY = 0, dx = 0, dy = 0, dragging = false, popTimer = null;
       el.addEventListener('pointerdown', function (e) {
         dragging = true;
-        el.classList.remove('running');
+        clearTimeout(popTimer);
+        el.classList.remove('popping', 'running');
         el.style.transitionDuration = ''; // clear any leftover run-duration override
+        el.style.transitionTimingFunction = '';
         startX = e.clientX;
         startY = e.clientY;
         el.classList.add('dragging');
@@ -1058,15 +1073,25 @@
           el.style.transform = 'translate3d(0,0,0)';
           return;
         }
+        if (!hasLegs) {
+          // Plain spring-back — unchanged from the original behavior.
+          el.style.transform = 'translate3d(0,0,0)';
+          return;
+        }
         // Scale the run's duration to the distance travelled — a short
         // drag gets a quick trot home, a long one gets several visible
         // running strides — clamped so it's never instant or sluggish.
         var distance = Math.sqrt(dx * dx + dy * dy);
-        var duration = Math.min(1.1, Math.max(0.45, distance / 260));
-        el.style.transitionDuration = duration + 's';
-        el.classList.add('running');
-        void el.offsetWidth; // force reflow so the transform change below transitions
-        el.style.transform = 'translate3d(0,0,0)';
+        var duration = Math.min(1.4, Math.max(0.6, distance / 180));
+        el.classList.add('popping'); // beat 1: a leg pops out, icon stays put
+        popTimer = setTimeout(function () {
+          el.classList.remove('popping');
+          el.classList.add('running'); // beat 2: run home, accelerating
+          el.style.transitionDuration = duration + 's';
+          el.style.transitionTimingFunction = RUN_EASE;
+          void el.offsetWidth; // force reflow so the transform change below transitions
+          el.style.transform = 'translate3d(0,0,0)';
+        }, POP_MS);
       }
       el.addEventListener('pointerup', release);
       el.addEventListener('pointercancel', release);
@@ -1074,11 +1099,12 @@
         // Only react to .orbit-drag's own transform transition — the
         // legs (.orbit-legs) have their own short "grow-in" transition
         // whose transitionend bubbles up here too, and was previously
-        // ending the run animation after ~0.12s instead of the full
-        // travel time.
+        // ending the run animation early instead of at the full travel
+        // time.
         if (e.target === el && e.propertyName === 'transform' && !dragging) {
           el.classList.remove('running');
           el.style.transitionDuration = '';
+          el.style.transitionTimingFunction = '';
         }
       });
     });
