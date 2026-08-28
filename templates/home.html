@@ -1,10 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+{% set canonical_url = request.url|replace('http://', 'https://') %}
+{% set og_image_url = url_for('static', filename='images/og-image.png', _external=True)|replace('http://', 'https://') %}
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Life Hub — Your whole life, one dashboard</title>
 <meta name="description" content="Life Hub brings your habits, health, budget, nutrition, notes, reminders, and passwords into one calm, private place.">
+<link rel="canonical" href="{{ canonical_url }}">
+<meta name="theme-color" content="#FFFFFF">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Life Hub">
+<meta property="og:title" content="Life Hub — Your whole life, one dashboard">
+<meta property="og:description" content="Habits, health, budget, nutrition, notes, reminders, and passwords — all in one calm, private dashboard built for one person's actual daily life.">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:image" content="{{ og_image_url }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Life Hub — Your whole life, one dashboard">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Life Hub — Your whole life, one dashboard">
+<meta name="twitter:description" content="Habits, health, budget, nutrition, notes, reminders, and passwords — all in one calm, private dashboard built for one person's actual daily life.">
+<meta name="twitter:image" content="{{ og_image_url }}">
+
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect x='1' y='1' width='26' height='26' rx='7' fill='%231C222A' stroke='%232A323C'/%3E%3Ccircle cx='14' cy='5.4' r='1.1' fill='%233A4351'/%3E%3Crect x='6.4' y='13' width='3.6' height='10' rx='1.8' fill='%234CC9E8'/%3E%3Crect x='12.2' y='7' width='3.6' height='16' rx='1.8' fill='%23F0B23D'/%3E%3Crect x='18' y='16' width='3.6' height='7' rx='1.8' fill='%238FD14F'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
