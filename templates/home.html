@@ -119,6 +119,15 @@
     animation: fade-up 0.7s 0.24s cubic-bezier(0.22,1,0.36,1) both;
   }
   .hero-ctas button, .hero-ctas .btn { padding: 13px 26px; font-size: 0.85rem; }
+  /* Idle breathing glow on the primary hero CTA, running continuously
+     from page load (not scroll-triggered) — the hero is above the fold,
+     so its motion language is "always alive", unlike lower sections
+     which only animate in response to scrolling. */
+  .hero-ctas button:not(.secondary) { animation: hero-cta-glow 3s ease-in-out infinite; }
+  @keyframes hero-cta-glow {
+    0%, 100% { box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--primary) 55%, transparent), 0 0 14px color-mix(in srgb, var(--primary) 35%, transparent); }
+    50% { box-shadow: 0 6px 26px -4px color-mix(in srgb, var(--primary) 70%, transparent), 0 0 26px color-mix(in srgb, var(--primary) 55%, transparent); }
+  }
   .hero-note {
     margin-top: 18px; font-size: 0.78rem; color: var(--muted);
     animation: fade-up 0.7s 0.3s cubic-bezier(0.22,1,0.36,1) both;
@@ -151,19 +160,6 @@
     font-size: 1.3rem;
     opacity: 0.85;
     animation: orbit-drift 9s ease-in-out infinite;
-    pointer-events: auto;
-    cursor: grab;
-    touch-action: none;
-    transition: box-shadow 0.2s ease, opacity 0.2s ease;
-  }
-  .orbit-icon:hover { opacity: 1; box-shadow: 0 10px 26px -10px color-mix(in srgb, var(--accent) 45%, transparent); }
-  .orbit-icon.dragging {
-    cursor: grabbing;
-    animation-play-state: paused;
-    opacity: 1;
-    transform: scale(1.15) !important;
-    box-shadow: 0 18px 34px -12px rgba(0,0,0,.4);
-    z-index: 5;
   }
   .orbit-parallax:nth-child(1) .orbit-icon { animation-delay: 0s; }
   .orbit-parallax:nth-child(2) .orbit-icon { animation-delay: -1.5s; }
@@ -178,16 +174,7 @@
   @media (max-width: 820px) { .hero-orbit { display: none; } }
 
   /* Feature grid */
-  /* NOTE: body has `display:flex; flex-direction:column` (site-wide,
-     for the sticky-footer trick on other pages). .landing-section and
-     .cta-band are direct children of that flex body, and horizontal
-     auto margins on a flex item cancel out the default cross-axis
-     "stretch" — so without an explicit width, each section shrank to
-     fit its own content instead of filling up to max-width, giving
-     every section a different (much narrower) effective width and
-     throwing off wrapping/heights and the scroll-reveal thresholds
-     below. width:100% restores the intended stretch-then-center. */
-  .landing-section { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 24px 90px; position: relative; z-index: 1; }
+  .landing-section { max-width: 1080px; margin: 0 auto; padding: 0 24px 90px; position: relative; z-index: 1; }
   .landing-section h2 {
     text-align: center; text-transform: none; font-size: 1.7rem; letter-spacing: -0.01em;
     margin: 0 0 8px;
@@ -196,9 +183,11 @@
     text-align: center; color: var(--muted); max-width: 480px; margin: 0 auto 46px; font-size: 0.95rem;
   }
 
-  /* Generic scroll-reveal, used on the section heading/subtext and the
-     CTA band. .feature-card below has its own copy of this (plus a
-     per-card stagger), so it isn't switched over to this shared class. */
+  /* Generic scroll-reveal, used on paragraph-level text (section
+     subheads, the proof note). Section *headings* also get
+     .heading-reveal (below) — a letter-spacing collapse layered on top
+     of this same fade-up — so headings and body copy read as related
+     but distinct motions rather than identical fades. */
   .reveal {
     opacity: 0; transform: translateY(40px);
     filter: blur(6px);
@@ -206,36 +195,22 @@
   }
   .reveal.in-view { opacity: 1; transform: translateY(0); filter: blur(0); }
 
-  /* Spotlight burst — used only on the CTA band. A radial glow expands
-     behind the content on reveal, plus a slow rotating gradient sheen
-     while it stays in view. A "flash" mechanism, distinct from every
-     other section's directional motion. */
+  /* Section headings: letters start spaced wide and draw together as
+     they land. Combined with .reveal (fade-up) on the same element. */
+  .heading-reveal {
+    letter-spacing: 0.35em;
+    transition: letter-spacing 0.8s cubic-bezier(0.22,1,0.36,1);
+  }
+  .heading-reveal.in-view { letter-spacing: -0.01em; }
+
+  /* Zoom variant of .reveal, used on the CTA band for a punchier,
+     springier entrance than the plain fade-up. */
   .reveal-zoom {
-    opacity: 0; transform: scale(0.94);
-    transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.22,1,0.36,1);
+    opacity: 0; transform: scale(0.75) rotate(-2deg);
+    filter: blur(8px);
+    transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.34,1.56,0.64,1), filter 0.6s ease;
   }
-  .reveal-zoom.in-view { opacity: 1; transform: scale(1); }
-  .cta-band::before {
-    content: '';
-    position: absolute; inset: -20%; z-index: -1;
-    background: radial-gradient(circle, color-mix(in srgb, var(--accent) 35%, transparent), transparent 60%);
-    opacity: 0; transform: scale(0.4);
-    transition: opacity 0.7s ease, transform 0.9s cubic-bezier(0.22,1,0.36,1);
-    pointer-events: none;
-  }
-  .cta-band.in-view::before { opacity: 1; transform: scale(1); }
-  .cta-band::after {
-    content: '';
-    position: absolute; inset: 0; z-index: -1; border-radius: inherit;
-    background: conic-gradient(from 0deg, transparent, color-mix(in srgb, var(--accent) 22%, transparent), transparent 35%);
-    opacity: 0;
-    pointer-events: none;
-  }
-  .cta-band.in-view::after { opacity: 1; animation: cta-sheen-rotate 7s linear infinite; }
-  @keyframes cta-sheen-rotate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
+  .reveal-zoom.in-view { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
 
   /* style.css gives every .card a built-in "card-in" mount animation
      (opacity/translateY, animation-fill-mode: both) that fires the
@@ -250,20 +225,20 @@
 
   .feature-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px;
-    perspective: 1000px;
+    perspective: 1400px;
   }
-  /* Alternating slide-in: odd cards enter from the left, even from the
-     right, with a 3D tilt on hover — a directional mechanism, distinct
-     from the scale/rotate/blur recipe used on other sections. */
+  /* Feature cards: a 3D flip reveal (rotateY), alternating hinge side per
+     card, rather than the scale/rotate-Z treatment used elsewhere on the
+     page — this section's identity is "cards swinging open into place". */
   .feature-card {
-    opacity: 0; transform: translateX(-70px) rotate(-3deg);
-    filter: blur(5px);
-    transition: opacity 0.6s ease, transform 0.65s cubic-bezier(0.34,1.56,0.64,1), filter 0.5s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+    opacity: 0; transform: rotateY(-75deg) translateZ(-30px);
+    transform-origin: left center;
+    transition: opacity 0.6s ease, transform 0.75s cubic-bezier(0.22,1,0.36,1), box-shadow 0.3s ease, border-color 0.3s ease;
   }
-  .feature-card:nth-child(even) { transform: translateX(70px) rotate(3deg); }
-  .feature-card.in-view { opacity: 1; transform: translateX(0) rotate(0deg); filter: blur(0); }
+  .feature-card:nth-child(even) { transform: rotateY(75deg) translateZ(-30px); transform-origin: right center; }
+  .feature-card.in-view { opacity: 1; transform: rotateY(0deg) translateZ(0); }
   .feature-card.in-view:hover {
-    transform: translateY(-8px) rotateX(6deg) scale(1.04);
+    transform: translateY(-8px) scale(1.03);
     box-shadow: 0 22px 40px -18px color-mix(in srgb, var(--tab-color) 55%, transparent);
     border-color: color-mix(in srgb, var(--tab-color) 55%, var(--border));
   }
@@ -272,22 +247,9 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 1.3rem; margin-bottom: 14px;
     background: color-mix(in srgb, var(--tab-color) 16%, transparent);
-    opacity: 0; transform: scale(0.3) rotate(-25deg);
-    transition: transform 0.5s 0.1s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s 0.1s ease;
-  }
-  /* Icon spring-pops in just after the card lands, then keeps a very
-     subtle idle glow going — texture while scrolling, not just a
-     one-time entrance. Animates `filter`, never `transform`, so it never
-     fights the hover tilt above. */
-  .feature-card.in-view .f-icon {
-    opacity: 1; transform: scale(1) rotate(0deg);
-    animation: icon-idle-glow 2.6s ease-in-out 0.6s infinite;
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
   }
   .feature-card:hover .f-icon { transform: rotate(-10deg) scale(1.18); }
-  @keyframes icon-idle-glow {
-    0%, 100% { filter: drop-shadow(0 0 0 transparent); }
-    50% { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--tab-color) 60%, transparent)); }
-  }
   .feature-card h3 { border-bottom: none; padding-bottom: 0; margin-bottom: 8px; color: var(--ink); font-size: 1rem; }
   .feature-card p { color: var(--muted); font-size: 0.88rem; line-height: 1.55; margin: 0; }
 
@@ -302,16 +264,32 @@
   /* Bottom CTA band */
   .cta-band {
     position: relative; z-index: 1;
-    width: calc(100% - 48px); max-width: 1080px;
+    max-width: 1080px; width: calc(100% - 48px);
     margin: 0 auto 90px; padding: 56px 32px;
     text-align: center; border-radius: 20px;
     background: linear-gradient(140deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), color-mix(in srgb, var(--violet) 10%, var(--bg-glow)));
     border: 1px solid var(--border);
     overflow: hidden;
   }
-  .cta-band h2 { text-transform: none; font-size: 1.5rem; margin-bottom: 10px; }
-  .cta-band p { color: var(--muted); margin-bottom: 26px; }
+  .cta-band h2 { position: relative; z-index: 1; text-transform: none; font-size: 1.5rem; margin-bottom: 10px; }
+  .cta-band p { position: relative; z-index: 1; color: var(--muted); margin-bottom: 26px; }
+  .cta-band a { position: relative; z-index: 1; display: inline-block; }
   .cta-band button { padding: 13px 28px; font-size: 0.85rem; }
+  /* Cursor-following spotlight: a soft radial glow tracks the mouse
+     position over the CTA band (position set via --mx/--my custom
+     properties in the mousemove handler below), fading in on hover and
+     out on mouse-leave, rather than the old always-on pulsing glow.
+     z-index: 0 keeps it behind the heading/copy/button above, which are
+     each lifted to z-index: 1. */
+  .cta-band::after {
+    content: '';
+    position: absolute; inset: 0; z-index: 0;
+    background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    pointer-events: none;
+  }
+  .cta-band.glow-active::after { opacity: 1; }
 
   /* Extra hover punch on the landing page's own CTAs, on top of the
      lift/glow style.css already gives every button. */
@@ -319,15 +297,15 @@
     transform: translateY(-3px) scale(1.05);
   }
 
-  /* How it works */
+  /* How it works: alternating horizontal slide-in per step (left, right,
+     left…), a springy overshoot on arrival, and — once a step has landed
+     — a continuous "radar ping" pulsing ring on its number badge, so
+     this section keeps moving gently even after the entrance finishes.
+     No blur or rotation here, unlike the feature grid and steps below. */
   .how-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px;
     position: relative;
-    perspective: 1200px;
   }
-  /* 3D hinge: cards tilt up out of the floor around a bottom pivot
-     (true rotateX via perspective), instead of the 2D translate+rotate
-     used on the feature grid. */
   .step-card {
     position: relative;
     padding: 28px 22px 24px;
@@ -335,25 +313,37 @@
     background: var(--surface);
     border: 1px solid var(--border);
     text-align: left;
-    transform-origin: 50% 100%;
-    opacity: 0; transform: translateY(30px) rotateX(-65deg);
-    filter: blur(4px);
-    transition: opacity 0.6s ease, transform 0.75s cubic-bezier(0.22,1,0.36,1), filter 0.5s ease, border-color 0.3s ease;
+    opacity: 0; transform: translateX(-70px);
+    transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.34,1.56,0.64,1), border-color 0.3s ease;
   }
-  .step-card.in-view { opacity: 1; transform: translateY(0) rotateX(0deg); filter: blur(0); }
-  .step-card.in-view:hover { transform: translateY(-6px) rotateX(0deg); border-color: var(--accent); }
+  .step-card:nth-child(even) { transform: translateX(70px); }
+  .step-card.in-view { opacity: 1; transform: translateX(0); }
+  .step-card:hover { transform: translateY(-6px); border-color: var(--accent); }
   .step-num {
+    position: relative;
     display: inline-flex; align-items: center; justify-content: center;
     width: 34px; height: 34px; border-radius: 50%;
     font-family: var(--font-mono); font-weight: 700; font-size: 0.95rem;
     color: var(--bg-glow);
     background: linear-gradient(135deg, var(--accent), var(--violet));
     margin-bottom: 14px;
-    opacity: 0; transform: scale(0.3) rotate(-45deg);
-    transition: transform 0.5s 0.15s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s 0.15s ease;
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
   }
-  .step-card.in-view .step-num { opacity: 1; transform: scale(1) rotate(0deg); }
   .step-card:hover .step-num { transform: scale(1.15) rotate(-10deg); }
+  /* Radar-ping: an expanding, fading ring. Kept paused until the step has
+     actually landed (in-view), and re-paused the moment it scrolls back
+     out, so it never runs off-screen or before the entrance finishes. */
+  .step-num::after {
+    content: ''; position: absolute; inset: 0; border-radius: 50%;
+    border: 2px solid var(--accent);
+    animation: radar-ping 2.4s ease-out infinite;
+    animation-play-state: paused;
+  }
+  .step-card.in-view .step-num::after { animation-play-state: running; }
+  @keyframes radar-ping {
+    0% { transform: scale(1); opacity: 0.7; }
+    100% { transform: scale(2.1); opacity: 0; }
+  }
   .step-card h3 { border-bottom: none; padding-bottom: 0; margin: 0 0 8px; color: var(--ink); font-size: 1rem; }
   .step-card p { color: var(--muted); font-size: 0.88rem; line-height: 1.55; margin: 0; }
   @media (min-width: 700px) {
@@ -363,197 +353,131 @@
       height: 1px;
       background-image: linear-gradient(90deg, var(--border) 60%, transparent 40%);
       background-size: 10px 1px; background-repeat: repeat-x;
-      opacity: 0.7;
       z-index: -1;
-      animation: line-breathe 3.5s ease-in-out infinite;
+      transform: scaleX(0); transform-origin: left center;
+      transition: transform 0.9s ease 0.2s;
     }
-  }
-  @keyframes line-breathe {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
+    .how-grid.in-view::before { transform: scaleX(1); }
   }
 
-  /* Dashboard preview */
-  /* Curtain/wipe reveal — clip-path sweeps left-to-right like a screen
-     powering on, instead of the scale+rotate+blur used elsewhere. */
+  /* Dashboard preview: a clip-path wipe reveal (curtain opening
+     left-to-right) for the browser-chrome frame, and a separate
+     rising-mask reveal (clip-path from the bottom edge) for the stat
+     cards inside — a masking technique used nowhere else on the page,
+     versus the transform-based effects elsewhere. */
   .preview-frame {
     max-width: 900px; margin: 0 auto;
     border-radius: 16px; overflow: hidden;
     border: 1px solid var(--border);
     background: var(--surface);
     box-shadow: var(--shadow);
-    opacity: 0;
     clip-path: inset(0 100% 0 0);
-    transition: opacity 0.5s ease, clip-path 0.9s cubic-bezier(0.65,0,0.35,1);
+    transition: clip-path 0.9s cubic-bezier(0.65,0,0.35,1);
   }
-  .preview-frame.in-view { opacity: 1; clip-path: inset(0 0 0 0); }
+  .preview-frame.in-view { clip-path: inset(0 0% 0 0); }
   .preview-chrome {
-    display: flex; align-items: center; justify-content: space-between; gap: 8px;
-    padding: 14px 20px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px;
     background: var(--surface-raised);
     border-bottom: 1px solid var(--border);
-    position: relative; overflow: hidden;
   }
-  /* Idle shimmer sweep across the chrome bar once the frame has landed —
-     continuous detail, not just a one-shot entrance. */
-  .preview-frame.in-view .preview-chrome::after {
-    content: '';
-    position: absolute; top: 0; left: -40%; width: 40%; height: 100%;
-    background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--accent) 18%, transparent), transparent);
-    animation: chrome-shimmer 3.2s ease-in-out infinite;
+  .preview-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .preview-dot.d1 { background: var(--danger); }
+  .preview-dot.d2 { background: var(--primary); }
+  .preview-dot.d3 { background: var(--success); }
+  .preview-url {
+    margin-left: 10px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--border-soft); border-radius: 999px;
+    padding: 3px 12px;
   }
-  @keyframes chrome-shimmer {
-    0% { left: -40%; }
-    100% { left: 120%; }
-  }
-  .preview-chrome-brand { display: flex; align-items: center; gap: 8px; }
-  .preview-chrome-brand svg { display: block; }
-  .preview-chrome-brand span {
-    font-family: var(--font-display); font-weight: 600; font-size: 0.85rem; color: var(--ink);
-  }
-  .preview-chrome-live {
-    display: flex; align-items: center; gap: 7px;
-    font-size: 0.72rem; font-weight: 500; color: var(--muted);
-  }
-  .preview-live-dot {
-    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
-    background: var(--success);
-    animation: live-pulse 2.2s ease-out infinite;
-  }
-  @keyframes live-pulse {
-    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 55%, transparent); }
-    70% { box-shadow: 0 0 0 7px transparent; }
-    100% { box-shadow: 0 0 0 0 transparent; }
-  }
-  .preview-body { padding: 26px; }
+  .preview-body { padding: 22px; }
   .mini-grid {
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px;
   }
-  @media (max-width: 639px) {
-    .mini-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
-  /* Scale-only stagger — no position or rotate change, just a landing
-     pop. Distinct from the frame's clip-path wipe and every other
-     section's directional motion. */
   .mini-card {
-    padding: 18px 20px 20px; border-radius: 16px;
-    background: linear-gradient(165deg, var(--surface-raised), color-mix(in srgb, var(--tab-color) 7%, var(--surface-raised)));
+    padding: 16px; border-radius: 12px;
+    background: var(--surface-raised);
     border: 1px solid var(--border-soft);
-    border-top: 3px solid var(--tab-color);
-    box-shadow: 0 10px 24px -18px color-mix(in srgb, var(--tab-color) 60%, transparent);
-    min-width: 0;
-    opacity: 0; transform: scale(0.5);
-    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease;
+    border-left: 2px solid var(--tab-color);
+    opacity: 0; clip-path: inset(0 0 100% 0);
+    transition: opacity 0.5s ease, clip-path 0.6s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s ease, transform 0.25s ease;
   }
-  .mini-card.in-view { opacity: 1; transform: scale(1); }
-  .mini-card.in-view:hover {
-    transform: scale(1.05) translateY(-2px);
-    box-shadow: 0 16px 30px -16px color-mix(in srgb, var(--tab-color) 55%, transparent);
+  .mini-card.in-view { opacity: 1; clip-path: inset(0 0 0% 0); }
+  .mini-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 26px -14px color-mix(in srgb, var(--tab-color) 55%, transparent);
   }
   .mini-card:nth-child(1) { --tab-color: var(--accent); }
   .mini-card:nth-child(2) { --tab-color: var(--success); }
   .mini-card:nth-child(3) { --tab-color: var(--danger); }
   .mini-card:nth-child(4) { --tab-color: var(--primary); }
-  .mini-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-  .mini-card-icon {
-    width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.95rem;
-    background: color-mix(in srgb, var(--tab-color) 20%, var(--surface));
-    border: 1px solid color-mix(in srgb, var(--tab-color) 40%, var(--border));
-  }
   .mini-card-title {
-    font-family: var(--font-display); font-size: 0.8rem; font-weight: 600;
-    letter-spacing: -0.01em; color: var(--ink);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: block; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
   }
-  .mini-stat-row { display: flex; gap: 20px; flex-wrap: wrap; }
-  .mini-stat { display: flex; flex-direction: column; gap: 2px; }
-  .mini-stat-value { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: var(--ink); }
-  .mini-card.in-view .mini-stat-value { animation: value-flash 0.7s ease-out 0.25s both; }
-  @keyframes value-flash {
-    0% { text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 70%, transparent); }
-    100% { text-shadow: 0 0 0 transparent; }
-  }
+  .mini-stat-row { display: flex; gap: 18px; flex-wrap: wrap; }
+  .mini-stat { display: flex; flex-direction: column; }
+  .mini-stat-value { font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; color: var(--ink); }
   .mini-stat-value small { font-size: 0.65rem; color: var(--muted); font-weight: 500; }
-  .mini-stat-label { font-size: 0.72rem; color: var(--muted); }
-  .mini-tag {
-    display: inline-block; margin-top: 2px; padding: 1px 9px; border-radius: 999px;
-    background: color-mix(in srgb, var(--success) 18%, transparent);
-    color: var(--success); font-weight: 600; font-size: 0.66rem;
-  }
-  .mini-checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .mini-stat-label { font-size: 0.7rem; color: var(--muted); }
+  .mini-tag { color: var(--success); }
+  .mini-checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
   .mini-checklist li { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--ink); }
-  .mini-checklist .mini-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .mini-streak { flex-shrink: 0; }
   .mini-checklist li.done { color: var(--muted); text-decoration: line-through; }
-  .mini-dot {
-    width: 17px; height: 17px; border-radius: 6px; flex-shrink: 0;
-    border: 1.5px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.62rem; color: transparent; line-height: 1;
-  }
-  .mini-dot.done { background: var(--success); border-color: var(--success); color: #fff; }
-  .mini-dot.done::after { content: '✓'; }
-  .mini-streak {
-    margin-left: auto; font-size: 0.72rem; font-weight: 600;
-    color: var(--primary);
-    background: color-mix(in srgb, var(--primary) 16%, transparent);
-    padding: 2px 9px; border-radius: 999px;
-  }
-  .mini-progress {
-    height: 6px; border-radius: 999px; margin-top: 16px; overflow: hidden;
-    background: var(--border-soft);
-  }
-  .mini-progress-bar {
-    height: 100%; border-radius: 999px;
-    background: linear-gradient(90deg, var(--tab-color), color-mix(in srgb, var(--tab-color) 60%, white));
-  }
+  .mini-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--border); flex-shrink: 0; }
+  .mini-dot.done { background: var(--success); border-color: var(--success); }
+  .mini-streak { margin-left: auto; font-size: 0.72rem; }
 
-
-  /* Social proof */
+  /* Social proof: a vertical 3D coin-flip (rotateX) — a different axis
+     than the feature grid's horizontal rotateY flip — plus a slow
+     shimmering gradient on the numbers once they've landed, so the
+     section keeps a little life after the entrance finishes. */
   .proof-band {
     display: flex; flex-wrap: wrap; justify-content: center; gap: 40px;
     padding: 8px 0 26px;
+    perspective: 800px;
   }
-  /* Spring/overshoot bounce (vertical) — a punchier elastic curve than
-     the feature grid's slide, paired with a JS count-up on the numbers
-     (see script below). */
   .proof-stat {
     text-align: center;
-    opacity: 0; transform: translateY(45px);
-    transition: opacity 0.5s ease, transform 0.7s cubic-bezier(0.68,-0.55,0.27,1.55);
+    opacity: 0; transform: rotateX(90deg);
+    transform-origin: center bottom;
+    transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.34,1.56,0.64,1);
   }
-  .proof-stat.in-view { opacity: 1; transform: translateY(0); }
+  .proof-stat.in-view { opacity: 1; transform: rotateX(0deg); }
   .proof-num {
     display: block; font-family: var(--font-display); font-size: 2.1rem; font-weight: 700;
     background: linear-gradient(100deg, var(--accent), var(--violet));
+    background-size: 200% auto;
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
-  .proof-stat.in-view .proof-num { animation: proof-glow-breathe 2.8s ease-in-out 0.6s infinite; }
-  @keyframes proof-glow-breathe {
-    0%, 100% { filter: drop-shadow(0 0 0 transparent); }
-    50% { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 45%, transparent)); }
-  }
+  .proof-stat.in-view .proof-num { animation: grad-shift 4s ease-in-out infinite; }
   .proof-label { font-size: 0.8rem; color: var(--muted); }
   .proof-note {
     text-align: center; max-width: 480px; margin: 0 auto; color: var(--muted); font-size: 0.88rem;
   }
   .proof-note a { color: var(--accent); }
 
-  /* FAQ */
+  /* FAQ: items fade up gently while a left accent bar draws itself in
+     top-to-bottom alongside — a "growing marker" mechanic instead of the
+     slide/flip/wipe treatments used elsewhere. */
   .faq-list { max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
-  /* Unfold — items scale up vertically from the top edge, like an
-     accordion literally unfolding, instead of sliding in sideways. */
   .faq-item {
+    position: relative;
     border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
     padding: 4px 20px;
-    transform-origin: top center;
-    opacity: 0; transform: scaleY(0.35);
-    transition: opacity 0.4s ease, transform 0.55s cubic-bezier(0.34,1.56,0.64,1);
+    opacity: 0; transform: translateY(18px);
+    transition: opacity 0.5s ease, transform 0.5s ease, border-color 0.25s ease;
   }
-  .faq-item.in-view { opacity: 1; transform: scaleY(1); }
-  .faq-item.in-view:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); transform: scaleY(1) scale(1.008); }
+  .faq-item::before {
+    content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, var(--accent), var(--violet));
+    transform: scaleY(0); transform-origin: top center;
+    transition: transform 0.45s ease 0.15s;
+  }
+  .faq-item.in-view { opacity: 1; transform: translateY(0); }
+  .faq-item.in-view::before { transform: scaleY(1); }
+  .faq-item:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
   .faq-item summary {
     cursor: pointer; list-style: none; padding: 16px 0;
     font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; color: var(--ink);
@@ -565,37 +489,27 @@
     transition: transform 0.25s ease;
   }
   .faq-item[open] summary::after { transform: rotate(45deg); }
-  .faq-item.in-view summary::after { animation: faq-icon-breathe 2.4s ease-in-out infinite; }
-  @keyframes faq-icon-breathe {
-    0%, 100% { opacity: 0.75; }
-    50% { opacity: 1; }
-  }
   .faq-item p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; margin: 0 0 18px; }
 
   /* Rich footer (mirrors base.html's .app-footer classes so the logged-out
      landing page and logged-in app share one footer language, but with
      landing-appropriate links instead of auth-gated app routes). */
-  .landing-footer { position: relative; z-index: 1; width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .landing-footer { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 0 24px; }
   .landing-footer .app-footer { margin-top: 0; }
-  .footer-reveal {
-    opacity: 0; transform: translateY(24px);
-    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22,1,0.36,1);
-  }
-  .footer-reveal.in-view { opacity: 1; transform: translateY(0); }
 
   @media (prefers-reduced-motion: reduce) {
-    .hero-blob, .orbit-icon, .hero-eyebrow .dot { animation: none !important; }
+    .hero-blob, .orbit-icon, .hero-eyebrow .dot, .hero-ctas button:not(.secondary),
+    .step-num::after, .proof-stat.in-view .proof-num {
+      animation: none !important;
+    }
     .blob-parallax, .orbit-parallax { transform: none !important; }
-    .hero-inner { opacity: 1 !important; transform: none !important; }
-    .feature-card, .reveal, .reveal-zoom, .step-card, .preview-frame, .mini-card, .proof-stat, .faq-item, .footer-reveal {
-      opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important; clip-path: none !important;
+    .heading-reveal { letter-spacing: -0.01em !important; transition: none !important; }
+    .feature-card, .reveal, .reveal-zoom, .step-card, .proof-stat, .faq-item {
+      opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important;
     }
-    .f-icon, .step-num, .mini-stat-value, .proof-num, .faq-item summary::after, .how-grid::before {
-      opacity: 1 !important; transform: none !important; animation: none !important; filter: none !important; text-shadow: none !important;
-    }
-    .preview-chrome::after, .cta-band::before, .cta-band::after {
-      display: none !important;
-    }
+    .preview-frame, .mini-card { clip-path: none !important; transition: none !important; }
+    .faq-item::before, .how-grid::before { transform: none !important; transition: none !important; }
+    .cta-band::after { display: none !important; }
   }
 </style>
 </head>
@@ -638,7 +552,7 @@
     <div class="orbit-parallax" data-speed="0.07"><div class="orbit-icon">📝</div></div>
     <div class="orbit-parallax" data-speed="0.10"><div class="orbit-icon">⏰</div></div>
   </div>
-  <div class="hero-inner">
+  <div class="hero-inner" id="heroInner">
     <span class="hero-eyebrow"><span class="dot"></span> One private dashboard for your whole life</span>
     <h1>Stop juggling apps.<br>Run your life from <span class="grad">one hub</span>.</h1>
     <p class="lead">
@@ -659,7 +573,7 @@
 </section>
 
 <section class="landing-section" id="features">
-  <h2 class="reveal">Everything, in one place</h2>
+  <h2 class="reveal heading-reveal">Everything, in one place</h2>
   <p class="section-sub reveal">Seven small tools that together cover the whole day — swap the sticky notes, spreadsheets, and five other apps for one.</p>
   <div class="feature-grid">
     <div class="card feature-card">
@@ -701,7 +615,7 @@
 </section>
 
 <section class="landing-section" id="how-it-works">
-  <h2 class="reveal">How it works</h2>
+  <h2 class="reveal heading-reveal">How it works</h2>
   <p class="section-sub reveal">Three steps, then it just runs quietly in the background.</p>
   <div class="how-grid">
     <div class="step-card">
@@ -723,65 +637,43 @@
 </section>
 
 <section class="landing-section" id="preview">
-  <h2 class="reveal">A peek at your dashboard</h2>
+  <h2 class="reveal heading-reveal">A peek at your dashboard</h2>
   <p class="section-sub reveal">Sample data shown below — this is the view that replaces the sticky notes and spreadsheets.</p>
   <div class="preview-frame">
     <div class="preview-chrome" aria-hidden="true">
-      <div class="preview-chrome-brand">
-        <svg viewBox="0 0 28 28" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="1" y="1" width="26" height="26" rx="7" fill="var(--surface)" stroke="var(--border)"/>
-          <circle cx="14" cy="5.4" r="1.1" fill="var(--rivet)"/>
-          <rect x="6.4" y="13" width="3.6" height="10" rx="1.8" fill="var(--accent)"/>
-          <rect x="12.2" y="7" width="3.6" height="16" rx="1.8" fill="var(--primary)"/>
-          <rect x="18" y="16" width="3.6" height="7" rx="1.8" fill="var(--success)"/>
-        </svg>
-        <span>Dashboard</span>
-      </div>
-      <span class="preview-chrome-live"><span class="preview-live-dot"></span>Live preview</span>
+      <span class="preview-dot d1"></span><span class="preview-dot d2"></span><span class="preview-dot d3"></span>
+      <span class="preview-url">lifehub.app/dashboard</span>
     </div>
     <div class="preview-body">
       <div class="mini-grid">
         <div class="mini-card">
-          <div class="mini-card-head">
-            <span class="mini-card-icon">❤️</span>
-            <span class="mini-card-title">Body</span>
-          </div>
+          <span class="mini-card-title">Body</span>
           <div class="mini-stat-row">
-            <div class="mini-stat"><span class="mini-stat-value">71.4<small>kg</small></span><span class="mini-stat-label">Latest weight</span></div>
-            <div class="mini-stat"><span class="mini-stat-value">22.1</span><span class="mini-stat-label">BMI</span><span class="mini-tag">Healthy</span></div>
+            <div class="mini-stat"><span class="mini-stat-value"><span class="count-target" data-count-target="71.4" data-count-decimals="1">0.0</span><small>kg</small></span><span class="mini-stat-label">Latest weight</span></div>
+            <div class="mini-stat"><span class="mini-stat-value"><span class="count-target" data-count-target="22.1" data-count-decimals="1">0.0</span></span><span class="mini-stat-label">BMI · <span class="mini-tag">Healthy</span></span></div>
           </div>
         </div>
         <div class="mini-card">
-          <div class="mini-card-head">
-            <span class="mini-card-icon">🍎</span>
-            <span class="mini-card-title">Today's Nutrition</span>
-          </div>
+          <span class="mini-card-title">Today's Nutrition</span>
           <div class="mini-stat-row">
-            <div class="mini-stat"><span class="mini-stat-value">1,840</span><span class="mini-stat-label">calories</span></div>
-            <div class="mini-stat"><span class="mini-stat-value">96<small>g</small></span><span class="mini-stat-label">protein</span></div>
+            <div class="mini-stat"><span class="mini-stat-value"><span class="count-target" data-count-target="1840" data-count-decimals="0">0</span></span><span class="mini-stat-label">calories</span></div>
+            <div class="mini-stat"><span class="mini-stat-value"><span class="count-target" data-count-target="96" data-count-decimals="0">0</span><small>g</small></span><span class="mini-stat-label">protein</span></div>
           </div>
         </div>
         <div class="mini-card">
-          <div class="mini-card-head">
-            <span class="mini-card-icon">🔥</span>
-            <span class="mini-card-title">Today's Habits</span>
-          </div>
+          <span class="mini-card-title">Today's Habits</span>
           <ul class="mini-checklist">
-            <li class="done"><span class="mini-dot done"></span><span class="mini-label">Morning walk</span></li>
-            <li><span class="mini-dot"></span><span class="mini-label">Read 20 min</span><span class="mini-streak">🔥 12</span></li>
-            <li class="done"><span class="mini-dot done"></span><span class="mini-label">Drink water</span></li>
+            <li class="done"><span class="mini-dot done"></span> Morning walk</li>
+            <li><span class="mini-dot"></span> Read 20 min <span class="mini-streak">🔥 12</span></li>
+            <li class="done"><span class="mini-dot done"></span> Drink water</li>
           </ul>
         </div>
         <div class="mini-card">
-          <div class="mini-card-head">
-            <span class="mini-card-icon">💰</span>
-            <span class="mini-card-title">Budget</span>
-          </div>
+          <span class="mini-card-title">Budget</span>
           <div class="mini-stat-row">
-            <div class="mini-stat"><span class="mini-stat-value">$1,240</span><span class="mini-stat-label">spent this month</span></div>
-            <div class="mini-stat"><span class="mini-stat-value">$260</span><span class="mini-stat-label">left in budget</span></div>
+            <div class="mini-stat"><span class="mini-stat-value"><span class="count-target" data-count-target="1240" data-count-decimals="0" data-count-prefix="$">$0</span></span><span class="mini-stat-label">spent this month</span></div>
+            <div class="mini-stat"><span class="mini-stat-value"><span class="count-target" data-count-target="260" data-count-decimals="0" data-count-prefix="$">$0</span></span><span class="mini-stat-label">left in budget</span></div>
           </div>
-          <div class="mini-progress"><div class="mini-progress-bar" style="width: 83%"></div></div>
         </div>
       </div>
     </div>
@@ -790,15 +682,15 @@
 
 <section class="landing-section proof-section" id="proof">
   <div class="proof-band">
-    <div class="proof-stat"><span class="proof-num" data-count-to="7">7</span><span class="proof-label">tools, one login</span></div>
-    <div class="proof-stat"><span class="proof-num" data-count-to="1">1</span><span class="proof-label">person it's built for — you</span></div>
-    <div class="proof-stat"><span class="proof-num" data-count-to="0">0</span><span class="proof-label">ads, trackers, or data sold</span></div>
+    <div class="proof-stat"><span class="proof-num">7</span><span class="proof-label">tools, one login</span></div>
+    <div class="proof-stat"><span class="proof-num">1</span><span class="proof-label">person it's built for — you</span></div>
+    <div class="proof-stat"><span class="proof-num">0</span><span class="proof-label">ads, trackers, or data sold</span></div>
   </div>
   <p class="proof-note reveal">Built and used every day by a solo developer solving his own scattered-app problem — <a href="mailto:zemexasma@gmail.com">say hi</a> if you have feedback.</p>
 </section>
 
 <section class="landing-section" id="faq">
-  <h2 class="reveal">Frequently asked questions</h2>
+  <h2 class="reveal heading-reveal">Frequently asked questions</h2>
   <p class="section-sub reveal">Still deciding? Here's what people usually ask.</p>
   <div class="faq-list">
     <details class="faq-item">
@@ -839,19 +731,19 @@
 <footer class="landing-footer">
   <div class="app-footer">
     <div class="app-footer-grid">
-      <div class="app-footer-col app-footer-brand-col footer-reveal">
+      <div class="app-footer-col app-footer-brand-col">
         <a href="{{ url_for('home') }}" class="app-footer-brand">
           <span class="app-footer-spark" aria-hidden="true">✦</span> LIFEHUB
         </a>
         <p class="app-footer-tagline">A personal life-management console — health, vault, budget, and tasks kept in one place.</p>
       </div>
-      <div class="app-footer-col footer-reveal">
+      <div class="app-footer-col">
         <span class="app-footer-col-title">Product</span>
         <a href="#features">Features</a>
         <a href="#how-it-works">How it works</a>
         <a href="#faq">FAQ</a>
       </div>
-      <div class="app-footer-col footer-reveal">
+      <div class="app-footer-col">
         <span class="app-footer-col-title">Get Started</span>
         {% if g.user_id %}
           <a href="{{ url_for('dashboard') }}">Go to Dashboard</a>
@@ -860,7 +752,7 @@
           <a href="{{ url_for('login') }}">Log In</a>
         {% endif %}
       </div>
-      <div class="app-footer-col footer-reveal">
+      <div class="app-footer-col">
         <span class="app-footer-col-title">Info</span>
         <span>Addis Ababa, Ethiopia</span>
         <a href="mailto:zemexasma@gmail.com">zemexasma@gmail.com</a>
@@ -891,16 +783,17 @@
     }
   })();
 
-  // Scroll-progress bar + nav "scrolled" glow + hero parallax, all driven
-  // off one rAF-throttled scroll handler to avoid layout thrash from
-  // three separate listeners.
+  // Scroll-progress bar + nav "scrolled" glow + hero parallax/fade, all
+  // driven off one rAF-throttled scroll handler to avoid layout thrash
+  // from several separate listeners.
   (function () {
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var progress = document.getElementById('scrollProgress');
     var nav = document.getElementById('landingNav');
+    var heroInner = document.getElementById('heroInner');
+    var hero = document.querySelector('.hero');
     var blobEls = reduced ? [] : document.querySelectorAll('.blob-parallax');
     var orbitEls = reduced ? [] : document.querySelectorAll('.orbit-parallax');
-    var heroInner = reduced ? null : document.querySelector('.hero-inner');
     if (!progress && !nav && !blobEls.length && !orbitEls.length && !heroInner) return;
 
     var ticking = false;
@@ -920,17 +813,19 @@
         el.style.transform = 'translate3d(0,' + (y * speed).toFixed(1) + 'px,0)';
       });
       orbitEls.forEach(function (el) {
-        if (el.dataset.userPlaced === '1') return; // dragged icons stay put, not scroll-parallaxed
         var speed = parseFloat(el.dataset.speed) || 0.06;
         el.style.transform = 'translate3d(0,' + (y * speed).toFixed(1) + 'px,0)';
       });
-      // Scroll-linked (not IntersectionObserver) fade+scale of the hero
-      // copy as it scrolls past — a continuous function of scroll
-      // position, so it's inherently reversible in both directions.
-      if (heroInner) {
-        var heroFade = Math.max(0, 1 - y / 420);
-        heroInner.style.opacity = heroFade.toFixed(3);
-        heroInner.style.transform = 'translateY(' + (y * 0.12).toFixed(1) + 'px) scale(' + (0.96 + heroFade * 0.04).toFixed(3) + ')';
+      // Continuous scroll-linked effect (not threshold-triggered like the
+      // rest of the page): the hero's copy fades and lifts smoothly as
+      // you scroll through the hero's own height, rather than toggling
+      // on/off at a fixed point — this is the one section whose motion
+      // tracks scroll position directly.
+      if (heroInner && hero && !reduced) {
+        var heroHeight = hero.offsetHeight || 1;
+        var heroProgress = Math.min(1, Math.max(0, y / heroHeight));
+        heroInner.style.opacity = String(Math.max(0, 1 - heroProgress * 1.4));
+        heroInner.style.transform = 'translateY(' + (heroProgress * -50).toFixed(1) + 'px)';
       }
 
       ticking = false;
@@ -942,68 +837,24 @@
     update();
   })();
 
-  // Draggable hero orbit icons — grab any of the floating module glyphs
-  // and drop it wherever. Dragging the icon repositions its wrapper
-  // (.orbit-parallax) directly via left/top in px, converting it out of
-  // the top/left-or-right percentage layout used for its resting spot.
-  // Once dropped, the wrapper is flagged data-user-placed so the scroll
-  // parallax loop above leaves it alone instead of fighting the manual
-  // position; the idle drift keyframe animation resumes around the new
-  // spot so it still feels alive rather than pinned dead-still.
+  // CTA band cursor-spotlight: the glow position (--mx/--my) tracks the
+  // mouse in real time on mousemove, and fades in/out on enter/leave.
+  // Skipped entirely under prefers-reduced-motion — this is a purely
+  // decorative hover effect, not something reduced-motion users need.
   (function () {
-    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var container = document.querySelector('.hero-orbit');
-    if (reduced || !container) return;
-
-    document.querySelectorAll('.orbit-icon').forEach(function (icon) {
-      var wrapper = icon.parentElement;
-      var dragging = false;
-      var startX, startY, wrapLeft, wrapTop;
-
-      icon.addEventListener('pointerdown', function (e) {
-        dragging = true;
-        icon.setPointerCapture(e.pointerId);
-        icon.classList.add('dragging');
-
-        var containerRect = container.getBoundingClientRect();
-        var wrapRect = wrapper.getBoundingClientRect();
-        // Freeze current on-screen position as explicit left/top px,
-        // clearing whatever combination of top/left/right/transform
-        // was placing it a moment ago (resting spot or mid-parallax).
-        wrapLeft = wrapRect.left - containerRect.left;
-        wrapTop = wrapRect.top - containerRect.top;
-        wrapper.style.left = wrapLeft + 'px';
-        wrapper.style.top = wrapTop + 'px';
-        wrapper.style.right = 'auto';
-        wrapper.style.transform = 'none';
-        wrapper.dataset.userPlaced = '1';
-
-        startX = e.clientX;
-        startY = e.clientY;
-        e.preventDefault();
-      });
-
-      icon.addEventListener('pointermove', function (e) {
-        if (!dragging) return;
-        var containerRect = container.getBoundingClientRect();
-        var newLeft = wrapLeft + (e.clientX - startX);
-        var newTop = wrapTop + (e.clientY - startY);
-        // Keep it within the hero section instead of letting it drift
-        // off into neighboring content.
-        newLeft = Math.max(0, Math.min(newLeft, containerRect.width - wrapper.offsetWidth));
-        newTop = Math.max(0, Math.min(newTop, containerRect.height - wrapper.offsetHeight));
-        wrapper.style.left = newLeft + 'px';
-        wrapper.style.top = newTop + 'px';
-      });
-
-      function endDrag(e) {
-        if (!dragging) return;
-        dragging = false;
-        icon.classList.remove('dragging');
-        try { icon.releasePointerCapture(e.pointerId); } catch (err) {}
-      }
-      icon.addEventListener('pointerup', endDrag);
-      icon.addEventListener('pointercancel', endDrag);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var band = document.querySelector('.cta-band');
+    if (!band) return;
+    band.addEventListener('mouseenter', function () {
+      band.classList.add('glow-active');
+    });
+    band.addEventListener('mousemove', function (e) {
+      var rect = band.getBoundingClientRect();
+      band.style.setProperty('--mx', (e.clientX - rect.left) + 'px');
+      band.style.setProperty('--my', (e.clientY - rect.top) + 'px');
+    });
+    band.addEventListener('mouseleave', function () {
+      band.classList.remove('glow-active');
     });
   })();
 
@@ -1017,19 +868,53 @@
   // is left listening once the element leaves view again.
   (function () {
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    // .preview-frame is handled by its own observer below (see note),
-    // so it's excluded from this shared selector.
-    var singleSelectors = '.reveal, .reveal-zoom';
+    var singleSelectors = '.reveal, .reveal-zoom, .preview-frame, .cta-band';
+
+    // Dashboard-preview stat numbers count up from 0 to their target
+    // when the mini-card group lands, and reset instantly when it
+    // scrolls back out of view, so the count-up replays each time.
+    function formatCount(el, value) {
+      var decimals = parseInt(el.dataset.countDecimals || '0', 10);
+      var prefix = el.dataset.countPrefix || '';
+      return prefix + value.toLocaleString('en-US', {
+        minimumFractionDigits: decimals, maximumFractionDigits: decimals
+      });
+    }
+    function setFinalCount(el) {
+      var target = parseFloat(el.dataset.countTarget);
+      if (isNaN(target)) return;
+      el.textContent = formatCount(el, target);
+    }
+    function animateCount(el) {
+      var target = parseFloat(el.dataset.countTarget);
+      if (isNaN(target)) return;
+      var duration = 900;
+      var start = null;
+      if (el._countRaf) window.cancelAnimationFrame(el._countRaf);
+      function frame(ts) {
+        if (start === null) start = ts;
+        var progress = Math.min(1, (ts - start) / duration);
+        var eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = formatCount(el, target * eased);
+        if (progress < 1) { el._countRaf = window.requestAnimationFrame(frame); }
+      }
+      el._countRaf = window.requestAnimationFrame(frame);
+    }
+    function resetCount(el) {
+      if (el._countRaf) window.cancelAnimationFrame(el._countRaf);
+      el.textContent = formatCount(el, 0);
+    }
 
     if (reduced || !('IntersectionObserver' in window)) {
       document.querySelectorAll(
-        singleSelectors + ', .preview-frame, .feature-card, .step-card, .mini-card, .proof-stat, .faq-item, .footer-reveal'
+        singleSelectors + ', .feature-card, .step-card, .mini-card, .proof-stat, .faq-item, .feature-grid, .how-grid, .faq-list'
       ).forEach(function (el) { el.classList.add('in-view'); });
+      document.querySelectorAll('.count-target').forEach(setFinalCount);
       return;
     }
 
-    // Single elements (headings, subtext, the CTA band): fade/zoom in
-    // and out as a unit, no stagger.
+    // Single elements (headings, subtext, the CTA band, the preview
+    // frame shell): fade/zoom in and out as a unit, no stagger.
     var singleObserver = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         entry.target.classList.toggle('in-view', entry.isIntersecting);
@@ -1039,29 +924,16 @@
       singleObserver.observe(el);
     });
 
-    // .preview-frame starts clipped to zero visible width (clip-path
-    // curtain wipe) until it gets .in-view. That means its own
-    // intersectionRatio is stuck at 0 the whole time it's hidden, so a
-    // non-zero threshold (like the 0.15 used above) can never be
-    // crossed — the reveal would depend on the element already being
-    // visible. Use threshold 0 here so "any pixel of its (unclipped)
-    // box enters the viewport" is enough to trigger it.
-    var previewFrame = document.querySelector('.preview-frame');
-    if (previewFrame) {
-      var previewObserver = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          entry.target.classList.toggle('in-view', entry.isIntersecting);
-        });
-      }, { threshold: 0 });
-      previewObserver.observe(previewFrame);
-    }
-
     // Grouped elements (feature cards, how-it-works steps, dashboard
     // preview mini-cards, proof stats, FAQ items): staggered entrance
     // when the group scrolls into view, and — since watching is never
     // switched off — an immediate reset back to hidden the moment the
     // group leaves the viewport, ready to stagger in again next time.
-    function revealGroup(gridSelector, itemSelector, staggerMs, threshold) {
+    // The grid container itself also gets "in-view" toggled (used by
+    // the how-it-works connector line), and an optional callback fires
+    // on every transition for section-specific extras like the preview
+    // section's number count-up.
+    function revealGroup(gridSelector, itemSelector, staggerMs, onChange) {
       var grid = document.querySelector(gridSelector);
       var items = document.querySelectorAll(itemSelector);
       if (!grid || !items.length) return;
@@ -1073,6 +945,7 @@
       var gridObserver = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {
           clearTimers();
+          grid.classList.toggle('in-view', entry.isIntersecting);
           if (entry.isIntersecting) {
             items.forEach(function (el, i) {
               timers.push(setTimeout(function () { el.classList.add('in-view'); }, i * staggerMs));
@@ -1080,60 +953,19 @@
           } else {
             items.forEach(function (el) { el.classList.remove('in-view'); });
           }
+          if (onChange) onChange(entry.isIntersecting);
         });
-      }, { threshold: threshold === undefined ? 0.1 : threshold });
+      }, { threshold: 0.1 });
       gridObserver.observe(grid);
     }
     revealGroup('.feature-grid', '.feature-card', 70);
     revealGroup('.how-grid', '.step-card', 100);
-    // threshold 0: the grid here is .preview-frame, which is clipped to
-    // zero visible width until it has .in-view (see the dedicated
-    // observer above) — its intersectionRatio can't cross a non-zero
-    // threshold, so this group would otherwise never reveal either.
-    revealGroup('.preview-frame', '.mini-card', 90, 0);
+    revealGroup('.preview-frame', '.mini-card', 90, function (isIntersecting) {
+      var counters = document.querySelectorAll('.preview-frame .count-target');
+      counters.forEach(isIntersecting ? animateCount : resetCount);
+    });
     revealGroup('.proof-band', '.proof-stat', 120);
     revealGroup('.faq-list', '.faq-item', 90);
-    revealGroup('.app-footer-grid', '.footer-reveal', 80);
-  })();
-
-  // Count-up for the social-proof numbers, synced with their bounce-in
-  // reveal. Resets on scroll-out so it replays if you scroll back up
-  // and down again, matching the reversible design above.
-  (function () {
-    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var nums = document.querySelectorAll('.proof-num[data-count-to]');
-    if (!nums.length) return;
-
-    if (reduced || !('IntersectionObserver' in window)) {
-      nums.forEach(function (el) { el.textContent = el.dataset.countTo; });
-      return;
-    }
-
-    function animateCount(el) {
-      var target = parseInt(el.dataset.countTo, 10) || 0;
-      var start = performance.now();
-      var duration = 900;
-      function frame(now) {
-        var p = Math.min(1, (now - start) / duration);
-        var eased = 1 - Math.pow(1 - p, 3);
-        el.textContent = Math.round(eased * target);
-        if (p < 1) window.requestAnimationFrame(frame);
-      }
-      window.requestAnimationFrame(frame);
-    }
-
-    var band = document.querySelector('.proof-band');
-    if (!band) return;
-    var countObserver = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          nums.forEach(function (el) { animateCount(el); });
-        } else {
-          nums.forEach(function (el) { el.textContent = '0'; });
-        }
-      });
-    }, { threshold: 0.3 });
-    countObserver.observe(band);
   })();
 </script>
 </body>
