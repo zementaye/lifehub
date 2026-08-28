@@ -1073,7 +1073,7 @@
     // the how-it-works connector line), and an optional callback fires
     // on every transition for section-specific extras like the preview
     // section's number count-up.
-    function revealGroup(gridSelector, itemSelector, staggerMs, onChange) {
+    function revealGroup(gridSelector, itemSelector, staggerMs, onChange, threshold) {
       var grid = document.querySelector(gridSelector);
       var items = document.querySelectorAll(itemSelector);
       if (!grid || !items.length) return;
@@ -1095,15 +1095,20 @@
           }
           if (onChange) onChange(entry.isIntersecting);
         });
-      }, { threshold: 0.1 });
+      }, { threshold: typeof threshold === 'number' ? threshold : 0.1 });
       gridObserver.observe(grid);
     }
     revealGroup('.feature-grid', '.feature-card', 70);
     revealGroup('.how-grid', '.step-card', 100);
+    // .preview-frame starts fully clipped via clip-path (curtain-wipe
+    // reveal), so its intersectionRatio is stuck at 0 until it un-clips —
+    // a non-zero threshold here can never fire, permanently deadlocking
+    // the reveal. Use threshold: 0 so it fires as soon as any pixel of
+    // the (zero-width-clipped) box enters the viewport.
     revealGroup('.preview-frame', '.mini-card', 90, function (isIntersecting) {
       var counters = document.querySelectorAll('.preview-frame .count-target');
       counters.forEach(isIntersecting ? animateCount : resetCount);
-    });
+    }, 0);
     revealGroup('.proof-band', '.proof-stat', 120);
     revealGroup('.faq-list', '.faq-item', 90);
   })();
