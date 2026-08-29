@@ -110,6 +110,7 @@
           </label>
         {% endif %}
         <button type="submit">Save</button>
+        <button type="button" class="secondary note-edit-cancel">Cancel</button>
       </form>
       <form method="post" action="{{ url_for('add_note_images', note_id=n.id) }}" enctype="multipart/form-data" class="inline-form note-photo-form" style="display:none; margin-top:10px;">
         <div class="inline-form-field" style="flex:1 1 100%;">Photos
@@ -297,6 +298,18 @@ document.querySelectorAll('.note-card').forEach(card => {
   editToggle.addEventListener('click', () => {
     editForm.style.display = editForm.style.display === 'none' ? 'flex' : 'none';
   });
+
+  // Cancel: editForm.reset() reverts every field to its initial HTML
+  // value — which is the note's last-saved title/body/recurrence, since
+  // that's what the form was rendered with — then the form collapses
+  // back to view mode, same as if Edit had never been clicked.
+  const editCancel = card.querySelector('.note-edit-cancel');
+  if (editCancel) {
+    editCancel.addEventListener('click', () => {
+      editForm.reset();
+      editForm.style.display = 'none';
+    });
+  }
 
   const photoToggle = card.querySelector('.note-photo-toggle');
   const photoForm = card.querySelector('.note-photo-form');
