@@ -21,6 +21,7 @@
       </div>
     </div>
     <button type="submit">Save</button>
+    <button type="button" class="secondary" id="new-note-cancel">Cancel</button>
   </form>
 </div>
 
@@ -266,6 +267,29 @@ function initPhotoPicker(root) {
 }
 
 document.querySelectorAll('[data-photo-picker]').forEach(initPhotoPicker);
+
+// New Note "Cancel": clears the title/body fields, and — since the photo
+// picker's chip list is only re-rendered on the file input's own
+// 'change' event (see initPhotoPicker above) — a plain form.reset()
+// alone would clear the underlying file input but leave the visual
+// list of selected-photo chips stuck on screen. Clear that by hand too.
+(function () {
+  var cancelBtn = document.getElementById('new-note-cancel');
+  if (!cancelBtn) return;
+  var form = cancelBtn.closest('form');
+  if (!form) return;
+  cancelBtn.addEventListener('click', function () {
+    form.reset();
+    var picker = form.querySelector('[data-photo-picker]');
+    if (!picker) return;
+    var input = picker.querySelector('.photo-picker-input');
+    var list = picker.querySelector('.photo-picker-list');
+    var drop = picker.querySelector('.photo-picker-drop');
+    if (input) input.files = new DataTransfer().files;
+    if (list) list.innerHTML = '';
+    if (drop) drop.classList.remove('has-files');
+  });
+})();
 
 document.querySelectorAll('.note-card').forEach(card => {
   const editToggle = card.querySelector('.note-edit-toggle');
