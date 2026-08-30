@@ -252,6 +252,18 @@ CREATE TABLE IF NOT EXISTS note_images (
     created_at REAL NOT NULL
 );
 
+-- Voice note attachments — same shape as note_images, just audio instead
+-- of pictures. Kept as its own table (rather than reusing note_images
+-- with a type column) so the two remain independently queryable and the
+-- image-specific code paths never need to branch on content type.
+CREATE TABLE IF NOT EXISTS note_voice (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_id INTEGER NOT NULL,
+    user_id INTEGER,
+    filename TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
+
 -- A single link a person hands to whoever they want ("here, my birthday's
 -- on here") that can carry several chosen dates at once. Nobody is named
 -- as the recipient up front — recipient_id is only filled in once someone
@@ -379,7 +391,7 @@ _USER_SCOPED_TABLES = [
     "profile", "weight_entries", "sessions", "custom_foods", "food_log",
     "documents", "reminders", "habits", "todos", "settings",
     "budget_categories", "transactions", "recurring_transactions",
-    "savings_goals", "passwords", "notes", "note_images", "notifications",
+    "savings_goals", "passwords", "notes", "note_images", "note_voice", "notifications",
 ]
 
 # These four tables carried a table-level constraint in the old single-user
@@ -870,6 +882,7 @@ _CONTENT_TABLES = [
     ("To-dos", "todos"),
     ("Notes", "notes"),
     ("Note images", "note_images"),
+    ("Voice notes", "note_voice"),
     ("Vault documents", "documents"),
     ("Passwords", "passwords"),
     ("Transactions", "transactions"),
@@ -1100,7 +1113,14 @@ def admin_delete_user(user_id: int):
         image_rows = conn.execute(
             "SELECT filename FROM note_images WHERE user_id = ?", (user_id,)
         ).fetchall()
-        filenames = [r["filename"] for r in doc_rows] + [r["filename"] for r in image_rows]
+        voice_rows = conn.execute(
+            "SELECT filename FROM note_voice WHERE user_id = ?", (user_id,)
+        ).fetchall()
+        filenames = (
+            [r["filename"] for r in doc_rows]
+            + [r["filename"] for r in image_rows]
+            + [r["filename"] for r in voice_rows]
+        )
 
         # savings_contributions hangs off savings_goals (goal_id), not a
         # direct user_id column, so it needs its own scoped delete before

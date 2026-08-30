@@ -1319,6 +1319,10 @@ ALLOWED_EXT = {"png", "jpg", "jpeg", "webp", "heic", "pdf"}
 # Subset of ALLOWED_EXT usable for note photo attachments — no PDFs, notes
 # images are strictly pictures.
 NOTE_IMAGE_EXT = {"png", "jpg", "jpeg", "webp", "heic"}
+# Covers both browser MediaRecorder output (webm/opus in Chrome & Firefox,
+# mp4/aac in Safari) and typical pre-recorded audio files someone might
+# upload instead of recording live.
+NOTE_VOICE_EXT = {"webm", "mp4", "m4a", "ogg", "mp3", "wav"}
 NOTE_RECURRENCES = {"once", "weekly", "monthly", "yearly"}
 
 
@@ -2558,14 +2562,20 @@ def notes():
         image_rows = conn.execute(
             "SELECT * FROM note_images WHERE user_id = ? ORDER BY created_at", (g.user_id,)
         ).fetchall()
+        voice_rows = conn.execute(
+            "SELECT * FROM note_voice WHERE user_id = ? ORDER BY created_at", (g.user_id,)
+        ).fetchall()
 
     images_by_note = {}
     for img in image_rows:
         images_by_note.setdefault(img["note_id"], []).append(img)
 
+    voice_by_note = {}
+    for v in voice_rows:
+        voice_by_note.setdefault(v["note_id"], []).append(v)
+
     outgoing_shares = db.list_outgoing_shares(g.user_id)
     outgoing_links = {sr["id"]: _share_link(sr["token"]) for sr in outgoing_shares if sr["status"] == "pending"}
-    outgoing_items = {sr["id"]: db.get_share_request_items(sr["id"], include_removed=True) for sr in outgoing_shares}
     incoming_shares = db.list_incoming_shares(g.user_id)
 
     new_share_token = request.args.get("shared_token")
@@ -2573,8 +2583,9 @@ def notes():
 
     return render_template(
         "notes.html", items=items, images_by_note=images_by_note,
+        voice_by_note=voice_by_note,
         outgoing_shares=outgoing_shares, outgoing_links=outgoing_links,
-        outgoing_items=outgoing_items, incoming_shares=incoming_shares,
+        incoming_shares=incoming_shares,
         new_share_link=new_share_link,
     )
 
@@ -2623,6 +2634,55 @@ def _save_note_images(note_id, user_id, files):
         with db.get_conn() as conn:
             conn.execute(
                 "INSERT INTO note_images (note_id, user_id, filename, created_at) VALUES (?,?,?,?)",
+                (note_id, user_id, filename, db.now()),
+            )
+        saved += 1
+    return saved, skipped
+
+
+def _delete_note_voice_files(filenames):
+    """Best-effort removal of voice note audio files from storage (local
+    disk or B2) — same shape as _delete_note_image_files above."""
+    for filename in filenames:
+        try:
+            if config.USE_B2:
+                storage.delete_file(filename)
+            else:
+                path = config.UPLOAD_DIR / filename
+                if path.exists():
+                    path.unlink()
+        except Exception:
+            logger.exception("Failed to delete voice note %s", filename)
+
+
+def _save_note_voice(note_id, user_id, files):
+    """Uploads any valid audio files (recorded or pre-existing) onto an
+    existing note. Returns (saved_count, skipped_count) — same shape as
+    _save_note_images above, just against NOTE_VOICE_EXT and note_voice."""
+    saved = 0
+    skipped = 0
+    for file in files:
+        if not file or not file.filename:
+            continue
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+        if ext not in NOTE_VOICE_EXT:
+            skipped += 1
+            continue
+
+        filename = f"{uuid.uuid4().hex}.{ext}"
+        if config.USE_B2:
+            try:
+                storage.upload_fileobj(file, filename, content_type=file.mimetype)
+            except Exception:
+                logger.exception("B2 upload failed for voice note %s", filename)
+                skipped += 1
+                continue
+        else:
+            file.save(config.UPLOAD_DIR / filename)
+
+        with db.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO note_voice (note_id, user_id, filename, created_at) VALUES (?,?,?,?)",
                 (note_id, user_id, filename, db.now()),
             )
         saved += 1
@@ -2749,6 +2809,59 @@ def delete_note_image(image_id):
     return redirect(url_for("notes"))
 
 
+@app.route("/notes/<int:note_id>/voice", methods=["POST"])
+@login_required
+def add_note_voice(note_id):
+    with db.get_conn() as conn:
+        owned = conn.execute(
+            "SELECT 1 FROM notes WHERE id = ? AND user_id = ?", (note_id, g.user_id)
+        ).fetchone()
+    if not owned:
+        return redirect(url_for("notes"))
+
+    clips = [f for f in request.files.getlist("voice") if f and f.filename]
+    if not clips:
+        flash("Record or choose an audio clip to add.")
+        return redirect(url_for("notes"))
+
+    saved, skipped = _save_note_voice(note_id, g.user_id, clips)
+    if saved and skipped:
+        flash(f"Added {saved} voice note{'s' if saved != 1 else ''} (skipped {skipped} unsupported).")
+    elif saved:
+        flash(f"Added {saved} voice note{'s' if saved != 1 else ''}.")
+    else:
+        flash("Unsupported audio format.")
+    return redirect(url_for("notes"))
+
+
+@app.route("/notes/voice/<filename>")
+@login_required
+def note_voice_file(filename):
+    with db.get_conn() as conn:
+        owned = conn.execute(
+            "SELECT 1 FROM note_voice WHERE filename = ? AND user_id = ?", (filename, g.user_id)
+        ).fetchone()
+    if not owned:
+        return "Not found.", 404
+    if config.USE_B2:
+        return redirect(storage.presigned_url(filename))
+    return send_from_directory(config.UPLOAD_DIR, filename)
+
+
+@app.route("/notes/voice/<int:voice_id>/delete", methods=["POST"])
+@login_required
+def delete_note_voice(voice_id):
+    with db.get_conn() as conn:
+        v = conn.execute(
+            "SELECT * FROM note_voice WHERE id = ? AND user_id = ?", (voice_id, g.user_id)
+        ).fetchone()
+        if v:
+            conn.execute("DELETE FROM note_voice WHERE id = ?", (voice_id,))
+    if v:
+        _delete_note_voice_files([v["filename"]])
+    return redirect(url_for("notes"))
+
+
 @app.route("/notes/<int:note_id>/delete", methods=["POST"])
 @login_required
 def delete_note(note_id):
@@ -2756,10 +2869,15 @@ def delete_note(note_id):
         image_rows = conn.execute(
             "SELECT filename FROM note_images WHERE note_id = ? AND user_id = ?", (note_id, g.user_id)
         ).fetchall()
+        voice_rows = conn.execute(
+            "SELECT filename FROM note_voice WHERE note_id = ? AND user_id = ?", (note_id, g.user_id)
+        ).fetchall()
         conn.execute("DELETE FROM note_images WHERE note_id = ? AND user_id = ?", (note_id, g.user_id))
+        conn.execute("DELETE FROM note_voice WHERE note_id = ? AND user_id = ?", (note_id, g.user_id))
         conn.execute("DELETE FROM notes WHERE id = ? AND user_id = ?", (note_id, g.user_id))
     db.remove_note_from_shares(note_id)
     _delete_note_image_files([r["filename"] for r in image_rows])
+    _delete_note_voice_files([r["filename"] for r in voice_rows])
     return redirect(url_for("notes"))
 
 
@@ -2774,8 +2892,16 @@ def bulk_delete_notes():
                 f"SELECT filename FROM note_images WHERE user_id = ? AND note_id IN ({placeholders})",
                 (g.user_id, *ids),
             ).fetchall()
+            voice_rows = conn.execute(
+                f"SELECT filename FROM note_voice WHERE user_id = ? AND note_id IN ({placeholders})",
+                (g.user_id, *ids),
+            ).fetchall()
             conn.execute(
                 f"DELETE FROM note_images WHERE user_id = ? AND note_id IN ({placeholders})",
+                (g.user_id, *ids),
+            )
+            conn.execute(
+                f"DELETE FROM note_voice WHERE user_id = ? AND note_id IN ({placeholders})",
                 (g.user_id, *ids),
             )
             conn.execute(
@@ -2785,6 +2911,7 @@ def bulk_delete_notes():
         for note_id in ids:
             db.remove_note_from_shares(note_id)
         _delete_note_image_files([r["filename"] for r in image_rows])
+        _delete_note_voice_files([r["filename"] for r in voice_rows])
         flash(f"Deleted {len(ids)} note{'s' if len(ids) != 1 else ''}.")
     return redirect(url_for("notes"))
 

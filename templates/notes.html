@@ -90,9 +90,24 @@
         </div>
       {% endif %}
 
+      {% set voice_clips = voice_by_note.get(n.id, []) %}
+      {% if voice_clips %}
+        <div class="note-voice-list">
+          {% for clip in voice_clips %}
+            <div class="note-voice-item">
+              <audio controls preload="none" src="{{ url_for('note_voice_file', filename=clip.filename) }}"></audio>
+              <form method="post" action="{{ url_for('delete_note_voice', voice_id=clip.id) }}" data-confirm="Remove this voice note?">
+                <button type="submit" class="btn-icon note-voice-delete-btn" title="Remove voice note">✕</button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
       <div class="note-card-actions">
         <button type="button" class="secondary note-edit-toggle">Edit</button>
         <button type="button" class="secondary note-photo-toggle">Add photo</button>
+        <button type="button" class="secondary note-voice-toggle">Add voice</button>
       </div>
       <form method="post" action="{{ url_for('edit_note', note_id=n.id) }}" class="inline-form note-edit-form" style="display:none; margin-top:10px;">
         <label style="flex:1 1 100%;">Title <input type="text" name="title" value="{{ n.title }}" required></label>
@@ -121,6 +136,24 @@
               <span class="photo-picker-text"><strong>Click to add photos</strong><br>or drag them here</span>
             </label>
             <div class="photo-picker-list"></div>
+          </div>
+        </div>
+        <button type="submit">Upload</button>
+      </form>
+      <form method="post" action="{{ url_for('add_note_voice', note_id=n.id) }}" enctype="multipart/form-data" class="inline-form note-voice-form" style="display:none; margin-top:10px;">
+        <div class="inline-form-field" style="flex:1 1 100%;">Voice note
+          <div class="voice-recorder" data-voice-recorder>
+            <input type="file" name="voice" accept="audio/*" required id="note-voice-{{ n.id }}" class="photo-picker-input voice-input">
+            <div class="voice-recorder-controls">
+              <button type="button" class="secondary voice-record-btn">🎙️ Record</button>
+              <span class="voice-record-timer"></span>
+              <label for="note-voice-{{ n.id }}" class="voice-upload-label">or choose an audio file</label>
+            </div>
+            <div class="voice-preview">
+              <audio controls></audio>
+              <button type="button" class="voice-discard-btn" title="Discard">✕</button>
+            </div>
+            <p class="voice-error"></p>
           </div>
         </div>
         <button type="submit">Upload</button>
@@ -269,6 +302,148 @@ function initPhotoPicker(root) {
 
 document.querySelectorAll('[data-photo-picker]').forEach(initPhotoPicker);
 
+// Voice note recorder: records via MediaRecorder (mic) or accepts a
+// plain uploaded audio file, and either way ends up as a File object
+// assigned to the same hidden file input — so submission is one ordinary
+// multipart form post, no custom upload/fetch logic needed.
+function initVoiceRecorder(recorder) {
+  const input = recorder.querySelector('.voice-input');
+  const recordBtn = recorder.querySelector('.voice-record-btn');
+  const timerEl = recorder.querySelector('.voice-record-timer');
+  const previewWrap = recorder.querySelector('.voice-preview');
+  const previewAudio = previewWrap ? previewWrap.querySelector('audio') : null;
+  const discardBtn = recorder.querySelector('.voice-discard-btn');
+  const errorEl = recorder.querySelector('.voice-error');
+  if (!input || !recordBtn || !previewWrap || !previewAudio) return;
+
+  let mediaRecorder = null;
+  let stream = null;
+  let chunks = [];
+  let timerInterval = null;
+  let autoStopTimeout = null;
+  let startTime = 0;
+
+  function showError(msg) {
+    if (!errorEl) return;
+    errorEl.textContent = msg;
+    errorEl.classList.add('show');
+  }
+  function clearError() {
+    if (!errorEl) return;
+    errorEl.textContent = '';
+    errorEl.classList.remove('show');
+  }
+  function formatElapsed(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function revokePreviewUrl() {
+    if (previewAudio.src && previewAudio.src.indexOf('blob:') === 0) {
+      URL.revokeObjectURL(previewAudio.src);
+    }
+  }
+  function showPreviewFile(file) {
+    revokePreviewUrl();
+    previewAudio.src = URL.createObjectURL(file);
+    previewWrap.classList.add('has-clip');
+  }
+  function clearPreview() {
+    previewAudio.pause();
+    revokePreviewUrl();
+    previewAudio.removeAttribute('src');
+    previewAudio.load();
+    previewWrap.classList.remove('has-clip');
+    input.files = new DataTransfer().files;
+  }
+  function extensionFor(mimeType) {
+    if (!mimeType) return 'webm';
+    if (mimeType.indexOf('mp4') !== -1) return 'mp4';
+    if (mimeType.indexOf('ogg') !== -1) return 'ogg';
+    if (mimeType.indexOf('wav') !== -1) return 'wav';
+    return 'webm';
+  }
+  function stopTimer() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    if (autoStopTimeout) { clearTimeout(autoStopTimeout); autoStopTimeout = null; }
+    if (timerEl) timerEl.textContent = '';
+  }
+  function stopStreamTracks() {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+  }
+  function setRecordingUI(isRecording) {
+    recordBtn.textContent = isRecording ? '⏹ Stop' : '🎙️ Record';
+    recordBtn.classList.toggle('recording', isRecording);
+  }
+
+  recordBtn.addEventListener('click', () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      return;
+    }
+    clearError();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showError('Your browser doesn\'t support in-browser recording — choose an audio file instead.');
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(mic => {
+      stream = mic;
+      chunks = [];
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.addEventListener('dataavailable', e => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      });
+      mediaRecorder.addEventListener('stop', () => {
+        stopTimer();
+        stopStreamTracks();
+        setRecordingUI(false);
+        const mimeType = mediaRecorder.mimeType || 'audio/webm';
+        const blob = new Blob(chunks, { type: mimeType });
+        const ext = extensionFor(mimeType);
+        const file = new File([blob], 'voice-' + Date.now() + '.' + ext, { type: mimeType });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+        showPreviewFile(file);
+      });
+      mediaRecorder.start();
+      setRecordingUI(true);
+      startTime = Date.now();
+      if (timerEl) timerEl.textContent = '0:00';
+      timerInterval = setInterval(() => {
+        if (timerEl) timerEl.textContent = formatElapsed(Date.now() - startTime);
+      }, 500);
+      // Safety cap so a forgotten open mic doesn't record indefinitely.
+      autoStopTimeout = setTimeout(() => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+      }, 5 * 60 * 1000);
+    }).catch(() => {
+      showError('Microphone access was blocked or unavailable — choose an audio file instead.');
+    });
+  });
+
+  // Manual file upload fallback: the input already has the right File in
+  // input.files once 'change' fires, so this just updates the preview —
+  // unlike the recorded path above, nothing needs reassigning here.
+  input.addEventListener('change', () => {
+    clearError();
+    if (input.files && input.files[0]) showPreviewFile(input.files[0]);
+  });
+
+  if (discardBtn) {
+    discardBtn.addEventListener('click', () => {
+      if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+      clearPreview();
+      clearError();
+    });
+  }
+}
+document.querySelectorAll('[data-voice-recorder]').forEach(initVoiceRecorder);
+
 // New Note "Cancel": clears the title/body fields, and — since the photo
 // picker's chip list is only re-rendered on the file input's own
 // 'change' event (see initPhotoPicker above) — a plain form.reset()
@@ -316,6 +491,14 @@ document.querySelectorAll('.note-card').forEach(card => {
   if (photoToggle && photoForm) {
     photoToggle.addEventListener('click', () => {
       photoForm.style.display = photoForm.style.display === 'none' ? 'flex' : 'none';
+    });
+  }
+
+  const voiceToggle = card.querySelector('.note-voice-toggle');
+  const voiceForm = card.querySelector('.note-voice-form');
+  if (voiceToggle && voiceForm) {
+    voiceToggle.addEventListener('click', () => {
+      voiceForm.style.display = voiceForm.style.display === 'none' ? 'flex' : 'none';
     });
   }
 });

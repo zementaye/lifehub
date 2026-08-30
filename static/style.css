@@ -1747,6 +1747,121 @@ body.vault-blur-off .doc-thumb-wrap::after { content: none; }
   color: #fff;
 }
 
+/* Attached voice notes on a note card — a row per clip: native <audio>
+   player (the browser's built-in controls, not custom-built ones) plus
+   a small round delete button, same shape as .note-image-wrap's overlay
+   button above but laid out as a list row instead of a thumbnail grid,
+   since a waveform/player needs width, not a square. */
+.note-voice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+}
+.note-voice-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.note-voice-item audio {
+  flex: 1 1 auto;
+  height: 32px;
+  max-width: 320px;
+}
+.note-voice-delete-btn {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  min-width: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--border);
+  color: inherit;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+.note-voice-delete-btn:hover {
+  background: var(--violet);
+  color: #fff;
+}
+
+/* Voice note recorder widget — a record/stop button (mic, in-browser via
+   MediaRecorder) alongside a plain file-upload fallback, feeding the same
+   hidden file input either way so both paths submit through one ordinary
+   multipart form, same as the photo picker above. */
+.voice-recorder { margin-top: 6px; }
+.voice-recorder-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.voice-record-btn { display: inline-flex; align-items: center; gap: 6px; }
+.voice-record-btn.recording {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  animation: voice-record-pulse 1.4s ease-in-out infinite;
+}
+@keyframes voice-record-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 45%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--danger) 0%, transparent); }
+}
+.voice-record-timer {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+  min-width: 38px;
+}
+.voice-upload-label {
+  font-size: 0.78rem;
+  color: var(--violet);
+  cursor: pointer;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.voice-preview {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--border-soft);
+}
+.voice-preview.has-clip { display: flex; }
+.voice-preview audio { flex: 1 1 auto; height: 32px; max-width: 260px; }
+.voice-discard-btn {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  min-width: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: none;
+  background: var(--border);
+  color: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.voice-discard-btn:hover { background: var(--violet); color: #fff; }
+.voice-error {
+  font-size: 0.78rem;
+  color: var(--danger);
+  margin-top: 6px;
+  display: none;
+}
+.voice-error.show { display: block; }
+
 /* Bulk-select toolbar (Notes, and reusable wherever else it's needed) */
 .list-toolbar {
   display: flex;
