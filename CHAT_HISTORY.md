@@ -312,3 +312,26 @@ per-note edit form) is wrapped in `{% if ai_available %}` — the same flag
 only appears when `GEMINI_API_KEY` is actually configured; nothing changes
 for anyone without it set. Added a small `.voice-transcribe-label` style
 in `static/style.css` to match `.voice-upload-label`'s sizing.
+
+## 2026-08-30 (transcription 500 error)
+
+**Fixed a 500 / worker crash when saving a note with "Transcribe to text"
+checked.** The Render logs showed a traceback inside `requests` mid-read of
+the Gemini HTTPS response, followed by `gunicorn.workers.base.handle_abort`
+→ `SystemExit: 1`, then "Worker (pid:44) was sent SIGKILL! Perhaps out of
+memory?" — that last line is misleading; the real cause is Gunicorn's own
+worker timeout. `Procfile` ran `gunicorn app:app --bind 0.0.0.0:$PORT` with
+no `--timeout` flag, so it used Gunicorn's default of 30 seconds — shorter
+than `ai.transcribe_audio`'s own 45-second `requests` timeout. Gunicorn
+was killing the whole worker process before the Gemini call could ever
+finish (or fail) on its own, which crashed the request with a 500 and
+looked like an OOM kill in the log. Fixed by adding `--timeout 60` to the
+Procfile's gunicorn command, giving it headroom above the 45s HTTP
+timeout.
+
+Worth knowing: the app currently runs Gunicorn with its default single
+sync worker (no `--workers`/`--threads` set), so while a transcription
+request is in flight, that worker can't serve any other request for up to
+that ~45s window. Fine for single-user use; would need `--workers` or
+`--threads` (or moving transcription off the request path) if that ever
+becomes a problem.
