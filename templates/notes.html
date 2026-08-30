@@ -20,6 +20,9 @@
       </label>
       <input type="file" name="voice" accept="audio/*" id="new-note-voice" class="voice-input" style="display:none;">
       <label for="new-note-voice" class="voice-upload-label">or attach an existing audio file</label>
+      {% if ai_available %}
+        <label class="voice-transcribe-label"><input type="checkbox" name="transcribe" value="1"> Transcribe to text</label>
+      {% endif %}
       <div class="voice-preview">
         <audio controls></audio>
         <button type="button" class="voice-discard-btn" title="Discard">✕</button>
@@ -139,6 +142,9 @@
           </label>
           <input type="file" name="voice" accept="audio/*" id="note-voice-{{ n.id }}" class="voice-input" style="display:none;">
           <label for="note-voice-{{ n.id }}" class="voice-upload-label">or attach an existing audio file</label>
+          {% if ai_available %}
+            <label class="voice-transcribe-label"><input type="checkbox" name="transcribe" value="1"> Transcribe to text</label>
+          {% endif %}
           <div class="voice-preview">
             <audio controls></audio>
             <button type="button" class="voice-discard-btn" title="Discard">✕</button>
@@ -438,7 +444,8 @@ function initVoiceRecorder(recorder) {
       autoStopTimeout = setTimeout(() => {
         if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
       }, 5 * 60 * 1000);
-    }).catch(() => {
+    }).catch((err) => {
+      console.error('getUserMedia failed:', err && err.name, err && err.message, err);
       showError('Microphone access was blocked or unavailable — choose an audio file instead.');
     });
   });

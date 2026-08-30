@@ -2657,12 +2657,18 @@ def _delete_note_voice_files(filenames):
             logger.exception("Failed to delete voice note %s", filename)
 
 
-def _save_note_voice(note_id, user_id, files):
+def _save_note_voice(note_id, user_id, files, transcribe=False):
     """Uploads any valid audio files (recorded or pre-existing) onto an
-    existing note. Returns (saved_count, skipped_count) — same shape as
-    _save_note_images above, just against NOTE_VOICE_EXT and note_voice."""
+    existing note. Returns (saved_count, skipped_count, transcript) — the
+    first two are the same shape as _save_note_images above; transcript is
+    the transcribed text of the first valid clip when transcribe=True and
+    Gemini is configured, else None. Transcription is read from the
+    upload stream before it's saved/uploaded (then the stream is rewound),
+    and a transcription failure is a soft no-op — it never blocks the
+    actual save."""
     saved = 0
     skipped = 0
+    transcript = None
     for file in files:
         if not file or not file.filename:
             continue
@@ -2670,6 +2676,16 @@ def _save_note_voice(note_id, user_id, files):
         if ext not in NOTE_VOICE_EXT:
             skipped += 1
             continue
+
+        if transcribe and transcript is None and ai.available():
+            try:
+                audio_bytes = file.read()
+                file.seek(0)
+                text, _err = ai.transcribe_audio(audio_bytes, file.mimetype)
+                if text:
+                    transcript = text
+            except Exception:
+                logger.exception("Transcription failed for voice note upload")
 
         filename = f"{uuid.uuid4().hex}.{ext}"
         if config.USE_B2:
@@ -2688,7 +2704,7 @@ def _save_note_voice(note_id, user_id, files):
                 (note_id, user_id, filename, db.now()),
             )
         saved += 1
-    return saved, skipped
+    return saved, skipped, transcript
 
 
 @app.route("/notes", methods=["POST"])
@@ -2719,13 +2735,21 @@ def add_note():
 
         images = [f for f in request.files.getlist("images") if f and f.filename]
         voice_clips = [f for f in request.files.getlist("voice") if f and f.filename]
+        want_transcribe = request.form.get("transcribe") == "1"
 
         skipped_photos = 0
         skipped_voice = 0
         if images:
             _saved, skipped_photos = _save_note_images(note_id, user_id, images)
         if voice_clips:
-            _saved, skipped_voice = _save_note_voice(note_id, user_id, voice_clips)
+            _saved, skipped_voice, transcript = _save_note_voice(note_id, user_id, voice_clips, transcribe=want_transcribe)
+            if transcript:
+                new_body = f"{body}\n\n{transcript}".strip() if body else transcript
+                with db.get_conn() as conn:
+                    conn.execute(
+                        "UPDATE notes SET body=?, updated_at=? WHERE id=?",
+                        (new_body, db.now(), note_id),
+                    )
 
         skip_notes = []
         if skipped_photos:
@@ -2771,7 +2795,15 @@ def edit_note(note_id):
     if existing:
         voice_clips = [f for f in request.files.getlist("voice") if f and f.filename]
         if voice_clips:
-            _saved, skipped = _save_note_voice(note_id, g.user_id, voice_clips)
+            want_transcribe = request.form.get("transcribe") == "1"
+            _saved, skipped, transcript = _save_note_voice(note_id, g.user_id, voice_clips, transcribe=want_transcribe)
+            if transcript:
+                new_body = f"{body}\n\n{transcript}".strip() if body else transcript
+                with db.get_conn() as conn:
+                    conn.execute(
+                        "UPDATE notes SET body=?, updated_at=? WHERE id=? AND user_id=?",
+                        (new_body, db.now(), note_id, g.user_id),
+                    )
             if skipped:
                 flash(f"Note updated (skipped {skipped} unsupported audio clip{'s' if skipped != 1 else ''}).")
             else:
@@ -2841,7 +2873,7 @@ def delete_note_image(image_id):
 def add_note_voice(note_id):
     with db.get_conn() as conn:
         owned = conn.execute(
-            "SELECT 1 FROM notes WHERE id = ? AND user_id = ?", (note_id, g.user_id)
+            "SELECT body FROM notes WHERE id = ? AND user_id = ?", (note_id, g.user_id)
         ).fetchone()
     if not owned:
         return redirect(url_for("notes"))
@@ -2851,7 +2883,16 @@ def add_note_voice(note_id):
         flash("Record or choose an audio clip to add.")
         return redirect(url_for("notes"))
 
-    saved, skipped = _save_note_voice(note_id, g.user_id, clips)
+    want_transcribe = request.form.get("transcribe") == "1"
+    saved, skipped, transcript = _save_note_voice(note_id, g.user_id, clips, transcribe=want_transcribe)
+    if transcript:
+        existing_body = owned["body"] or ""
+        new_body = f"{existing_body}\n\n{transcript}".strip() if existing_body else transcript
+        with db.get_conn() as conn:
+            conn.execute(
+                "UPDATE notes SET body=?, updated_at=? WHERE id=? AND user_id=?",
+                (new_body, db.now(), note_id, g.user_id),
+            )
     if saved and skipped:
         flash(f"Added {saved} voice note{'s' if saved != 1 else ''} (skipped {skipped} unsupported).")
     elif saved:

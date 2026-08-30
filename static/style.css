@@ -1860,6 +1860,21 @@ body.vault-blur-off .doc-thumb-wrap::after { content: none; }
   border: none;
   padding: 0;
 }
+.voice-transcribe-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 0.76rem;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+.voice-transcribe-label input[type="checkbox"] {
+  margin: 0;
+  accent-color: var(--violet);
+}
 .voice-preview {
   display: none;
   align-items: center;

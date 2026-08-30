@@ -284,3 +284,31 @@ added a `console.error` in the voice-recorder's `.catch()` in
 `templates/notes.html` (it previously swallowed the real error name),
 which is what surfaced the Permissions-Policy violation in the first
 place.
+
+## 2026-08-30 (voice transcription)
+
+**Added an optional "Transcribe to text" checkbox for Notes voice clips.**
+Uses the existing Gemini integration in `ai.py` (already used for the chat
+assistant and quick-add) rather than a separate speech-to-text service —
+Gemini 2.5 Flash accepts short audio clips as inline base64 data the same
+way it accepts text prompts. Refactored `ai.py`'s `_call` to share its
+HTTP/response-parsing logic with a new `_generate` helper, then added
+`ai.transcribe_audio(audio_bytes, mime_type)` on top of it (45s timeout,
+since transcription is slower than a short text prompt; returns `""` — not
+an error — for a silent/no-speech clip).
+
+`_save_note_voice` in `app.py` now takes a `transcribe=` flag: when set and
+Gemini is configured, it reads the first valid clip's bytes (rewinding the
+stream after, so the normal save/upload still works unchanged), transcribes
+it, and returns the transcript alongside the usual (saved, skipped) counts.
+All three call sites (`add_note`, `edit_note`, `add_note_voice`) now read a
+`transcribe=1` checkbox from the form and, if a transcript comes back,
+append it to the note's body (`existing body + "\n\n" + transcript`, or
+just the transcript if the body was empty).
+
+The checkbox itself (`templates/notes.html`, new-note form and the
+per-note edit form) is wrapped in `{% if ai_available %}` — the same flag
+`base.html` already injects for the chat assistant / quick-add — so it
+only appears when `GEMINI_API_KEY` is actually configured; nothing changes
+for anyone without it set. Added a small `.voice-transcribe-label` style
+in `static/style.css` to match `.voice-upload-label`'s sizing.

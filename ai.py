@@ -15,6 +15,7 @@ food, setting a reminder etc. all still work by hand exactly as before
 regardless of whether any of this is configured or currently reachable.
 """
 
+import base64
 import json
 import logging
 
@@ -31,24 +32,19 @@ def available() -> bool:
     return bool(config.GEMINI_API_KEY)
 
 
-def _call(system_prompt: str, user_prompt: str, want_json: bool = False, temperature: float = 0.2):
-    """Low-level call to the Gemini API. Returns (result, error_message) —
-    result is a parsed dict/list when want_json is True, else plain text.
-    Exactly one of the two is ever non-None."""
+def _generate(payload: dict, want_json: bool = False, timeout: int = 20):
+    """Shared plumbing behind every Gemini call in this module — POSTs a
+    fully-built request payload and turns it into (result, error_message),
+    the same best-effort contract described at the top of this file.
+    Callers (_call for text prompts, transcribe_audio for audio input)
+    only need to build the payload's `contents`; this handles the
+    network/HTTP/response-shape parts identically for both."""
     if not config.GEMINI_API_KEY:
         return None, "AI isn't configured on this server."
 
-    payload = {
-        "system_instruction": {"parts": [{"text": system_prompt}]},
-        "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
-        "generationConfig": {"temperature": temperature},
-    }
-    if want_json:
-        payload["generationConfig"]["responseMimeType"] = "application/json"
-
     url = GEMINI_API.format(model=config.GEMINI_MODEL)
     try:
-        resp = requests.post(url, params={"key": config.GEMINI_API_KEY}, json=payload, timeout=20)
+        resp = requests.post(url, params={"key": config.GEMINI_API_KEY}, json=payload, timeout=timeout)
     except requests.RequestException as e:
         logger.warning("Gemini request failed: %s", e)
         return None, "Couldn't reach the AI service — try again in a moment."
@@ -84,6 +80,63 @@ def _call(system_prompt: str, user_prompt: str, want_json: bool = False, tempera
     except ValueError:
         logger.warning("Gemini didn't return valid JSON: %s", text[:300])
         return None, "The AI's response wasn't in the expected format."
+
+
+def _call(system_prompt: str, user_prompt: str, want_json: bool = False, temperature: float = 0.2):
+    """Low-level call to the Gemini API for a plain text prompt. Returns
+    (result, error_message) — result is a parsed dict/list when want_json
+    is True, else plain text. Exactly one of the two is ever non-None."""
+    payload = {
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+        "generationConfig": {"temperature": temperature},
+    }
+    if want_json:
+        payload["generationConfig"]["responseMimeType"] = "application/json"
+    return _generate(payload, want_json=want_json)
+
+
+# ── Voice note transcription ─────────────────────────────────────────────
+# Used by the Notes page's "transcribe to text" option (see
+# _save_note_voice in app.py) — Gemini accepts short audio clips as inline
+# base64 data the same way it accepts text, so no separate speech-to-text
+# service is needed. Same best-effort contract as everything else here.
+
+def transcribe_audio(audio_bytes: bytes, mime_type: str):
+    """Transcribe a recorded voice note to plain text. mime_type should
+    match what the browser actually recorded (e.g. audio/webm, audio/mp4,
+    audio/wav) — the caller reads this straight off the uploaded file.
+    Returns (text, None) on success — text is "" (not an error) when the
+    clip has no discernible speech — or (None, reason) on failure."""
+    system = (
+        "Transcribe this audio recording exactly as spoken, in the "
+        "language it was spoken in. Reply with ONLY the transcript text — "
+        "no preamble, no speaker labels, no timestamps, no surrounding "
+        "quotation marks. If the audio has no discernible speech, reply "
+        "with exactly: (no speech detected)"
+    )
+    payload = {
+        "system_instruction": {"parts": [{"text": system}]},
+        "contents": [{
+            "role": "user",
+            "parts": [{
+                "inline_data": {
+                    "mime_type": mime_type or "audio/webm",
+                    "data": base64.b64encode(audio_bytes).decode("ascii"),
+                }
+            }],
+        }],
+        "generationConfig": {"temperature": 0.0},
+    }
+    # Transcription can take longer than a short text prompt, especially
+    # on the free tier — give it more room than _call's default 20s.
+    text, err = _generate(payload, timeout=45)
+    if err:
+        return None, err
+    text = (text or "").strip()
+    if text.lower() == "(no speech detected)":
+        return "", None
+    return text, None
 
 
 # ── Chat assistant ──────────────────────────────────────────────────────
