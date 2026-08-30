@@ -1807,14 +1807,32 @@ body.vault-blur-off .doc-thumb-wrap::after { content: none; }
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  font-size: 0.95rem;
   line-height: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--violet);
+  box-shadow: none;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.voice-mic-btn::before { display: none; }
+.voice-mic-btn:hover {
+  background: color-mix(in srgb, var(--violet) 14%, var(--surface));
+  border-color: var(--violet);
+  color: var(--violet);
+  transform: none;
+  box-shadow: none;
 }
 .voice-mic-btn.recording {
   background: var(--danger);
   border-color: var(--danger);
   color: #fff;
   animation: voice-record-pulse 1.4s ease-in-out infinite;
+}
+.voice-mic-btn.recording:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
 }
 @keyframes voice-record-pulse {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 45%, transparent); }

@@ -11,7 +11,10 @@
       <label>Note
         <div class="note-textarea-wrap">
           <textarea name="body" rows="3" style="width:100%; resize:vertical;"></textarea>
-          <button type="button" class="voice-mic-btn voice-record-btn" title="Record a voice note">🎙️</button>
+          <button type="button" class="voice-mic-btn voice-record-btn" title="Record a voice note">
+            <svg class="voice-mic-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            <svg class="voice-stop-icon" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" style="display:none;"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+          </button>
           <span class="voice-record-timer"></span>
         </div>
       </label>
@@ -127,7 +130,10 @@
           <label>Note
             <div class="note-textarea-wrap">
               <textarea name="body" rows="4" style="width:100%; resize:vertical;">{{ n.body or '' }}</textarea>
-              <button type="button" class="voice-mic-btn voice-record-btn" title="Record a voice note">🎙️</button>
+              <button type="button" class="voice-mic-btn voice-record-btn" title="Record a voice note">
+                <svg class="voice-mic-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                <svg class="voice-stop-icon" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" style="display:none;"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+              </button>
               <span class="voice-record-timer"></span>
             </div>
           </label>
@@ -383,7 +389,10 @@ function initVoiceRecorder(recorder) {
     }
   }
   function setRecordingUI(isRecording) {
-    recordBtn.textContent = isRecording ? '⏹' : '🎙️';
+    const micIcon = recordBtn.querySelector('.voice-mic-icon');
+    const stopIcon = recordBtn.querySelector('.voice-stop-icon');
+    if (micIcon) micIcon.style.display = isRecording ? 'none' : '';
+    if (stopIcon) stopIcon.style.display = isRecording ? '' : 'none';
     recordBtn.title = isRecording ? 'Stop recording' : 'Record a voice note';
     recordBtn.classList.toggle('recording', isRecording);
   }

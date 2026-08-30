@@ -250,3 +250,17 @@ include_removed=True) for sr in outgoing_shares}` and pass it into
 the template alongside the others. Verified the exact Jinja
 expression against real `sqlite3.Row` data (including a removed item
 and an empty share) — filters and joins correctly, no error.
+
+## 2026-08-30
+
+**Notes page: restyled the voice-note mic button.** The record button
+used the default amber `button` styling (LifeHub's primary-accent
+color) plus a raw 🎙️/⏹ emoji swap, which clashed against the Notes
+page's violet theme. Replaced the emoji with inline SVG mic/stop
+icons (`currentColor`, swapped via `display` toggle in
+`setRecordingUI` instead of `textContent`), and restyled
+`.voice-mic-btn` as a ghost circular button (`--surface` background,
+`--border` ring, `--violet` icon color, violet-tinted hover) with the
+global button shine-sweep (`::before`) suppressed. Recording state
+still switches it to `--danger` red with the existing pulse
+animation. Changed files: `templates/notes.html`, `static/style.css`.
