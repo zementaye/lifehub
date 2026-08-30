@@ -24,7 +24,9 @@ PowerShell**, never bash/cmd/WSL syntax. That covers things like:
 - `Expand-Archive` (not `unzip`)
 - `Copy-Item` (not `cp`)
 - `Remove-Item` (not `rm`)
-- `$env:USERPROFILE\Downloads\...` style paths (not `~/Downloads/...`)
+- `D:\Chrome_Downloads\...` style paths (not `~/Downloads/...` or the
+  default `$env:USERPROFILE\Downloads\...` — HP's browser download folder
+  is `D:\Chrome_Downloads`)
 
 ## The end-to-end push workflow
 
@@ -37,10 +39,10 @@ that into the real repo is:
 cd C:\Users\HP\LifeHub
 
 # 1. Unzip the delivered file (adjust the filename to match what was downloaded)
-Expand-Archive -Path "$env:USERPROFILE\Downloads\<name>.zip" -DestinationPath "$env:USERPROFILE\Downloads\<name>" -Force
+Expand-Archive -Path "D:\Chrome_Downloads\<name>.zip" -DestinationPath "D:\Chrome_Downloads\<name>" -Force
 
 # 2. Copy only the changed files over (one Copy-Item per file, matching folders)
-Copy-Item "$env:USERPROFILE\Downloads\<name>\lifehub-main\<path\to\file>" -Destination .\<path\to\> -Force
+Copy-Item "D:\Chrome_Downloads\<name>\lifehub-main\<path\to\file>" -Destination .\<path\to\> -Force
 
 # 3. Review before committing
 git status
@@ -58,7 +60,7 @@ Rules for this flow:
   file — never a blind folder copy that could overwrite unrelated files.
 - Each delivered zip gets a unique filename — never reuse the same zip name
   across deliverables in a session or across sessions, so old downloads in
-  `C:\Users\HP\Downloads` don't get confused with new ones.
+  `D:\Chrome_Downloads` don't get confused with new ones.
 - HP reviews `git diff` before committing. Claude should tell them what to
   look for if it isn't obvious.
 - Commit messages are short, specific, and describe the change (not "update
