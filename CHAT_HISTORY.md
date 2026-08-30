@@ -335,3 +335,33 @@ request is in flight, that worker can't serve any other request for up to
 that ~45s window. Fine for single-user use; would need `--workers` or
 `--threads` (or moving transcription off the request path) if that ever
 becomes a problem.
+
+## 2026-08-30 (transcribe without saving)
+
+**Reworked voice transcription to happen immediately, without saving the
+note first.** HP didn't like that the transcript only appeared after a
+full save + page reload. Replaced the save-time (server-side, on `POST
+/notes` etc.) transcription with a client-side flow:
+
+- New JSON endpoint `POST /api/notes/transcribe` (mirrors the existing
+  `/api/ai/chat` and `/api/ai/quick-add` pattern) — takes an `audio` file,
+  calls `ai.transcribe_audio`, returns `{ok, text}` or `{ok:false,
+  error}`. No note_id needed since this runs before the note exists.
+- `_save_note_voice` in `app.py` reverted back to its pre-transcription
+  shape (just `(saved, skipped)`) — the three call sites (`add_note`,
+  `edit_note`, `add_note_voice`) no longer touch transcription at all.
+- `templates/notes.html`: the "Transcribe to text" checkbox is no longer
+  a form field submitted to the server (dropped its `name`/`value`) —
+  it's now a pure client-side toggle (`.voice-transcribe-toggle`). A new
+  `maybeTranscribe(file)` in `initVoiceRecorder` fires right after a
+  recording finishes, right after a file is attached via the input's
+  `change` event, or when the checkbox itself gets checked with a clip
+  already attached. It posts the clip to `/api/notes/transcribe` via
+  `fetch()` (with the `X-CSRFToken` header, same as the existing AI chat
+  popup's fetch calls) and appends the returned text straight into the
+  `<textarea name="body">` — no save/reload needed. A small
+  `.voice-transcribe-status` span next to the checkbox shows
+  "Transcribing…" / "Transcribed ✓" / "No speech detected." / the error
+  message. Discarding the clip (or the note-edit Cancel button, via the
+  existing `_clearVoiceRecorder` hook) resets the status and lets the
+  same clip be retried if it's re-attached.

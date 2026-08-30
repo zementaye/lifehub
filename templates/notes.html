@@ -21,7 +21,10 @@
       <input type="file" name="voice" accept="audio/*" id="new-note-voice" class="voice-input" style="display:none;">
       <label for="new-note-voice" class="voice-upload-label">or attach an existing audio file</label>
       {% if ai_available %}
-        <label class="voice-transcribe-label"><input type="checkbox" name="transcribe" value="1"> Transcribe to text</label>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label class="voice-transcribe-label"><input type="checkbox" class="voice-transcribe-toggle"> Transcribe to text</label>
+          <span class="voice-transcribe-status"></span>
+        </div>
       {% endif %}
       <div class="voice-preview">
         <audio controls></audio>
@@ -143,7 +146,10 @@
           <input type="file" name="voice" accept="audio/*" id="note-voice-{{ n.id }}" class="voice-input" style="display:none;">
           <label for="note-voice-{{ n.id }}" class="voice-upload-label">or attach an existing audio file</label>
           {% if ai_available %}
-            <label class="voice-transcribe-label"><input type="checkbox" name="transcribe" value="1"> Transcribe to text</label>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <label class="voice-transcribe-label"><input type="checkbox" class="voice-transcribe-toggle"> Transcribe to text</label>
+              <span class="voice-transcribe-status"></span>
+            </div>
           {% endif %}
           <div class="voice-preview">
             <audio controls></audio>
@@ -333,6 +339,9 @@ function initVoiceRecorder(recorder) {
   const previewAudio = previewWrap ? previewWrap.querySelector('audio') : null;
   const discardBtn = recorder.querySelector('.voice-discard-btn');
   const errorEl = recorder.querySelector('.voice-error');
+  const bodyTextarea = recorder.querySelector('textarea[name="body"]');
+  const transcribeCheckbox = recorder.querySelector('.voice-transcribe-toggle');
+  const transcribeStatusEl = recorder.querySelector('.voice-transcribe-status');
   if (!input || !recordBtn || !previewWrap || !previewAudio) return;
 
   let mediaRecorder = null;
@@ -341,6 +350,7 @@ function initVoiceRecorder(recorder) {
   let timerInterval = null;
   let autoStopTimeout = null;
   let startTime = 0;
+  let transcribedFile = null; // dedupes re-firing for the same clip
 
   function showError(msg) {
     if (!errorEl) return;
@@ -375,6 +385,47 @@ function initVoiceRecorder(recorder) {
     previewAudio.load();
     previewWrap.classList.remove('has-clip');
     input.files = new DataTransfer().files;
+    transcribedFile = null;
+    setTranscribeStatus('');
+  }
+  function setTranscribeStatus(msg) {
+    if (transcribeStatusEl) transcribeStatusEl.textContent = msg;
+  }
+  // Fires right after a clip is recorded or attached — no note-save
+  // needed to see the transcript. Runs client-side via fetch() so it can
+  // drop straight into the body textarea instead of waiting on a
+  // save/reload round-trip (see /api/notes/transcribe in app.py).
+  function maybeTranscribe(file) {
+    if (!transcribeCheckbox || !transcribeCheckbox.checked) return;
+    if (!bodyTextarea || !file || file === transcribedFile) return;
+    transcribedFile = file;
+    setTranscribeStatus('Transcribing…');
+    const formData = new FormData();
+    formData.append('audio', file, file.name);
+    fetch('/api/notes/transcribe', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': window.LIFEHUB_CSRF_TOKEN || '' },
+      body: formData,
+    }).then(r => r.json()).then(data => {
+      if (file !== transcribedFile) return; // superseded by a newer clip
+      if (!data.ok) {
+        transcribedFile = null; // allow retrying (e.g. re-check the box)
+        setTranscribeStatus(data.error || 'Transcription failed.');
+        return;
+      }
+      if (!data.text) {
+        setTranscribeStatus('No speech detected.');
+        return;
+      }
+      bodyTextarea.value = bodyTextarea.value.trim()
+        ? bodyTextarea.value.trim() + '\n\n' + data.text
+        : data.text;
+      setTranscribeStatus('Transcribed ✓');
+    }).catch(() => {
+      if (file !== transcribedFile) return;
+      transcribedFile = null;
+      setTranscribeStatus('Transcription failed — check your connection.');
+    });
   }
   function extensionFor(mimeType) {
     if (!mimeType) return 'webm';
@@ -432,6 +483,7 @@ function initVoiceRecorder(recorder) {
         dt.items.add(file);
         input.files = dt.files;
         showPreviewFile(file);
+        maybeTranscribe(file);
       });
       mediaRecorder.start();
       setRecordingUI(true);
@@ -455,8 +507,21 @@ function initVoiceRecorder(recorder) {
   // unlike the recorded path above, nothing needs reassigning here.
   input.addEventListener('change', () => {
     clearError();
-    if (input.files && input.files[0]) showPreviewFile(input.files[0]);
+    if (input.files && input.files[0]) {
+      showPreviewFile(input.files[0]);
+      maybeTranscribe(input.files[0]);
+    }
   });
+
+  if (transcribeCheckbox) {
+    // Covers the case where the box gets checked after a clip is already
+    // attached (e.g. record first, then decide to transcribe).
+    transcribeCheckbox.addEventListener('change', () => {
+      if (transcribeCheckbox.checked && input.files && input.files[0]) {
+        maybeTranscribe(input.files[0]);
+      }
+    });
+  }
 
   if (discardBtn) {
     discardBtn.addEventListener('click', () => {

@@ -2657,18 +2657,15 @@ def _delete_note_voice_files(filenames):
             logger.exception("Failed to delete voice note %s", filename)
 
 
-def _save_note_voice(note_id, user_id, files, transcribe=False):
+def _save_note_voice(note_id, user_id, files):
     """Uploads any valid audio files (recorded or pre-existing) onto an
-    existing note. Returns (saved_count, skipped_count, transcript) — the
-    first two are the same shape as _save_note_images above; transcript is
-    the transcribed text of the first valid clip when transcribe=True and
-    Gemini is configured, else None. Transcription is read from the
-    upload stream before it's saved/uploaded (then the stream is rewound),
-    and a transcription failure is a soft no-op — it never blocks the
-    actual save."""
+    existing note. Returns (saved_count, skipped_count) — same shape as
+    _save_note_images above, just against NOTE_VOICE_EXT and note_voice.
+    (Transcription used to happen here on save; it's now done client-side
+    via /api/notes/transcribe right after a clip is recorded/attached, so
+    the transcript is already in the note body by the time this runs.)"""
     saved = 0
     skipped = 0
-    transcript = None
     for file in files:
         if not file or not file.filename:
             continue
@@ -2676,16 +2673,6 @@ def _save_note_voice(note_id, user_id, files, transcribe=False):
         if ext not in NOTE_VOICE_EXT:
             skipped += 1
             continue
-
-        if transcribe and transcript is None and ai.available():
-            try:
-                audio_bytes = file.read()
-                file.seek(0)
-                text, _err = ai.transcribe_audio(audio_bytes, file.mimetype)
-                if text:
-                    transcript = text
-            except Exception:
-                logger.exception("Transcription failed for voice note upload")
 
         filename = f"{uuid.uuid4().hex}.{ext}"
         if config.USE_B2:
@@ -2704,7 +2691,7 @@ def _save_note_voice(note_id, user_id, files, transcribe=False):
                 (note_id, user_id, filename, db.now()),
             )
         saved += 1
-    return saved, skipped, transcript
+    return saved, skipped
 
 
 @app.route("/notes", methods=["POST"])
@@ -2735,21 +2722,13 @@ def add_note():
 
         images = [f for f in request.files.getlist("images") if f and f.filename]
         voice_clips = [f for f in request.files.getlist("voice") if f and f.filename]
-        want_transcribe = request.form.get("transcribe") == "1"
 
         skipped_photos = 0
         skipped_voice = 0
         if images:
             _saved, skipped_photos = _save_note_images(note_id, user_id, images)
         if voice_clips:
-            _saved, skipped_voice, transcript = _save_note_voice(note_id, user_id, voice_clips, transcribe=want_transcribe)
-            if transcript:
-                new_body = f"{body}\n\n{transcript}".strip() if body else transcript
-                with db.get_conn() as conn:
-                    conn.execute(
-                        "UPDATE notes SET body=?, updated_at=? WHERE id=?",
-                        (new_body, db.now(), note_id),
-                    )
+            _saved, skipped_voice = _save_note_voice(note_id, user_id, voice_clips)
 
         skip_notes = []
         if skipped_photos:
@@ -2795,15 +2774,7 @@ def edit_note(note_id):
     if existing:
         voice_clips = [f for f in request.files.getlist("voice") if f and f.filename]
         if voice_clips:
-            want_transcribe = request.form.get("transcribe") == "1"
-            _saved, skipped, transcript = _save_note_voice(note_id, g.user_id, voice_clips, transcribe=want_transcribe)
-            if transcript:
-                new_body = f"{body}\n\n{transcript}".strip() if body else transcript
-                with db.get_conn() as conn:
-                    conn.execute(
-                        "UPDATE notes SET body=?, updated_at=? WHERE id=? AND user_id=?",
-                        (new_body, db.now(), note_id, g.user_id),
-                    )
+            _saved, skipped = _save_note_voice(note_id, g.user_id, voice_clips)
             if skipped:
                 flash(f"Note updated (skipped {skipped} unsupported audio clip{'s' if skipped != 1 else ''}).")
             else:
@@ -2873,7 +2844,7 @@ def delete_note_image(image_id):
 def add_note_voice(note_id):
     with db.get_conn() as conn:
         owned = conn.execute(
-            "SELECT body FROM notes WHERE id = ? AND user_id = ?", (note_id, g.user_id)
+            "SELECT 1 FROM notes WHERE id = ? AND user_id = ?", (note_id, g.user_id)
         ).fetchone()
     if not owned:
         return redirect(url_for("notes"))
@@ -2883,16 +2854,7 @@ def add_note_voice(note_id):
         flash("Record or choose an audio clip to add.")
         return redirect(url_for("notes"))
 
-    want_transcribe = request.form.get("transcribe") == "1"
-    saved, skipped, transcript = _save_note_voice(note_id, g.user_id, clips, transcribe=want_transcribe)
-    if transcript:
-        existing_body = owned["body"] or ""
-        new_body = f"{existing_body}\n\n{transcript}".strip() if existing_body else transcript
-        with db.get_conn() as conn:
-            conn.execute(
-                "UPDATE notes SET body=?, updated_at=? WHERE id=? AND user_id=?",
-                (new_body, db.now(), note_id, g.user_id),
-            )
+    saved, skipped = _save_note_voice(note_id, g.user_id, clips)
     if saved and skipped:
         flash(f"Added {saved} voice note{'s' if saved != 1 else ''} (skipped {skipped} unsupported).")
     elif saved:
@@ -3460,6 +3422,37 @@ def api_ai_quick_add():
 
     messages, redirect_target = _quick_add_execute(text, g.user_id)
     return jsonify(ok=True, messages=messages, redirect=redirect_target)
+
+
+@app.route("/api/notes/transcribe", methods=["POST"])
+@login_required
+def api_notes_transcribe():
+    """JSON endpoint backing the Notes page's "Transcribe to text" option.
+    Called via fetch() from templates/notes.html right after a recording
+    finishes or an audio file is attached — before the note is ever
+    saved — so the transcript can be dropped straight into the body
+    textarea instead of requiring a save/reload round-trip."""
+    if not ai.available():
+        return jsonify(ok=False, error="AI isn't configured on this server.")
+
+    file = request.files.get("audio")
+    if not file or not file.filename:
+        return jsonify(ok=False, error="No audio clip provided.")
+
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if ext not in NOTE_VOICE_EXT:
+        return jsonify(ok=False, error="Unsupported audio format.")
+
+    try:
+        audio_bytes = file.read()
+    except Exception:
+        logger.exception("Failed to read uploaded audio for transcription")
+        return jsonify(ok=False, error="Couldn't read the audio clip.")
+
+    text, err = ai.transcribe_audio(audio_bytes, file.mimetype)
+    if err:
+        return jsonify(ok=False, error=err)
+    return jsonify(ok=True, text=text)
 
 
 # ── Settings ─────────────────────────────────────────────────────────────

@@ -1875,6 +1875,12 @@ body.vault-blur-off .doc-thumb-wrap::after { content: none; }
   margin: 0;
   accent-color: var(--violet);
 }
+.voice-transcribe-status {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
 .voice-preview {
   display: none;
   align-items: center;
