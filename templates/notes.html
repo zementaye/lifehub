@@ -7,9 +7,22 @@
   <h3>New Note</h3>
   <form method="post" action="{{ url_for('add_note') }}" enctype="multipart/form-data" class="inline-form">
     <label>Title <input type="text" name="title" placeholder="e.g. Wifi password, packing list" required></label>
-    <label style="flex:1 1 100%;">Note
-      <textarea name="body" rows="3" style="width:100%; resize:vertical;"></textarea>
-    </label>
+    <div data-voice-recorder style="flex:1 1 100%; display:flex; flex-direction:column; gap:4px;">
+      <label>Note
+        <div class="note-textarea-wrap">
+          <textarea name="body" rows="3" style="width:100%; resize:vertical;"></textarea>
+          <button type="button" class="voice-mic-btn voice-record-btn" title="Record a voice note">🎙️</button>
+          <span class="voice-record-timer"></span>
+        </div>
+      </label>
+      <input type="file" name="voice" accept="audio/*" id="new-note-voice" class="voice-input" style="display:none;">
+      <label for="new-note-voice" class="voice-upload-label">or attach an existing audio file</label>
+      <div class="voice-preview">
+        <audio controls></audio>
+        <button type="button" class="voice-discard-btn" title="Discard">✕</button>
+      </div>
+      <p class="voice-error"></p>
+    </div>
     <div class="inline-form-field" style="flex:1 1 100%;">Photos <span class="muted" style="text-transform:none;">(optional)</span>
       <div class="photo-picker" data-photo-picker>
         <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/heic" multiple id="new-note-photos" class="photo-picker-input">
@@ -107,13 +120,25 @@
       <div class="note-card-actions">
         <button type="button" class="secondary note-edit-toggle">Edit</button>
         <button type="button" class="secondary note-photo-toggle">Add photo</button>
-        <button type="button" class="secondary note-voice-toggle">Add voice</button>
       </div>
-      <form method="post" action="{{ url_for('edit_note', note_id=n.id) }}" class="inline-form note-edit-form" style="display:none; margin-top:10px;">
+      <form method="post" action="{{ url_for('edit_note', note_id=n.id) }}" enctype="multipart/form-data" class="inline-form note-edit-form" style="display:none; margin-top:10px;">
         <label style="flex:1 1 100%;">Title <input type="text" name="title" value="{{ n.title }}" required></label>
-        <label style="flex:1 1 100%;">Note
-          <textarea name="body" rows="4" style="width:100%; resize:vertical;">{{ n.body or '' }}</textarea>
-        </label>
+        <div data-voice-recorder style="flex:1 1 100%; display:flex; flex-direction:column; gap:4px;">
+          <label>Note
+            <div class="note-textarea-wrap">
+              <textarea name="body" rows="4" style="width:100%; resize:vertical;">{{ n.body or '' }}</textarea>
+              <button type="button" class="voice-mic-btn voice-record-btn" title="Record a voice note">🎙️</button>
+              <span class="voice-record-timer"></span>
+            </div>
+          </label>
+          <input type="file" name="voice" accept="audio/*" id="note-voice-{{ n.id }}" class="voice-input" style="display:none;">
+          <label for="note-voice-{{ n.id }}" class="voice-upload-label">or attach an existing audio file</label>
+          <div class="voice-preview">
+            <audio controls></audio>
+            <button type="button" class="voice-discard-btn" title="Discard">✕</button>
+          </div>
+          <p class="voice-error"></p>
+        </div>
         {% if n.linked_date %}
           <label style="flex:1 1 100%;">Repeats <span class="muted" style="text-transform:none;">(tagged {{ n.linked_date }})</span>
             <select name="recurrence">
@@ -136,24 +161,6 @@
               <span class="photo-picker-text"><strong>Click to add photos</strong><br>or drag them here</span>
             </label>
             <div class="photo-picker-list"></div>
-          </div>
-        </div>
-        <button type="submit">Upload</button>
-      </form>
-      <form method="post" action="{{ url_for('add_note_voice', note_id=n.id) }}" enctype="multipart/form-data" class="inline-form note-voice-form" style="display:none; margin-top:10px;">
-        <div class="inline-form-field" style="flex:1 1 100%;">Voice note
-          <div class="voice-recorder" data-voice-recorder>
-            <input type="file" name="voice" accept="audio/*" required id="note-voice-{{ n.id }}" class="photo-picker-input voice-input">
-            <div class="voice-recorder-controls">
-              <button type="button" class="secondary voice-record-btn">🎙️ Record</button>
-              <span class="voice-record-timer"></span>
-              <label for="note-voice-{{ n.id }}" class="voice-upload-label">or choose an audio file</label>
-            </div>
-            <div class="voice-preview">
-              <audio controls></audio>
-              <button type="button" class="voice-discard-btn" title="Discard">✕</button>
-            </div>
-            <p class="voice-error"></p>
           </div>
         </div>
         <button type="submit">Upload</button>
@@ -376,7 +383,8 @@ function initVoiceRecorder(recorder) {
     }
   }
   function setRecordingUI(isRecording) {
-    recordBtn.textContent = isRecording ? '⏹ Stop' : '🎙️ Record';
+    recordBtn.textContent = isRecording ? '⏹' : '🎙️';
+    recordBtn.title = isRecording ? 'Stop recording' : 'Record a voice note';
     recordBtn.classList.toggle('recording', isRecording);
   }
 
@@ -441,6 +449,17 @@ function initVoiceRecorder(recorder) {
       clearError();
     });
   }
+
+  // Exposed so other handlers (e.g. the note-edit Cancel button) can
+  // discard an in-progress recording/preview without duplicating this
+  // logic — form.reset() alone clears the underlying file input but,
+  // same as the photo picker, never touches the visual preview since
+  // that's only ever updated on the input's own 'change' event.
+  recorder._clearVoiceRecorder = () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+    clearPreview();
+    clearError();
+  };
 }
 document.querySelectorAll('[data-voice-recorder]').forEach(initVoiceRecorder);
 
@@ -457,13 +476,16 @@ document.querySelectorAll('[data-voice-recorder]').forEach(initVoiceRecorder);
   cancelBtn.addEventListener('click', function () {
     form.reset();
     var picker = form.querySelector('[data-photo-picker]');
-    if (!picker) return;
-    var input = picker.querySelector('.photo-picker-input');
-    var list = picker.querySelector('.photo-picker-list');
-    var drop = picker.querySelector('.photo-picker-drop');
-    if (input) input.files = new DataTransfer().files;
-    if (list) list.innerHTML = '';
-    if (drop) drop.classList.remove('has-files');
+    if (picker) {
+      var input = picker.querySelector('.photo-picker-input');
+      var list = picker.querySelector('.photo-picker-list');
+      var drop = picker.querySelector('.photo-picker-drop');
+      if (input) input.files = new DataTransfer().files;
+      if (list) list.innerHTML = '';
+      if (drop) drop.classList.remove('has-files');
+    }
+    var recorder = form.querySelector('[data-voice-recorder]');
+    if (recorder && recorder._clearVoiceRecorder) recorder._clearVoiceRecorder();
   });
 })();
 
@@ -477,11 +499,15 @@ document.querySelectorAll('.note-card').forEach(card => {
   // Cancel: editForm.reset() reverts every field to its initial HTML
   // value — which is the note's last-saved title/body/recurrence, since
   // that's what the form was rendered with — then the form collapses
-  // back to view mode, same as if Edit had never been clicked.
+  // back to view mode, same as if Edit had never been clicked. Also
+  // discards any in-progress recording/preview, same reasoning as the
+  // New Note cancel handler above (form.reset() alone won't touch it).
   const editCancel = card.querySelector('.note-edit-cancel');
   if (editCancel) {
     editCancel.addEventListener('click', () => {
       editForm.reset();
+      const recorder = editForm.querySelector('[data-voice-recorder]');
+      if (recorder && recorder._clearVoiceRecorder) recorder._clearVoiceRecorder();
       editForm.style.display = 'none';
     });
   }
@@ -491,14 +517,6 @@ document.querySelectorAll('.note-card').forEach(card => {
   if (photoToggle && photoForm) {
     photoToggle.addEventListener('click', () => {
       photoForm.style.display = photoForm.style.display === 'none' ? 'flex' : 'none';
-    });
-  }
-
-  const voiceToggle = card.querySelector('.note-voice-toggle');
-  const voiceForm = card.querySelector('.note-voice-form');
-  if (voiceToggle && voiceForm) {
-    voiceToggle.addEventListener('click', () => {
-      voiceForm.style.display = voiceForm.style.display === 'none' ? 'flex' : 'none';
     });
   }
 });

@@ -1788,19 +1788,29 @@ body.vault-blur-off .doc-thumb-wrap::after { content: none; }
   color: #fff;
 }
 
-/* Voice note recorder widget — a record/stop button (mic, in-browser via
-   MediaRecorder) alongside a plain file-upload fallback, feeding the same
+/* Voice note recorder — a mic icon sitting inside the corner of the Note
+   textarea itself (record in-browser via MediaRecorder; click again to
+   stop), plus a plain file-upload fallback underneath, feeding the same
    hidden file input either way so both paths submit through one ordinary
-   multipart form, same as the photo picker above. */
-.voice-recorder { margin-top: 6px; }
-.voice-recorder-controls {
+   multipart form alongside the rest of the note. */
+.note-textarea-wrap { position: relative; }
+.note-textarea-wrap textarea { padding-right: 44px; }
+.voice-mic-btn {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 30px;
+  height: 30px;
+  min-width: 0;
+  padding: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.95rem;
+  line-height: 1;
 }
-.voice-record-btn { display: inline-flex; align-items: center; gap: 6px; }
-.voice-record-btn.recording {
+.voice-mic-btn.recording {
   background: var(--danger);
   border-color: var(--danger);
   color: #fff;
@@ -1811,13 +1821,20 @@ body.vault-blur-off .doc-thumb-wrap::after { content: none; }
   50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--danger) 0%, transparent); }
 }
 .voice-record-timer {
+  position: absolute;
+  right: 44px;
+  bottom: 12px;
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--muted);
-  min-width: 38px;
+  background: var(--surface);
+  padding: 1px 4px;
+  border-radius: 4px;
 }
 .voice-upload-label {
-  font-size: 0.78rem;
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.76rem;
   color: var(--violet);
   cursor: pointer;
   text-decoration: underline;
@@ -1829,7 +1846,7 @@ body.vault-blur-off .doc-thumb-wrap::after { content: none; }
   display: none;
   align-items: center;
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 8px;
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 10px;

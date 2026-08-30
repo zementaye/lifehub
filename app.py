@@ -2718,12 +2718,22 @@ def add_note():
             note_id = cur.lastrowid
 
         images = [f for f in request.files.getlist("images") if f and f.filename]
+        voice_clips = [f for f in request.files.getlist("voice") if f and f.filename]
+
+        skipped_photos = 0
+        skipped_voice = 0
         if images:
-            _saved, skipped = _save_note_images(note_id, user_id, images)
-            if skipped:
-                flash(f"Note added: {title} (skipped {skipped} unsupported photo{'s' if skipped != 1 else ''})")
-            else:
-                flash(f"Note added: {title}")
+            _saved, skipped_photos = _save_note_images(note_id, user_id, images)
+        if voice_clips:
+            _saved, skipped_voice = _save_note_voice(note_id, user_id, voice_clips)
+
+        skip_notes = []
+        if skipped_photos:
+            skip_notes.append(f"{skipped_photos} unsupported photo{'s' if skipped_photos != 1 else ''}")
+        if skipped_voice:
+            skip_notes.append(f"{skipped_voice} unsupported audio clip{'s' if skipped_voice != 1 else ''}")
+        if skip_notes:
+            flash(f"Note added: {title} (skipped {', '.join(skip_notes)})")
         else:
             flash(f"Note added: {title}")
     # Sent from the notes page itself, or quick-added from a calendar day —
@@ -2754,7 +2764,22 @@ def edit_note(note_id):
                 "UPDATE notes SET title=?, body=?, updated_at=? WHERE id=? AND user_id=?",
                 (title, body, db.now(), note_id, g.user_id),
             )
-    flash("Note updated.")
+
+    # existing is only truthy if a note with this id actually belongs to
+    # this user (the SELECT above is already scoped by user_id) — reused
+    # here as the ownership check before saving anything against note_id.
+    if existing:
+        voice_clips = [f for f in request.files.getlist("voice") if f and f.filename]
+        if voice_clips:
+            _saved, skipped = _save_note_voice(note_id, g.user_id, voice_clips)
+            if skipped:
+                flash(f"Note updated (skipped {skipped} unsupported audio clip{'s' if skipped != 1 else ''}).")
+            else:
+                flash("Note updated.")
+        else:
+            flash("Note updated.")
+    else:
+        flash("Note updated.")
     return redirect(url_for("notes"))
 
 
