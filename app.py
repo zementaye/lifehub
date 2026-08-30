@@ -865,7 +865,7 @@ def security_headers(resp):
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"  # legacy fallback for browsers that ignore frame-ancestors
     resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    resp.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    resp.headers["Permissions-Policy"] = "geolocation=(), microphone=(self), camera=()"
     resp.headers["Content-Security-Policy"] = _build_csp(g.get("csp_nonce", ""))
     # Authenticated HTML pages must never be served from the browser's
     # back/forward cache or disk cache. Without this, hitting Back after

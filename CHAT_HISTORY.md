@@ -264,3 +264,23 @@ icons (`currentColor`, swapped via `display` toggle in
 global button shine-sweep (`::before`) suppressed. Recording state
 still switches it to `--danger` red with the existing pulse
 animation. Changed files: `templates/notes.html`, `static/style.css`.
+
+## 2026-08-30 (follow-up)
+
+**Fixed the actual cause of "Microphone access was blocked or unavailable"
+on Notes.** Debugged with HP: Chrome's per-site mic setting was "Ask
+(default)", Windows privacy settings and the desktop-apps mic toggle were
+all on, and the built-in mic was detected and working in Windows Sound
+settings — so no OS/browser-level block. The real cause turned out to be
+`app.py`'s blanket `security_headers` after_request hook, which set
+`Permissions-Policy: geolocation=(), microphone=(), camera=()` on every
+response — the empty `()` for microphone disables it for the document
+entirely, so Chrome never even shows a permission prompt (confirmed via
+a `[Violation] Permissions policy violation: microphone is not allowed in
+this document` console error). Changed `microphone=()` to
+`microphone=(self)` so same-origin pages (like the Notes recorder) can
+request it, while geolocation and camera stay fully locked down. Also
+added a `console.error` in the voice-recorder's `.catch()` in
+`templates/notes.html` (it previously swallowed the real error name),
+which is what surfaced the Permissions-Policy violation in the first
+place.
