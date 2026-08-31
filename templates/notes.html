@@ -412,26 +412,48 @@ function initVoiceRecorder(recorder) {
       method: 'POST',
       headers: { 'X-CSRFToken': window.LIFEHUB_CSRF_TOKEN || '' },
       body: formData,
-    }).then(r => r.json()).then(data => {
-      if (file !== transcribedFile) return; // superseded by a newer clip
-      if (!data.ok) {
-        transcribedFile = null; // allow retrying (e.g. re-check the box)
-        setTranscribeStatus(data.error || 'Transcription failed.');
-        return;
-      }
-      if (!data.text) {
-        setTranscribeStatus('No speech detected.');
-        return;
-      }
-      bodyTextarea.value = bodyTextarea.value.trim()
-        ? bodyTextarea.value.trim() + '\n\n' + data.text
-        : data.text;
-      setTranscribeStatus('Transcribed ✓');
-    }).catch(() => {
-      if (file !== transcribedFile) return;
-      transcribedFile = null;
-      setTranscribeStatus('Transcription failed — check your connection.');
-    });
+    }).then(r => r.text().then(bodyText => ({ status: r.status, ok: r.ok, bodyText })))
+      .then(({ status, ok, bodyText }) => {
+        if (file !== transcribedFile) return; // superseded by a newer clip
+        let data;
+        try {
+          data = JSON.parse(bodyText);
+        } catch (parseErr) {
+          // Server sent back something that isn't JSON at all — an HTML
+          // error/redirect page (session expiry, a proxy timeout page,
+          // an unhandled 500), not a real transcription failure. Log the
+          // raw response so the actual cause shows up in DevTools instead
+          // of getting swallowed into a generic message.
+          console.error('Transcribe: non-JSON response, status', status, bodyText.slice(0, 500));
+          transcribedFile = null;
+          if (status === 401 || status === 403) {
+            setTranscribeStatus('Session expired — reload the page and try again.');
+          } else if (status === 502 || status === 503 || status === 504) {
+            setTranscribeStatus('Server took too long — try a shorter clip.');
+          } else {
+            setTranscribeStatus('Unexpected server response (status ' + status + ') — try again.');
+          }
+          return;
+        }
+        if (!data.ok) {
+          transcribedFile = null; // allow retrying (e.g. re-check the box)
+          setTranscribeStatus(data.error || 'Transcription failed.');
+          return;
+        }
+        if (!data.text) {
+          setTranscribeStatus('No speech detected.');
+          return;
+        }
+        bodyTextarea.value = bodyTextarea.value.trim()
+          ? bodyTextarea.value.trim() + '\n\n' + data.text
+          : data.text;
+        setTranscribeStatus('Transcribed ✓');
+      }).catch((err) => {
+        console.error('Transcribe request error (actual network failure):', err);
+        if (file !== transcribedFile) return;
+        transcribedFile = null;
+        setTranscribeStatus('Transcription failed — check your connection.');
+      });
   }
   function extensionFor(mimeType) {
     if (!mimeType) return 'webm';

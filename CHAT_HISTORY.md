@@ -389,3 +389,21 @@ transcription is now a choice made only at record time, per HP's request
 about "the audio button" specifically. Removed the old
 `.voice-transcribe-label` checkbox styling from `style.css`; added
 `.voice-record-menu` / `.voice-record-menu-item` in its place.
+
+## 2026-08-31 (transcription "check your connection" debugging)
+
+**Improved error handling to diagnose a false "Transcription failed —
+check your connection" message.** HP got this on a good connection, which
+meant the real failure was in the `.then(r => r.json())` step, not
+`fetch()` itself — any non-JSON response (an HTML redirect page from the
+CSRFError handler on session expiry, a Render/proxy 502/504 timeout page,
+an unhandled 500's default HTML page) throws inside `r.json()` and was
+landing in the generic `.catch()`, mislabeling it as a connection issue.
+`maybeTranscribe` in `templates/notes.html` now reads the response as text
+first, tries to JSON-parse it, and on failure logs the raw response body
+and status to the console and shows a status-specific message (401/403 →
+session expired, 502/503/504 → server timeout, other → "unexpected server
+response"). A genuine fetch()-level failure (actual network error) now
+also gets console-logged before falling back to the "check your
+connection" message, so that message is only shown when it's actually
+true.
