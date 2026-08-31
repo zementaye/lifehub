@@ -15,16 +15,19 @@
             <svg class="voice-mic-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
             <svg class="voice-stop-icon" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" style="display:none;"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
           </button>
+          {% if ai_available %}
+            <div class="voice-record-menu">
+              <button type="button" class="voice-record-menu-item" data-mode="record">🎙️ Record</button>
+              <button type="button" class="voice-record-menu-item" data-mode="transcribe">📝 Record &amp; Transcribe</button>
+            </div>
+          {% endif %}
           <span class="voice-record-timer"></span>
         </div>
       </label>
       <input type="file" name="voice" accept="audio/*" id="new-note-voice" class="voice-input" style="display:none;">
       <label for="new-note-voice" class="voice-upload-label">or attach an existing audio file</label>
       {% if ai_available %}
-        <div style="display:flex; align-items:center; gap:8px;">
-          <label class="voice-transcribe-label"><input type="checkbox" class="voice-transcribe-toggle"> Transcribe to text</label>
-          <span class="voice-transcribe-status"></span>
-        </div>
+        <span class="voice-transcribe-status"></span>
       {% endif %}
       <div class="voice-preview">
         <audio controls></audio>
@@ -140,16 +143,19 @@
                 <svg class="voice-mic-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                 <svg class="voice-stop-icon" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" style="display:none;"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
               </button>
+              {% if ai_available %}
+                <div class="voice-record-menu">
+                  <button type="button" class="voice-record-menu-item" data-mode="record">🎙️ Record</button>
+                  <button type="button" class="voice-record-menu-item" data-mode="transcribe">📝 Record &amp; Transcribe</button>
+                </div>
+              {% endif %}
               <span class="voice-record-timer"></span>
             </div>
           </label>
           <input type="file" name="voice" accept="audio/*" id="note-voice-{{ n.id }}" class="voice-input" style="display:none;">
           <label for="note-voice-{{ n.id }}" class="voice-upload-label">or attach an existing audio file</label>
           {% if ai_available %}
-            <div style="display:flex; align-items:center; gap:8px;">
-              <label class="voice-transcribe-label"><input type="checkbox" class="voice-transcribe-toggle"> Transcribe to text</label>
-              <span class="voice-transcribe-status"></span>
-            </div>
+            <span class="voice-transcribe-status"></span>
           {% endif %}
           <div class="voice-preview">
             <audio controls></audio>
@@ -340,7 +346,7 @@ function initVoiceRecorder(recorder) {
   const discardBtn = recorder.querySelector('.voice-discard-btn');
   const errorEl = recorder.querySelector('.voice-error');
   const bodyTextarea = recorder.querySelector('textarea[name="body"]');
-  const transcribeCheckbox = recorder.querySelector('.voice-transcribe-toggle');
+  const recordMenu = recorder.querySelector('.voice-record-menu');
   const transcribeStatusEl = recorder.querySelector('.voice-transcribe-status');
   if (!input || !recordBtn || !previewWrap || !previewAudio) return;
 
@@ -391,12 +397,12 @@ function initVoiceRecorder(recorder) {
   function setTranscribeStatus(msg) {
     if (transcribeStatusEl) transcribeStatusEl.textContent = msg;
   }
-  // Fires right after a clip is recorded or attached — no note-save
-  // needed to see the transcript. Runs client-side via fetch() so it can
-  // drop straight into the body textarea instead of waiting on a
-  // save/reload round-trip (see /api/notes/transcribe in app.py).
+  // Called only when "Record & Transcribe" was chosen from the record
+  // button's menu — no note-save needed to see the transcript. Runs
+  // client-side via fetch() so it can drop straight into the body
+  // textarea instead of waiting on a save/reload round-trip (see
+  // /api/notes/transcribe in app.py).
   function maybeTranscribe(file) {
-    if (!transcribeCheckbox || !transcribeCheckbox.checked) return;
     if (!bodyTextarea || !file || file === transcribedFile) return;
     transcribedFile = file;
     setTranscribeStatus('Transcribing…');
@@ -454,12 +460,43 @@ function initVoiceRecorder(recorder) {
     recordBtn.classList.toggle('recording', isRecording);
   }
 
-  recordBtn.addEventListener('click', () => {
+  recordBtn.addEventListener('click', (e) => {
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
       return;
     }
     clearError();
+    if (recordMenu) {
+      e.stopPropagation();
+      closeAllRecordMenus(recordMenu);
+      recordMenu.classList.toggle('open');
+      return;
+    }
+    startRecording(false);
+  });
+
+  if (recordMenu) {
+    recordMenu.querySelectorAll('.voice-record-menu-item').forEach(item => {
+      item.addEventListener('click', () => {
+        recordMenu.classList.remove('open');
+        startRecording(item.dataset.mode === 'transcribe');
+      });
+    });
+    // Click-away closes the menu without starting anything.
+    document.addEventListener('click', (e) => {
+      if (recordMenu.classList.contains('open') && !recordMenu.contains(e.target) && e.target !== recordBtn) {
+        recordMenu.classList.remove('open');
+      }
+    });
+  }
+
+  function closeAllRecordMenus(exceptMenu) {
+    document.querySelectorAll('.voice-record-menu.open').forEach(m => {
+      if (m !== exceptMenu) m.classList.remove('open');
+    });
+  }
+
+  function startRecording(wantTranscribe) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       showError('Your browser doesn\'t support in-browser recording — choose an audio file instead.');
       return;
@@ -483,7 +520,7 @@ function initVoiceRecorder(recorder) {
         dt.items.add(file);
         input.files = dt.files;
         showPreviewFile(file);
-        maybeTranscribe(file);
+        if (wantTranscribe) maybeTranscribe(file);
       });
       mediaRecorder.start();
       setRecordingUI(true);
@@ -500,28 +537,19 @@ function initVoiceRecorder(recorder) {
       console.error('getUserMedia failed:', err && err.name, err && err.message, err);
       showError('Microphone access was blocked or unavailable — choose an audio file instead.');
     });
-  });
+  }
 
   // Manual file upload fallback: the input already has the right File in
   // input.files once 'change' fires, so this just updates the preview —
   // unlike the recorded path above, nothing needs reassigning here.
+  // (No transcribe option here — that choice is made up front via the
+  // record button's menu; attached files are just attached.)
   input.addEventListener('change', () => {
     clearError();
     if (input.files && input.files[0]) {
       showPreviewFile(input.files[0]);
-      maybeTranscribe(input.files[0]);
     }
   });
-
-  if (transcribeCheckbox) {
-    // Covers the case where the box gets checked after a clip is already
-    // attached (e.g. record first, then decide to transcribe).
-    transcribeCheckbox.addEventListener('change', () => {
-      if (transcribeCheckbox.checked && input.files && input.files[0]) {
-        maybeTranscribe(input.files[0]);
-      }
-    });
-  }
 
   if (discardBtn) {
     discardBtn.addEventListener('click', () => {

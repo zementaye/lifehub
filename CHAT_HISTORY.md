@@ -365,3 +365,27 @@ full save + page reload. Replaced the save-time (server-side, on `POST
   message. Discarding the clip (or the note-edit Cancel button, via the
   existing `_clearVoiceRecorder` hook) resets the status and lets the
   same clip be retried if it's re-attached.
+
+## 2026-08-30 (record button dropdown)
+
+**Replaced the "Transcribe to text" checkbox with a dropdown on the mic
+button itself.** HP wanted the choice made right at the record button
+instead of a separate row. Clicking the mic button (when not already
+recording, and only when `ai_available`) now opens a small menu
+(`.voice-record-menu`, absolutely positioned above the button within
+`.note-textarea-wrap`, so it visually pops open right from the button) with
+two choices: "🎙️ Record" and "📝 Record & Transcribe". Picking either
+starts the actual recording via a new `startRecording(wantTranscribe)`
+(refactored out of the old inline click handler); the transcription call
+(`maybeTranscribe`) only fires afterward if "Record & Transcribe" was
+picked. Clicking outside the menu closes it without starting anything.
+Without `GEMINI_API_KEY` configured, `ai_available` is false, the menu
+markup isn't rendered at all, and the mic button goes straight back to
+recording immediately on click — same as before transcription existed.
+
+Scope note: the "attach an existing audio file" flow no longer has a
+transcribe option (it did briefly, gated by the now-removed checkbox) —
+transcription is now a choice made only at record time, per HP's request
+about "the audio button" specifically. Removed the old
+`.voice-transcribe-label` checkbox styling from `style.css`; added
+`.voice-record-menu` / `.voice-record-menu-item` in its place.

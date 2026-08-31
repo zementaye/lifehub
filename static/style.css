@@ -1860,26 +1860,52 @@ body.vault-blur-off .doc-thumb-wrap::after { content: none; }
   border: none;
   padding: 0;
 }
-.voice-transcribe-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 6px;
-  font-size: 0.76rem;
-  color: var(--muted);
-  text-transform: none;
-  letter-spacing: normal;
-  cursor: pointer;
-}
-.voice-transcribe-label input[type="checkbox"] {
-  margin: 0;
-  accent-color: var(--violet);
-}
 .voice-transcribe-status {
   display: inline-block;
-  margin-left: 8px;
+  margin-top: 4px;
   font-size: 0.76rem;
   color: var(--muted);
+}
+.voice-record-menu {
+  position: absolute;
+  right: 8px;
+  bottom: 44px;
+  display: none;
+  flex-direction: column;
+  min-width: 190px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  z-index: 20;
+}
+.voice-record-menu.open { display: flex; }
+.voice-record-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: none;
+}
+.voice-record-menu-item::before { display: none; }
+.voice-record-menu-item:hover {
+  background: color-mix(in srgb, var(--violet) 14%, var(--surface));
+  transform: none;
+  box-shadow: none;
+}
+.voice-record-menu-item + .voice-record-menu-item {
+  border-top: 1px solid var(--border);
 }
 .voice-preview {
   display: none;
