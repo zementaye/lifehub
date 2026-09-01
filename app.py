@@ -307,10 +307,13 @@ def inject_user():
 
 @app.context_processor
 def inject_ai_available():
-    """Makes {{ ai_available }} available in every template, so base.html
-    can decide whether to render the floating AI chat popup without every
-    route needing to pass it explicitly."""
-    return {"ai_available": ai.available()}
+    """Makes {{ ai_available }} and {{ transcription_available }} available
+    in every template, so base.html/notes.html can decide what to render
+    without every route needing to pass it explicitly. These are two
+    separate flags on purpose — chat/quick-add (ai_available, Gemini) and
+    voice transcription (transcription_available, Groq) are independent
+    providers; see ai.py's file docstring for why."""
+    return {"ai_available": ai.available(), "transcription_available": ai.transcription_available()}
 
 
 @app.context_processor
@@ -3452,8 +3455,8 @@ def api_notes_transcribe():
     finishes or an audio file is attached — before the note is ever
     saved — so the transcript can be dropped straight into the body
     textarea instead of requiring a save/reload round-trip."""
-    if not ai.available():
-        return jsonify(ok=False, error="AI isn't configured on this server.")
+    if not ai.transcription_available():
+        return jsonify(ok=False, error="Transcription isn't configured on this server.")
 
     file = request.files.get("audio")
     if not file or not file.filename:
@@ -3469,7 +3472,7 @@ def api_notes_transcribe():
         logger.exception("Failed to read uploaded audio for transcription")
         return jsonify(ok=False, error="Couldn't read the audio clip.")
 
-    text, err = ai.transcribe_audio(audio_bytes, file.mimetype)
+    text, err = ai.transcribe_audio(audio_bytes, file.mimetype, file.filename)
     if err:
         return jsonify(ok=False, error=err)
     return jsonify(ok=True, text=text)

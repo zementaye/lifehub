@@ -15,7 +15,7 @@
             <svg class="voice-mic-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
             <svg class="voice-stop-icon" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" style="display:none;"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
           </button>
-          {% if ai_available %}
+          {% if transcription_available %}
             <div class="voice-record-menu">
               <button type="button" class="voice-record-menu-item" data-mode="record">🎙️ Record</button>
               <button type="button" class="voice-record-menu-item" data-mode="transcribe">📝 Record &amp; Transcribe</button>
@@ -26,7 +26,7 @@
       </label>
       <input type="file" name="voice" accept="audio/*" id="new-note-voice" class="voice-input" style="display:none;">
       <label for="new-note-voice" class="voice-upload-label">or attach an existing audio file</label>
-      {% if ai_available %}
+      {% if transcription_available %}
         <span class="voice-transcribe-status"></span>
       {% endif %}
       <div class="voice-preview">
@@ -143,7 +143,7 @@
                 <svg class="voice-mic-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                 <svg class="voice-stop-icon" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" style="display:none;"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
               </button>
-              {% if ai_available %}
+              {% if transcription_available %}
                 <div class="voice-record-menu">
                   <button type="button" class="voice-record-menu-item" data-mode="record">🎙️ Record</button>
                   <button type="button" class="voice-record-menu-item" data-mode="transcribe">📝 Record &amp; Transcribe</button>
@@ -154,7 +154,7 @@
           </label>
           <input type="file" name="voice" accept="audio/*" id="note-voice-{{ n.id }}" class="voice-input" style="display:none;">
           <label for="note-voice-{{ n.id }}" class="voice-upload-label">or attach an existing audio file</label>
-          {% if ai_available %}
+          {% if transcription_available %}
             <span class="voice-transcribe-status"></span>
           {% endif %}
           <div class="voice-preview">

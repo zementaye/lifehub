@@ -1,11 +1,18 @@
 """AI features: a chat assistant over the user's own data, natural-language
 quick-add (turn a typed sentence into a transaction/food-log/reminder/todo),
-and auto-categorization of transactions.
+auto-categorization of transactions, and voice note transcription.
 
-Built on Google's Gemini API — picked over Anthropic/OpenAI for having an
-actually-free tier (no credit card, no expiring trial credit) that's
-generous enough for a single small personal app. See config.py for
-GEMINI_API_KEY / GEMINI_MODEL.
+Two separate providers, on purpose:
+- Chat/quick-add/auto-categorize run on Google's Gemini API — picked over
+  Anthropic/OpenAI for having an actually-free tier (no credit card, no
+  expiring trial credit) that's generous enough for a single small personal
+  app. See config.py for GEMINI_API_KEY / GEMINI_MODEL.
+- Voice note transcription runs on Groq's hosted Whisper API instead (see
+  config.py for GROQ_API_KEY / GROQ_STT_MODEL) — Gemini's shared free-tier
+  LLM capacity proved too unreliable for that one feature specifically
+  (repeated "high demand" 503s; see CHAT_HISTORY.md, 2026-09-01), while
+  Whisper on Groq is a dedicated speech-to-text model on infrastructure
+  built for exactly that job, not a general-purpose chat model.
 
 Every public function here is best-effort and never raises: a missing key,
 a network hiccup, a rate limit, or a malformed model response all come back
@@ -15,9 +22,9 @@ food, setting a reminder etc. all still work by hand exactly as before
 regardless of whether any of this is configured or currently reachable.
 """
 
-import base64
 import json
 import logging
+import time
 
 import requests
 
@@ -26,6 +33,18 @@ import config
 logger = logging.getLogger(__name__)
 
 GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+GROQ_TRANSCRIBE_API = "https://api.groq.com/openai/v1/audio/transcriptions"
+
+# A 503 from Gemini ("model is currently experiencing high demand...") is
+# Google's own transient-overload signal, distinct from the 429 rate-limit
+# case below — worth one quick automatic retry before bothering the person
+# with it, since Google's own copy says these spikes are usually short-lived.
+# Kept small (one retry, short sleep) so a transcription call — already
+# using the longest timeout in this module — has no realistic way to run
+# past the gunicorn worker timeout (see Procfile) and reintroduce the raw,
+# non-JSON 500 that a worker getting killed mid-request would cause.
+_OVERLOAD_RETRIES = 1
+_OVERLOAD_RETRY_DELAY_SECONDS = 2
 
 
 def available() -> bool:
@@ -43,11 +62,20 @@ def _generate(payload: dict, want_json: bool = False, timeout: int = 20):
         return None, "AI isn't configured on this server."
 
     url = GEMINI_API.format(model=config.GEMINI_MODEL)
-    try:
-        resp = requests.post(url, params={"key": config.GEMINI_API_KEY}, json=payload, timeout=timeout)
-    except requests.RequestException as e:
-        logger.warning("Gemini request failed: %s", e)
-        return None, "Couldn't reach the AI service — try again in a moment."
+    attempt = 0
+    while True:
+        try:
+            resp = requests.post(url, params={"key": config.GEMINI_API_KEY}, json=payload, timeout=timeout)
+        except requests.RequestException as e:
+            logger.warning("Gemini request failed: %s", e)
+            return None, "Couldn't reach the AI service — try again in a moment."
+
+        if resp.status_code == 503 and attempt < _OVERLOAD_RETRIES:
+            attempt += 1
+            logger.info("Gemini overloaded (503) — retrying (attempt %d)", attempt + 1)
+            time.sleep(_OVERLOAD_RETRY_DELAY_SECONDS)
+            continue
+        break
 
     if resp.status_code == 429:
         return None, "AI is rate-limited right now (free tier) — try again shortly."
@@ -118,46 +146,64 @@ def _call(system_prompt: str, user_prompt: str, want_json: bool = False, tempera
     return _generate(payload, want_json=want_json)
 
 
-# ── Voice note transcription ─────────────────────────────────────────────
-# Used by the Notes page's "transcribe to text" option (see
-# _save_note_voice in app.py) — Gemini accepts short audio clips as inline
-# base64 data the same way it accepts text, so no separate speech-to-text
-# service is needed. Same best-effort contract as everything else here.
+# ── Voice note transcription (Groq / Whisper) ────────────────────────────
+# Used by the Notes page's "Record & Transcribe" option (see
+# api_notes_transcribe in app.py) — a separate provider from every other
+# function in this module; see the file docstring and config.py for why.
 
-def transcribe_audio(audio_bytes: bytes, mime_type: str):
-    """Transcribe a recorded voice note to plain text. mime_type should
-    match what the browser actually recorded (e.g. audio/webm, audio/mp4,
-    audio/wav) — the caller reads this straight off the uploaded file.
+def transcription_available() -> bool:
+    return bool(config.GROQ_API_KEY)
+
+
+def transcribe_audio(audio_bytes: bytes, mime_type: str, filename: str = ""):
+    """Transcribe a recorded voice note to plain text via Groq's hosted
+    Whisper API. mime_type should match what the browser actually
+    recorded (e.g. audio/webm, audio/mp4, audio/wav) — the caller reads
+    this straight off the uploaded file; filename is passed through as-is
+    for the multipart upload and falls back to a generic name if empty.
     Returns (text, None) on success — text is "" (not an error) when the
     clip has no discernible speech — or (None, reason) on failure."""
-    system = (
-        "Transcribe this audio recording exactly as spoken, in the "
-        "language it was spoken in. Reply with ONLY the transcript text — "
-        "no preamble, no speaker labels, no timestamps, no surrounding "
-        "quotation marks. If the audio has no discernible speech, reply "
-        "with exactly: (no speech detected)"
-    )
-    payload = {
-        "system_instruction": {"parts": [{"text": system}]},
-        "contents": [{
-            "role": "user",
-            "parts": [{
-                "inline_data": {
-                    "mime_type": mime_type or "audio/webm",
-                    "data": base64.b64encode(audio_bytes).decode("ascii"),
-                }
-            }],
-        }],
-        "generationConfig": {"temperature": 0.0},
+    if not config.GROQ_API_KEY:
+        return None, "Transcription isn't configured on this server."
+
+    files = {
+        "file": (filename or "voice-note", audio_bytes, mime_type or "audio/webm"),
     }
-    # Transcription can take longer than a short text prompt, especially
-    # on the free tier — give it more room than _call's default 20s.
-    text, err = _generate(payload, timeout=45)
-    if err:
-        return None, err
-    text = (text or "").strip()
-    if text.lower() == "(no speech detected)":
-        return "", None
+    data = {"model": config.GROQ_STT_MODEL, "response_format": "text"}
+    headers = {"Authorization": f"Bearer {config.GROQ_API_KEY}"}
+    try:
+        # Whisper on Groq runs at roughly 10-20x real-time even for the
+        # largest model, so a generous-looking 30s timeout here is really
+        # just headroom for network hiccups, not for the transcription
+        # itself — nowhere near Gemini's old 45s, which existed because
+        # Gemini's shared LLM capacity could genuinely be that slow.
+        resp = requests.post(GROQ_TRANSCRIBE_API, files=files, data=data, headers=headers, timeout=30)
+    except requests.RequestException as e:
+        logger.warning("Groq request failed: %s", e)
+        return None, "Couldn't reach the transcription service — try again in a moment."
+
+    if resp.status_code == 429:
+        return None, "Transcription is rate-limited right now (free tier) — try again shortly."
+    if resp.status_code == 401 or resp.status_code == 403:
+        logger.error("Groq API rejected the configured key (HTTP %s)", resp.status_code)
+        return None, "Transcription isn't working right now — ask an admin to check the setup."
+    if resp.status_code >= 400:
+        logger.warning("Groq API error %s: %s", resp.status_code, resp.text[:300])
+        # Same reasoning as the Gemini error branch above: surface Groq's
+        # own explanation (shape: {"error": {"message": ..., "type": ...}})
+        # instead of a flat, undiagnosable message.
+        detail = None
+        try:
+            detail = resp.json().get("error", {}).get("message")
+        except ValueError:
+            pass
+        if detail:
+            return None, f"The transcription service returned an error: {detail}"
+        return None, f"The transcription service returned an error (HTTP {resp.status_code})."
+
+    # response_format=text means the body IS the transcript — no JSON
+    # envelope to unwrap, unlike every Gemini call in this module.
+    text = (resp.text or "").strip()
     return text, None
 
 

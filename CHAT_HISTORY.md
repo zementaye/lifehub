@@ -480,3 +480,40 @@ legacy tier automatically as Google rotates model versions, without
 needing to revisit this default every time a model gets deprecated.
 Only takes effect if `GEMINI_MODEL` isn't already set in Render's env
 vars (it wasn't). Changed files: `config.py`.
+
+## 2026-09-01 (transcription — swapped provider entirely, Gemini → Groq)
+
+**Even `gemini-flash-latest` hit the same "high demand" 503** —
+confirmed Gemini's free tier just isn't reliable enough for this one
+feature, model swap or not. Rather than keep chasing Gemini's capacity,
+switched voice note transcription to a different provider entirely:
+Groq's hosted Whisper API (`whisper-large-v3-turbo`), a dedicated
+speech-to-text model on its own infrastructure rather than a
+general-purpose chat model sharing capacity with everyone's other
+requests. Free tier: 2,000 requests/day, 28,800 audio-seconds/day —
+plenty for personal use. HP needs to sign up at console.groq.com for a
+free API key and add it as `GROQ_API_KEY` in Render's env vars (see
+"what HP needs to do" note below) — Claude can't create accounts or
+add env vars on Render on HP's behalf.
+
+Chat, quick-add, and auto-categorize are untouched and still run on
+Gemini — this only affects transcription. Changes:
+- `config.py`: new `GROQ_API_KEY` / `GROQ_STT_MODEL` (default
+  `whisper-large-v3-turbo`).
+- `ai.py`: `transcribe_audio()` rewritten to POST multipart form data to
+  Groq's OpenAI-compatible `/audio/transcriptions` endpoint instead of
+  base64-inlining audio into a Gemini `generateContent` call. New
+  `transcription_available()` (checks `GROQ_API_KEY`) alongside the
+  existing `available()` (checks `GEMINI_API_KEY`) — these are now two
+  independent flags. Unused `base64` import dropped.
+- `app.py`: the `inject_ai_available` context processor now also injects
+  `transcription_available`; `/api/notes/transcribe` checks
+  `ai.transcription_available()` instead of `ai.available()` and passes
+  `file.filename` through to `transcribe_audio()`.
+- `templates/notes.html`: all four `{% if ai_available %}` guards around
+  the record-menu / transcribe-status UI (both the new-note and
+  edit-note forms) changed to `{% if transcription_available %}` — these
+  were only ever gating transcription UI, never anything Gemini-related,
+  so this was a mislabeled flag being fixed, not new behavior.
+
+Changed files: `config.py`, `ai.py`, `app.py`, `templates/notes.html`.

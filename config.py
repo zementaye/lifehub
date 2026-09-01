@@ -62,6 +62,23 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 # than always running on the current model.
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 
+# ── Voice note transcription (Groq) ──────────────────────────────────────
+# A deliberately separate provider from the Gemini features above — Gemini's
+# shared free-tier LLM capacity turned out to be too unreliable for voice
+# note transcription specifically (repeated "high demand" 503s; see
+# CHAT_HISTORY.md, 2026-09-01), so that one feature now goes through Groq's
+# hosted Whisper API instead: a dedicated speech-to-text model on
+# infrastructure built for exactly this job, not a general-purpose chat
+# model juggling everyone's demand at once. Same optional pattern as
+# everything else here — unset and the "Record & Transcribe" option simply
+# doesn't show up (see transcription_available() in ai.py). Free key at
+# https://console.groq.com — free tier covers 2,000 requests/day and
+# 28,800 audio-seconds/day, far more than a personal voice-notes feature
+# will realistically use; confirm at signup whether a card is currently
+# required, since that detail can change.
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
+GROQ_STT_MODEL = os.environ.get("GROQ_STT_MODEL", "whisper-large-v3-turbo")
+
 # ── Habit nudge / reminder scheduling ───────────────────────────────────
 TIMEZONE = os.environ.get("TIMEZONE", "Africa/Addis_Ababa")
 NUDGE_HOUR = int(os.environ.get("NUDGE_HOUR", "8"))   # 24h, local TZ — daily check time
