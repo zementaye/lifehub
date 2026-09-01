@@ -6,10 +6,12 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-09-01 10:32
+Last updated: 2026-09-01 10:38
 
 ---
 
+- **2026-09-01** c05dcc3 - Surface Gemini's actual error message instead of a generic one (Zemen)
+- **2026-09-01** 12778ac - Update commit history (Zemen)
 - **2026-09-01** fb4787f - Fix transcribe 500: widen ai.py exception handling, add global JSON error handler (Zemen)
 - **2026-08-31** c51fed7 - Diagnose real cause behind generic transcription failure message (Zemen)
 - **2026-08-31** c5b0e7b - Move transcribe option into a dropdown on the record button (Zemen)
