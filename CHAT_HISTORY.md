@@ -449,3 +449,34 @@ Render logs. Changed files: `ai.py`. **Next step once redeployed:**
 try transcribing again and read the specific message shown — if it
 says the model is unavailable/retired, set `GEMINI_MODEL` in Render's
 env vars to a current model id and redeploy.
+
+## 2026-09-01 (transcription — "high demand", added retry)
+
+**The detailed error from the previous fix immediately paid off:**
+HP got back Gemini's own message, *"This model is currently
+experiencing high demand... Please try again later"* — a transient
+503 overload, not a bug, and separate from the 429 rate-limit case
+already handled. Since Google's own guidance is that these spikes are
+short-lived, added one automatic retry in `_generate()` (2 second
+delay) specifically for 503s before giving up and returning the error
+to the user. Deliberately kept to a single retry with a short delay —
+transcription already uses the module's longest timeout (45s), and
+retrying too aggressively risked running past the gunicorn worker
+timeout (Procfile: `--timeout 60`) and reintroducing the raw 500 from
+two fixes ago. Changed files: `ai.py`.
+
+## 2026-09-01 (transcription — persistent overload, switched default model)
+
+**The retry from the last fix didn't help** — HP hit the same "high
+demand" 503 again right after, meaning the free-tier `gemini-2.5-flash`
+pool is genuinely saturated, not just an occasional blip. Makes sense:
+that model is a legacy tier heading toward its Oct 16, 2026 retirement,
+and those tend to get more contended as everyone else gets migrated
+off them too. Fix: changed `config.py`'s `GEMINI_MODEL` default from
+the hardcoded `"gemini-2.5-flash"` to `"gemini-flash-latest"` — a
+Google-maintained alias that always points at their current-generation
+Flash model (currently Gemini 3.5 Flash), so it stays off the crowded
+legacy tier automatically as Google rotates model versions, without
+needing to revisit this default every time a model gets deprecated.
+Only takes effect if `GEMINI_MODEL` isn't already set in Render's env
+vars (it wasn't). Changed files: `config.py`.

@@ -49,7 +49,18 @@ USDA_API_KEY = os.environ.get("USDA_API_KEY", "DEMO_KEY")
 # Anthropic/OpenAI specifically because Gemini's free tier has no expiring
 # trial credit and is generous enough for a single small personal app.
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+# "gemini-2.5-flash" (the old default here) is a legacy model heading
+# toward its Oct 16, 2026 retirement, and free-tier legacy models get more
+# contended as everyone else gets migrated off them too — that's what was
+# behind the "high demand" 503s, not anything wrong with this app's
+# request. gemini-flash-latest is a Google-maintained alias that always
+# points at their current-generation Flash model, so it stays off the
+# crowded legacy tier automatically as Google rotates versions, without
+# needing this default revisited every time a model gets deprecated.
+# Override with a pinned version via the GEMINI_MODEL env var if stable,
+# reproducible behavior across Google's model swaps ever matters more
+# than always running on the current model.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 
 # ── Habit nudge / reminder scheduling ───────────────────────────────────
 TIMEZONE = os.environ.get("TIMEZONE", "Africa/Addis_Ababa")
