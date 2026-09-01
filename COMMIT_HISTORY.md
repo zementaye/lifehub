@@ -6,10 +6,12 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-09-01 10:58
+Last updated: 2026-09-01 11:27
 
 ---
 
+- **2026-09-01** ad6bc20 - Swap voice transcription from Gemini to Groq's Whisper API (Zemen)
+- **2026-09-01** 8de738f - Update commit history (Zemen)
 - **2026-09-01** 4c42176 - Default GEMINI_MODEL to gemini-flash-latest, off the crowded legacy tier (Zemen)
 - **2026-09-01** 754842a - Update commit history (Zemen)
 - **2026-09-01** c05dcc3 - Surface Gemini's actual error message instead of a generic one (Zemen)
