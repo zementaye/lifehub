@@ -426,3 +426,26 @@ fell through to Flask's default HTML error page — fatal for a
 but returns a clean JSON error body for anything under `/api/*`
 (HTTPExceptions like 404s still pass through unchanged). Changed files:
 `app.py`, `ai.py`.
+
+## 2026-09-01 (transcription — "AI service returned an error", vague)
+
+**Confirmed the previous fix deployed correctly** (HP now gets a real
+JSON error message instead of a raw crash — progress). The message
+itself, "The AI service returned an error," was too vague to diagnose
+further: it comes from `_generate()`'s catch-all for any Gemini HTTP
+4xx/5xx, which only logged the response body server-side instead of
+surfacing it. Checked whether `audio/webm` (what Chrome/Firefox
+`MediaRecorder` produces by default) is actually a supported Gemini
+audio MIME type — it is, per current docs, so that's ruled out. Also
+flagged that the default model, `gemini-2.5-flash`
+(`GEMINI_MODEL` env var, unset here), has an announced shutdown of
+Oct 16, 2026 with scattered reports of early failures ahead of that
+date — a plausible cause, but not confirmed, so didn't blind-swap the
+model. Instead, `_generate()` now parses Gemini's own
+`{"error": {"message": ...}}` body and includes that message directly
+in the returned error, so the next failure (wrong/retired model,
+unsupported format, etc.) is self-diagnosing in the UI without pulling
+Render logs. Changed files: `ai.py`. **Next step once redeployed:**
+try transcribing again and read the specific message shown — if it
+says the model is unavailable/retired, set `GEMINI_MODEL` in Render's
+env vars to a current model id and redeploy.

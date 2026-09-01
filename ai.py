@@ -56,7 +56,21 @@ def _generate(payload: dict, want_json: bool = False, timeout: int = 20):
         return None, "AI isn't working right now — ask an admin to check the setup."
     if resp.status_code >= 400:
         logger.warning("Gemini API error %s: %s", resp.status_code, resp.text[:300])
-        return None, "The AI service returned an error."
+        # Surface Gemini's own explanation (e.g. "model not found",
+        # "unsupported mime type") instead of a flat, undiagnosable
+        # message — Gemini's error responses are shaped like
+        # {"error": {"code": ..., "message": ..., "status": ...}}, and
+        # that message is exactly what's needed to tell "model was
+        # retired" apart from "bad request" apart from "quota exceeded"
+        # without having to go pull server logs each time.
+        detail = None
+        try:
+            detail = resp.json().get("error", {}).get("message")
+        except ValueError:
+            pass
+        if detail:
+            return None, f"The AI service returned an error: {detail}"
+        return None, f"The AI service returned an error (HTTP {resp.status_code})."
 
     try:
         data = resp.json()
