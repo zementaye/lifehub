@@ -6,10 +6,33 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-08-28 10:40
+Last updated: 2026-09-01 10:32
 
 ---
 
+- **2026-09-01** fb4787f - Fix transcribe 500: widen ai.py exception handling, add global JSON error handler (Zemen)
+- **2026-08-31** c51fed7 - Diagnose real cause behind generic transcription failure message (Zemen)
+- **2026-08-31** c5b0e7b - Move transcribe option into a dropdown on the record button (Zemen)
+- **2026-08-30** 27c8aad - Transcribe voice notes immediately on record/attach, not on save (Zemen)
+- **2026-08-30** 60c27b8 - Increase gunicorn timeout to 60s to fit Gemini transcription calls (Zemen)
+- **2026-08-30** 8c895dd - Add optional voice-note transcription via Gemini on Notes page (Zemen)
+- **2026-08-30** a0d66cb - Allow same-origin microphone access in Permissions-Policy header (Zemen)
+- **2026-08-30** b9fd9ca - Restyle notes voice-mic button to match violet theme, add SVG icons (Zemen)
+- **2026-08-30** 4cdc837 - Update working rules: downloads folder is now D:\Chrome_Downloads (Zemen)
+- **2026-08-30** 8926c5b - Redesign voice notes: small mic icon inside the Note textarea, on both New Note and Edit forms (Zemen)
+- **2026-08-30** 0b464fe - Fix /notes 500: notes() never built outgoing_items, which the template already referenced (Zemen)
+- **2026-08-30** b824487 - Add voice note attachments: record via mic or upload an audio file, per-note, like photo attachments (Zemen)
+- **2026-08-29** a1d6baa - Add Cancel button to note edit form, reverting to last-saved values (Zemen)
+- **2026-08-29** 7e97beb - Add Cancel button to New Note form (Zemen)
+- **2026-08-28** 39551ed - Add spin to landing flourish; apply pop/run/land treatment to all 6 hero icons (Zemen)
+- **2026-08-28** 3679b92 - Bigger legs + theatrical squash/impact-ring landing on the run-home icons (Zemen)
+- **2026-08-28** 261eba9 - Fix hopping legs (phase-shift via animation-delay), muted color, slower run (Zemen)
+- **2026-08-28** 977f602 - Money/nutrition/notes icons: pop a leg out, then run home accelerating (Zemen)
+- **2026-08-28** cd03109 - Fix legs disappearing instantly: transitionend was bubbling from child (Zemen)
+- **2026-08-28** b895c4c - Floating hero icons grow legs and run home instead of snapping back (Zemen)
+- **2026-08-28** 4c62c92 - Make floating hero module icons draggable, snapping back on release (Zemen)
+- **2026-08-28** 350d662 - Fix dashboard preview mockup stuck invisible (threshold-0 clip-path deadlock) (Zemen)
+- **2026-08-28** 4a70b28 - Update commit history (Zemen)
 - **2026-08-28** c2181c9 - Fix dashboard preview frame getting stuck invisible (duplicate IntersectionObservers race) (Zemen)
 - **2026-08-28** dc69533 - Update commit history (Zemen)
 - **2026-08-28** c47f74b - Add sticky mobile CTA bar that appears past the hero and hides near the CTA band/footer (Zemen)
