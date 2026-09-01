@@ -68,7 +68,15 @@ def _generate(payload: dict, want_json: bool = False, timeout: int = 20):
             reason = data.get("promptFeedback", {}).get("blockReason")
             return None, f"The AI declined to respond ({reason})." if reason else "The AI didn't return a response."
         text = candidates[0]["content"]["parts"][0]["text"]
-    except (KeyError, IndexError, ValueError):
+    except Exception:
+        # Deliberately broad: this module's contract (see the file
+        # docstring) is that every public function is best-effort and
+        # never raises. A narrower tuple here (KeyError/IndexError/
+        # ValueError) still lets an odd response shape — e.g. "candidates"
+        # coming back as something other than a list of dicts — raise a
+        # TypeError that escapes uncaught, past every caller, and surfaces
+        # to the browser as a raw unhandled-exception 500 instead of the
+        # JSON error response this endpoint is supposed to always return.
         logger.warning("Unexpected Gemini response shape: %s", resp.text[:300])
         return None, "Got an unexpected response from the AI service."
 

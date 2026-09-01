@@ -407,3 +407,22 @@ response"). A genuine fetch()-level failure (actual network error) now
 also gets console-logged before falling back to the "check your
 connection" message, so that message is only shown when it's actually
 true.
+
+## 2026-09-01 (transcription "status 500" — actual server-side fix)
+
+**Root-caused and fixed the "Unexpected server response (status 500)"
+that the previous session's debugging surfaced but didn't fix.** That
+message means the server returned a real HTTP 500 with an HTML body
+(not JSON), which happens when an exception escapes unhandled. Two
+gaps: `ai.py`'s `_generate()` only caught `(KeyError, IndexError,
+ValueError)` while parsing Gemini's response shape — an unexpected
+shape could raise something outside that tuple (e.g. `TypeError`) and
+escape the module entirely, breaking its own "never raises" contract.
+Widened that to `except Exception`. Separately, `app.py` had no
+catch-all error handler at all, so *any* unhandled exception anywhere
+fell through to Flask's default HTML error page — fatal for a
+`fetch()`-based JSON endpoint like `/api/notes/transcribe`. Added
+`@app.errorhandler(Exception)` that logs the real traceback server-side
+but returns a clean JSON error body for anything under `/api/*`
+(HTTPExceptions like 404s still pass through unchanged). Changed files:
+`app.py`, `ai.py`.

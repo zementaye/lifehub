@@ -20,7 +20,7 @@ from flask_wtf import CSRFProtect
 from flask_wtf.csrf import CSRFError, generate_csrf
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 from werkzeug.security import generate_password_hash
 
 import ai
@@ -136,6 +136,26 @@ def handle_csrf_error(e):
 def handle_upload_too_large(e):
     flash(f"That file is too large — the limit is {config.MAX_UPLOAD_MB} MB.")
     return redirect(request.referrer or url_for("dashboard"))
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(e):
+    # No catch-all existed before this: any unhandled exception anywhere
+    # fell through to Flask/Werkzeug's default HTML error page. For a
+    # normal page load that's a plain 500 screen, tolerable. For a JSON
+    # endpoint called via fetch() — like /api/notes/transcribe — the
+    # frontend expects to parse the body as JSON and, getting HTML
+    # instead, can only show a generic "unexpected server response"
+    # message with no real explanation. Give /api/* callers a proper JSON
+    # error body instead so failures are at least legible; let werkzeug's
+    # built-in HTTP exceptions (404s, method-not-allowed, etc.) pass
+    # through unchanged since those already carry the right status/body.
+    if isinstance(e, HTTPException):
+        return e
+    logger.exception("Unhandled exception on %s", request.path)
+    if request.path.startswith("/api/"):
+        return jsonify(ok=False, error="Something went wrong on our end — try again."), 500
+    return "Internal Server Error", 500
 
 
 # ── Auth ─────────────────────────────────────────────────────────────────
