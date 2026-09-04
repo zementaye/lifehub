@@ -417,16 +417,17 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
 
 // Note delete: two-phase animation. Hooked into the shared confirm modal
 // below — once a note delete (single card or bulk selection) is
-// confirmed, the matching card(s) first tremble/flash red ("distress",
-// while the delete is effectively in flight) and then dissolve into a
-// burst of particles ("disintegrate"). Only once both phases finish does
+// confirmed, the matching card(s) first shake with mounting intensity
+// ("distress", starting slow and speeding up, while the delete is
+// effectively in flight) and then burst apart all at once ("explode":
+// flash + particle scatter + fade). Only once the explosion finishes does
 // the already-confirmed submit actually fire, so the page's own
 // "Deleting…" loading overlay (see the submit listener further down)
 // still shows right after, same as it always has. Every other
 // data-confirm form on the site (habits, budgets, images, users, etc.)
 // isn't touched: it calls `done()` immediately, same as before this existed.
-const NOTE_DISTRESS_MS = 750;
-const NOTE_DISINTEGRATE_MS = 950;
+const NOTE_DISTRESS_MS = 700;
+const NOTE_EXPLODE_MS = 480;
 
 function getNoteDeleteCards(form) {
   if (form.classList.contains('note-delete-form')) {
@@ -441,21 +442,26 @@ function getNoteDeleteCards(form) {
   return [];
 }
 
-function spawnDisintegrateParticles(card) {
+function spawnExplosion(card) {
   const rect = card.getBoundingClientRect();
+
+  const flash = document.createElement('div');
+  flash.className = 'note-explode-flash';
+  card.appendChild(flash);
+
   const particles = document.createElement('div');
   particles.className = 'note-disintegrate-particles';
-  const count = 26;
+  const count = 30;
   for (let i = 0; i < count; i++) {
     const p = document.createElement('span');
     const angle = Math.random() * Math.PI * 2;
-    const dist = 50 + Math.random() * 110;
+    const dist = 70 + Math.random() * 160; // wider spray for an explosion vs a gradual drift
     p.style.setProperty('--px', `${Math.random() * rect.width}px`);
     p.style.setProperty('--py', `${Math.random() * rect.height}px`);
     p.style.setProperty('--size', `${3 + Math.random() * 5}px`);
     p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
-    p.style.setProperty('--dy', `${Math.sin(angle) * dist - 26}px`); // slight upward drift
-    p.style.setProperty('--pdelay', `${Math.random() * 220}ms`);
+    p.style.setProperty('--dy', `${Math.sin(angle) * dist - 22}px`); // slight upward bias
+    p.style.setProperty('--pdelay', `${Math.random() * 40}ms`); // near-simultaneous, not a slow trickle
     particles.appendChild(p);
   }
   card.appendChild(particles);
@@ -466,18 +472,18 @@ function playNoteDeleteAnimation(form, done) {
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (cards.length === 0 || reduceMotion) { done(); return; }
 
-  // Phase 1: distress — the card trembles/flashes red while the delete
-  // is effectively already underway.
+  // Phase 1: distress — accelerating shake (see the keyframe spacing in
+  // style.css) while the delete is effectively already underway.
   cards.forEach((card) => card.classList.add('note-distress'));
 
   setTimeout(() => {
-    // Phase 2: disintegrate — swap the shake for the dissolve + particle burst.
+    // Phase 2: explode — swap the shake for a flash + particle burst, then done.
     cards.forEach((card) => {
       card.classList.remove('note-distress');
-      card.classList.add('note-disintegrating');
-      spawnDisintegrateParticles(card);
+      card.classList.add('note-exploding');
+      spawnExplosion(card);
     });
-    setTimeout(done, NOTE_DISINTEGRATE_MS);
+    setTimeout(done, NOTE_EXPLODE_MS);
   }, NOTE_DISTRESS_MS);
 }
 

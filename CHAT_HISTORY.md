@@ -518,30 +518,35 @@ Gemini — this only affects transcription. Changes:
 
 Changed files: `config.py`, `ai.py`, `app.py`, `templates/notes.html`.
 
-## 2026-09-04 (note delete disintegration animation)
+## 2026-09-04 (note delete: shake + explode animation)
 
 Added a delete animation for notes: instead of a card just vanishing on
 the page reload, it now runs a two-phase effect before the real delete
-submits. Phase 1 ("distress", 750ms): the card trembles and its border/
-glow flashes `--danger` red, as if straining against being removed —
-this is the visual stand-in for "deleting is in progress." Phase 2
-("disintegrate", 950ms): the card dissolves in place (fade + blur +
-shrink/drift) while a burst of ~26 accent-colored particles scatters
-outward from it. Only after both phases finish does the already-
-confirmed form actually submit, so the page's existing "Deleting…"
-loading overlay still shows right after, unchanged — this only adds the
-two-phase effect in front of it, it doesn't replace it. (First pass only
-had the disintegrate phase at 650ms total, which read as too quick to
-register — extended to ~1.7s total and added the distress phase per
-feedback.)
+submits, then the page's existing "Deleting…" loading overlay shows
+right after, unchanged throughout every iteration below.
+
+- Phase 1 ("distress", 700ms): the card shakes and its border/glow
+  flashes `--danger` red — the shake starts slow and gets faster
+  (keyframe stops bunch up toward the end so it reads as accelerating
+  within the fixed duration), ending in a slightly compressed "wind-up"
+  pose right before the burst.
+- Phase 2 ("explode", 480ms): a fast burst — radial flash, ~30
+  accent-colored particles sprayed outward all at once, card scales up
+  and blurs to nothing — and that's it, no lingering fade afterward.
+
+Iterated a couple of times on feedback: first pass was a single 650ms
+dissolve + particle fade that read as too quick to register; second
+pass added a slower two-phase distress+dissolve at ~1.7s total; this
+final pass replaced the slow dissolve with a quick genuine explosion and
+made the shake itself accelerate rather than just grow in amplitude.
 
 Hooked into the existing shared confirm-modal in `app.js` (the one every
 delete button site-wide already uses) rather than adding a separate
 confirm flow, so it only fires for note deletes — single card or a bulk
 selection — and every other delete on the site (habits, budgets, photos,
 users, etc.) still submits immediately, unchanged. Respects
-`prefers-reduced-motion` (falls back to a quick plain fade, no
-particles/shake). Colors use the existing `--tab-color`/`--accent`/
+`prefers-reduced-motion` (skips straight to a quick plain fade, no
+shake/flash/particles). Colors use the existing `--tab-color`/`--accent`/
 `--danger` variables so it follows whatever theme is active, matching
 the HUD dematerialize feel already used by the scan-line/corner-bracket
 treatment on `.card`.
