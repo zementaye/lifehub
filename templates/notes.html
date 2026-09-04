@@ -58,7 +58,7 @@
       <form method="post" action="{{ url_for('create_share') }}" id="notes-share-form">
         <button type="submit" class="secondary" id="notes-bulk-share-btn" disabled>Share Selected</button>
       </form>
-      <form method="post" action="{{ url_for('bulk_delete_notes') }}" id="notes-bulk-form">
+      <form method="post" action="{{ url_for('bulk_delete_notes') }}" id="notes-bulk-form" data-no-loading>
         <button type="submit" class="confirm-modal-danger" id="notes-bulk-delete-btn" disabled>Delete Selected</button>
       </form>
       <button type="button" id="notes-select-cancel" class="btn-icon" title="Cancel selection">✕ Cancel</button>
@@ -93,7 +93,7 @@
             {% endif %}
           {% endif %}
         </div>
-        <form method="post" action="{{ url_for('delete_note', note_id=n.id) }}" data-confirm="Delete {{ n.title }}?" class="note-delete-form">
+        <form method="post" action="{{ url_for('delete_note', note_id=n.id) }}" data-confirm="Delete {{ n.title }}?" class="note-delete-form" data-no-loading>
           <button class="btn-icon" title="Delete">🗑️</button>
         </form>
       </div>

@@ -552,3 +552,17 @@ the HUD dematerialize feel already used by the scan-line/corner-bracket
 treatment on `.card`.
 
 Changed files: `static/style.css`, `static/app.js`.
+
+**Follow-up same day:** after the explosion finished, the site's generic
+full-page "Deleting…" overlay was still popping up and sitting through
+the network round-trip — redundant once the card had already visually
+finished disappearing. First attempt fixed this by setting
+`form.dataset.noLoading` at runtime right before the real submit fired,
+but that didn't take effect for HP (likely a caching/deploy timing
+issue, or just needed a harder guarantee) — so replaced it with a static
+`data-no-loading` attribute directly on the `note-delete-form` and
+`notes-bulk-form` markup in `templates/notes.html`. This is unconditional:
+the generic overlay is off for these two forms no matter what (animation
+played, reduced-motion, whatever), so there's nothing relying on timing
+anymore. Removed the now-redundant runtime toggle from `app.js`.
+Changed files: `templates/notes.html`, `static/app.js`.

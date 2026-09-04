@@ -420,12 +420,14 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
 // confirmed, the matching card(s) first shake with mounting intensity
 // ("distress", starting slow and speeding up, while the delete is
 // effectively in flight) and then burst apart all at once ("explode":
-// flash + particle scatter + fade). Only once the explosion finishes does
-// the already-confirmed submit actually fire, so the page's own
-// "Deleting…" loading overlay (see the submit listener further down)
-// still shows right after, same as it always has. Every other
-// data-confirm form on the site (habits, budgets, images, users, etc.)
-// isn't touched: it calls `done()` immediately, same as before this existed.
+// flash + particle scatter + fade). The explosion is the only "it's
+// deleting" signal for these two forms — the generic full-page
+// "Deleting…" overlay (see the submit listener further down) is turned
+// off for them entirely via a static `data-no-loading` attribute on the
+// forms in notes.html, so there's nothing left showing once the card is
+// gone. Every other data-confirm form on the site (habits, budgets,
+// images, users, etc.) isn't touched: it calls `done()` immediately,
+// same as before this existed, and still gets the normal overlay.
 const NOTE_DISTRESS_MS = 700;
 const NOTE_EXPLODE_MS = 480;
 
