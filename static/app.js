@@ -415,49 +415,70 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
   });
 })();
 
-// Note delete: disintegration animation. Hooked into the shared confirm
-// modal below — once a note delete (single card or bulk selection) is
-// confirmed, the matching card(s) dissolve into a burst of particles
-// before the already-confirmed submit actually fires, instead of the
-// card just vanishing on the page reload. Every other data-confirm form
-// on the site (habits, budgets, images, users, etc.) isn't touched: it
-// calls `done()` immediately, same as before this existed.
-function playNoteDeleteAnimation(form, done) {
-  let cards = [];
+// Note delete: two-phase animation. Hooked into the shared confirm modal
+// below — once a note delete (single card or bulk selection) is
+// confirmed, the matching card(s) first tremble/flash red ("distress",
+// while the delete is effectively in flight) and then dissolve into a
+// burst of particles ("disintegrate"). Only once both phases finish does
+// the already-confirmed submit actually fire, so the page's own
+// "Deleting…" loading overlay (see the submit listener further down)
+// still shows right after, same as it always has. Every other
+// data-confirm form on the site (habits, budgets, images, users, etc.)
+// isn't touched: it calls `done()` immediately, same as before this existed.
+const NOTE_DISTRESS_MS = 750;
+const NOTE_DISINTEGRATE_MS = 950;
+
+function getNoteDeleteCards(form) {
   if (form.classList.contains('note-delete-form')) {
     const card = form.closest('.note-card');
-    if (card) cards = [card];
-  } else if (form.id === 'notes-bulk-form') {
-    cards = Array.from(document.querySelectorAll('#notes-grid .note-select-box:checked'))
+    return card ? [card] : [];
+  }
+  if (form.id === 'notes-bulk-form') {
+    return Array.from(document.querySelectorAll('#notes-grid .note-select-box:checked'))
       .map((b) => b.closest('.note-card'))
       .filter(Boolean);
   }
+  return [];
+}
 
+function spawnDisintegrateParticles(card) {
+  const rect = card.getBoundingClientRect();
+  const particles = document.createElement('div');
+  particles.className = 'note-disintegrate-particles';
+  const count = 26;
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('span');
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 50 + Math.random() * 110;
+    p.style.setProperty('--px', `${Math.random() * rect.width}px`);
+    p.style.setProperty('--py', `${Math.random() * rect.height}px`);
+    p.style.setProperty('--size', `${3 + Math.random() * 5}px`);
+    p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+    p.style.setProperty('--dy', `${Math.sin(angle) * dist - 26}px`); // slight upward drift
+    p.style.setProperty('--pdelay', `${Math.random() * 220}ms`);
+    particles.appendChild(p);
+  }
+  card.appendChild(particles);
+}
+
+function playNoteDeleteAnimation(form, done) {
+  const cards = getNoteDeleteCards(form);
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (cards.length === 0 || reduceMotion) { done(); return; }
 
-  cards.forEach((card) => {
-    const rect = card.getBoundingClientRect();
-    const particles = document.createElement('div');
-    particles.className = 'note-disintegrate-particles';
-    const count = 22;
-    for (let i = 0; i < count; i++) {
-      const p = document.createElement('span');
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 40 + Math.random() * 90;
-      p.style.setProperty('--px', `${Math.random() * rect.width}px`);
-      p.style.setProperty('--py', `${Math.random() * rect.height}px`);
-      p.style.setProperty('--size', `${3 + Math.random() * 5}px`);
-      p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
-      p.style.setProperty('--dy', `${Math.sin(angle) * dist - 20}px`); // slight upward drift
-      p.style.setProperty('--pdelay', `${Math.random() * 180}ms`);
-      particles.appendChild(p);
-    }
-    card.appendChild(particles);
-    card.classList.add('note-disintegrating');
-  });
+  // Phase 1: distress — the card trembles/flashes red while the delete
+  // is effectively already underway.
+  cards.forEach((card) => card.classList.add('note-distress'));
 
-  setTimeout(done, 650);
+  setTimeout(() => {
+    // Phase 2: disintegrate — swap the shake for the dissolve + particle burst.
+    cards.forEach((card) => {
+      card.classList.remove('note-distress');
+      card.classList.add('note-disintegrating');
+      spawnDisintegrateParticles(card);
+    });
+    setTimeout(done, NOTE_DISINTEGRATE_MS);
+  }, NOTE_DISTRESS_MS);
 }
 
 // Shared delete/destructive-action confirmation modal (see the markup in

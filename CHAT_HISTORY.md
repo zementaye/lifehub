@@ -521,17 +521,29 @@ Changed files: `config.py`, `ai.py`, `app.py`, `templates/notes.html`.
 ## 2026-09-04 (note delete disintegration animation)
 
 Added a delete animation for notes: instead of a card just vanishing on
-the page reload, it now dissolves in place (fade + blur + slight shrink/
-drift) while a burst of small accent-colored particles scatters outward
-from it, then the real delete submits right after. Hooked into the
-existing shared confirm-modal in `app.js` (the one every delete button
-site-wide already uses) rather than adding a separate confirm flow, so
-it only fires for note deletes — single card or a bulk selection — and
-every other delete on the site (habits, budgets, photos, users, etc.)
-still submits immediately, unchanged. Respects `prefers-reduced-motion`
-(falls back to a quick plain fade, no particles). Colors use the
-existing `--tab-color`/`--accent` variables so it follows whatever theme
-is active, matching the HUD dematerialize feel already used by the
-scan-line/corner-bracket treatment on `.card`.
+the page reload, it now runs a two-phase effect before the real delete
+submits. Phase 1 ("distress", 750ms): the card trembles and its border/
+glow flashes `--danger` red, as if straining against being removed —
+this is the visual stand-in for "deleting is in progress." Phase 2
+("disintegrate", 950ms): the card dissolves in place (fade + blur +
+shrink/drift) while a burst of ~26 accent-colored particles scatters
+outward from it. Only after both phases finish does the already-
+confirmed form actually submit, so the page's existing "Deleting…"
+loading overlay still shows right after, unchanged — this only adds the
+two-phase effect in front of it, it doesn't replace it. (First pass only
+had the disintegrate phase at 650ms total, which read as too quick to
+register — extended to ~1.7s total and added the distress phase per
+feedback.)
+
+Hooked into the existing shared confirm-modal in `app.js` (the one every
+delete button site-wide already uses) rather than adding a separate
+confirm flow, so it only fires for note deletes — single card or a bulk
+selection — and every other delete on the site (habits, budgets, photos,
+users, etc.) still submits immediately, unchanged. Respects
+`prefers-reduced-motion` (falls back to a quick plain fade, no
+particles/shake). Colors use the existing `--tab-color`/`--accent`/
+`--danger` variables so it follows whatever theme is active, matching
+the HUD dematerialize feel already used by the scan-line/corner-bracket
+treatment on `.card`.
 
 Changed files: `static/style.css`, `static/app.js`.
