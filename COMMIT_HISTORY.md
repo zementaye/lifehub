@@ -6,10 +6,15 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-09-01 11:27
+Last updated: 2026-09-04 07:42
 
 ---
 
+- **2026-09-04** 1d459be - Statically disable Deleting overlay for note delete forms (Zemen)
+- **2026-09-04** f0c02f7 - Accelerate shake and replace dissolve with explosion for note delete (Zemen)
+- **2026-09-04** ff51c12 - Add distress+disintegrate two-phase animation for note delete (Zemen)
+- **2026-09-04** 55fdfa6 - Add particle-disintegration animation for note delete (Zemen)
+- **2026-09-01** d050a72 - Update commit history (Zemen)
 - **2026-09-01** ad6bc20 - Swap voice transcription from Gemini to Groq's Whisper API (Zemen)
 - **2026-09-01** 8de738f - Update commit history (Zemen)
 - **2026-09-01** 4c42176 - Default GEMINI_MODEL to gemini-flash-latest, off the crowded legacy tier (Zemen)
