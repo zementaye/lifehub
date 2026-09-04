@@ -1994,6 +1994,50 @@ body.vault-blur-off .doc-thumb-wrap::after { content: none; }
   cursor: auto;
 }
 
+/* Note delete: disintegration animation. Plays on the confirmed delete
+   (single or bulk, see app.js) before the form actually submits — the
+   card dissolves in place while a burst of accent-colored particles
+   scatters outward from it, matching the HUD dematerialize feel used by
+   the scan-line/corner-bracket treatment on every .card. */
+.note-card.note-disintegrating {
+  overflow: visible;
+  animation: note-dissolve 650ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
+  pointer-events: none;
+}
+@keyframes note-dissolve {
+  0%   { opacity: 1;    filter: blur(0) brightness(1);     transform: scale(1) translateY(0); }
+  55%  { opacity: 0.5;  filter: blur(2px) brightness(1.35); transform: scale(0.99) translateY(-4px); }
+  100% { opacity: 0;    filter: blur(9px) brightness(1.7);  transform: scale(0.94) translateY(-16px); }
+}
+.note-disintegrate-particles {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 6;
+}
+.note-disintegrate-particles span {
+  position: absolute;
+  top: var(--py);
+  left: var(--px);
+  width: var(--size);
+  height: var(--size);
+  background: var(--tab-color, var(--accent));
+  border-radius: 1px;
+  opacity: 0;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--tab-color, var(--accent)) 75%, transparent);
+  animation: note-particle-fly 600ms ease-out forwards;
+  animation-delay: var(--pdelay);
+}
+@keyframes note-particle-fly {
+  0%   { opacity: 0.9; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0;   transform: translate(var(--dx), var(--dy)) scale(0.25); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-card.note-disintegrating { animation: none; opacity: 0; transition: opacity 200ms ease; }
+  .note-disintegrate-particles { display: none; }
+}
+
 /* Link styled like button.secondary, for <a> tags */
 a.btn-secondary {
   display: inline-block;

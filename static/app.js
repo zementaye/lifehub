@@ -415,6 +415,51 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
   });
 })();
 
+// Note delete: disintegration animation. Hooked into the shared confirm
+// modal below — once a note delete (single card or bulk selection) is
+// confirmed, the matching card(s) dissolve into a burst of particles
+// before the already-confirmed submit actually fires, instead of the
+// card just vanishing on the page reload. Every other data-confirm form
+// on the site (habits, budgets, images, users, etc.) isn't touched: it
+// calls `done()` immediately, same as before this existed.
+function playNoteDeleteAnimation(form, done) {
+  let cards = [];
+  if (form.classList.contains('note-delete-form')) {
+    const card = form.closest('.note-card');
+    if (card) cards = [card];
+  } else if (form.id === 'notes-bulk-form') {
+    cards = Array.from(document.querySelectorAll('#notes-grid .note-select-box:checked'))
+      .map((b) => b.closest('.note-card'))
+      .filter(Boolean);
+  }
+
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (cards.length === 0 || reduceMotion) { done(); return; }
+
+  cards.forEach((card) => {
+    const rect = card.getBoundingClientRect();
+    const particles = document.createElement('div');
+    particles.className = 'note-disintegrate-particles';
+    const count = 22;
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement('span');
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 40 + Math.random() * 90;
+      p.style.setProperty('--px', `${Math.random() * rect.width}px`);
+      p.style.setProperty('--py', `${Math.random() * rect.height}px`);
+      p.style.setProperty('--size', `${3 + Math.random() * 5}px`);
+      p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+      p.style.setProperty('--dy', `${Math.sin(angle) * dist - 20}px`); // slight upward drift
+      p.style.setProperty('--pdelay', `${Math.random() * 180}ms`);
+      particles.appendChild(p);
+    }
+    card.appendChild(particles);
+    card.classList.add('note-disintegrating');
+  });
+
+  setTimeout(done, 650);
+}
+
 // Shared delete/destructive-action confirmation modal (see the markup in
 // base.html). Any form with data-confirm="..." uses this instead of the
 // native browser confirm() popup, so every page's confirmation looks and
@@ -479,7 +524,9 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
     if (!form) return;
     close();
     form.dataset.confirmed = '1';
-    form.requestSubmit ? form.requestSubmit() : form.submit();
+    playNoteDeleteAnimation(form, () => {
+      form.requestSubmit ? form.requestSubmit() : form.submit();
+    });
   });
 
   // Safety net if the page is restored from bfcache mid-confirm.

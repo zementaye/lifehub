@@ -517,3 +517,21 @@ Gemini — this only affects transcription. Changes:
   so this was a mislabeled flag being fixed, not new behavior.
 
 Changed files: `config.py`, `ai.py`, `app.py`, `templates/notes.html`.
+
+## 2026-09-04 (note delete disintegration animation)
+
+Added a delete animation for notes: instead of a card just vanishing on
+the page reload, it now dissolves in place (fade + blur + slight shrink/
+drift) while a burst of small accent-colored particles scatters outward
+from it, then the real delete submits right after. Hooked into the
+existing shared confirm-modal in `app.js` (the one every delete button
+site-wide already uses) rather than adding a separate confirm flow, so
+it only fires for note deletes — single card or a bulk selection — and
+every other delete on the site (habits, budgets, photos, users, etc.)
+still submits immediately, unchanged. Respects `prefers-reduced-motion`
+(falls back to a quick plain fade, no particles). Colors use the
+existing `--tab-color`/`--accent` variables so it follows whatever theme
+is active, matching the HUD dematerialize feel already used by the
+scan-line/corner-bracket treatment on `.card`.
+
+Changed files: `static/style.css`, `static/app.js`.
