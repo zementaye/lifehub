@@ -2957,8 +2957,18 @@ def delete_note(note_id):
         conn.execute("DELETE FROM note_voice WHERE note_id = ? AND user_id = ?", (note_id, g.user_id))
         conn.execute("DELETE FROM notes WHERE id = ? AND user_id = ?", (note_id, g.user_id))
     db.remove_note_from_shares(note_id)
-    _delete_note_image_files([r["filename"] for r in image_rows])
-    _delete_note_voice_files([r["filename"] for r in voice_rows])
+    # The db rows are already gone, so the note has fully "disappeared" as
+    # far as the app is concerned — the actual file removal (a real network
+    # call per file when B2 is configured) doesn't need to hold up the
+    # response. Off the request thread, same best-effort/log-on-failure
+    # behavior as before, just not blocking the redirect on it anymore.
+    image_names = [r["filename"] for r in image_rows]
+    voice_names = [r["filename"] for r in voice_rows]
+    if image_names or voice_names:
+        threading.Thread(
+            target=lambda: (_delete_note_image_files(image_names), _delete_note_voice_files(voice_names)),
+            daemon=True,
+        ).start()
     return redirect(url_for("notes"))
 
 
@@ -2991,8 +3001,14 @@ def bulk_delete_notes():
             )
         for note_id in ids:
             db.remove_note_from_shares(note_id)
-        _delete_note_image_files([r["filename"] for r in image_rows])
-        _delete_note_voice_files([r["filename"] for r in voice_rows])
+        # See delete_note() above — same reasoning for backgrounding this.
+        image_names = [r["filename"] for r in image_rows]
+        voice_names = [r["filename"] for r in voice_rows]
+        if image_names or voice_names:
+            threading.Thread(
+                target=lambda: (_delete_note_image_files(image_names), _delete_note_voice_files(voice_names)),
+                daemon=True,
+            ).start()
         flash(f"Deleted {len(ids)} note{'s' if len(ids) != 1 else ''}.")
     return redirect(url_for("notes"))
 

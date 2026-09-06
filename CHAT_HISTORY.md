@@ -675,3 +675,28 @@ simulating the exact fetch a browser would send (multipart POST) via
 the Flask test client, for both single and bulk delete.
 
 Changed files: `static/app.js`.
+
+## 2026-09-06 (note delete: found the real delay — server-side, not animation timing)
+
+The `app.js` overlap fix from earlier today didn't actually help — HP
+still saw a big delay. Root cause was server-side, not client-side
+sequencing: `delete_note()` and `bulk_delete_notes()` in `app.py` both
+called `_delete_note_image_files()` / `_delete_note_voice_files()`
+*synchronously, before returning the response*. When B2 is configured
+(likely in production, since local uploads get wiped on redeploy — see
+"Project basics" above), each attached photo/voice clip is a real
+network call to Backblaze, done one at a time in a blocking loop —
+easily several seconds for a note with a couple of attachments, dwarfing
+the ~1.2s animation the earlier fix was overlapping against.
+
+Fixed by moving the actual file cleanup onto a background daemon thread
+in both routes (same established pattern as `_auto_categorize_transaction`
+in the budget code) — the db rows are deleted synchronously as before
+(so the note is genuinely gone immediately), but the response no longer
+waits on file removal from storage. Verified by simulating a slow
+(2s/file) delete: the HTTP response now returns in ~0ms instead of
+blocking for the full simulated delay, the note disappears from the page
+immediately, and the background cleanup still completes and actually
+removes the files/db attachment rows shortly after.
+
+Changed files: `app.py`.
