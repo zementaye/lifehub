@@ -3,13 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Enter your code — Life Hub</title>
-<meta name="description" content="Enter your two-factor authentication code to finish logging in to Life Hub.">
-<meta name="robots" content="noindex, nofollow">
+<title>Page not found — Life Hub</title>
+<meta name="description" content="This page doesn't exist or may have moved. Head back to your Life Hub dashboard.">
+<meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect x='1' y='1' width='26' height='26' rx='7' fill='%231C222A' stroke='%232A323C'/%3E%3Ccircle cx='14' cy='5.4' r='1.1' fill='%233A4351'/%3E%3Crect x='6.4' y='13' width='3.6' height='10' rx='1.8' fill='%234CC9E8'/%3E%3Crect x='12.2' y='7' width='3.6' height='16' rx='1.8' fill='%23F0B23D'/%3E%3Crect x='18' y='16' width='3.6' height='7' rx='1.8' fill='%238FD14F'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version }}">
+<style>
+  .error-code {
+    font-family: var(--font-mono);
+    font-size: 3.2rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    line-height: 1;
+    margin: 0 0 6px;
+  }
+  .error-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  .error-actions .secondary { text-decoration: none; }
+</style>
 </head>
 <body class="auth-page" data-theme="light">
 <div class="auth-wrap">
@@ -24,37 +37,20 @@
     LIFEHUB
   </a>
   <div class="card auth-card">
-    <h1>🔐 Enter your code</h1>
+    <p class="error-code">404</p>
+    <h1>Page not found</h1>
     <p class="muted">
-      Your password checked out. Now enter the 6-digit code from your
-      authenticator app — or one of your backup codes if you don't have
-      access to it right now.
+      The page you're looking for doesn't exist, was moved, or the link is out of date.
     </p>
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <div class="flash">{% for m in messages %}<div class="flash-msg">{{ m }}</div>{% endfor %}</div>
+    <div class="error-actions">
+      {% if g.user_id %}
+        <a href="{{ url_for('dashboard') }}"><button type="button">Go to Dashboard</button></a>
+      {% else %}
+        <a href="{{ url_for('login') }}"><button type="button">Log In</button></a>
       {% endif %}
-    {% endwith %}
-    <form method="post" class="inline-form auth-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label>Code
-        <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code"
-               placeholder="123456 or 1234-5678" required autofocus>
-      </label>
-      <button type="submit">Continue</button>
-    </form>
-    <p class="muted">
-      <a href="{{ url_for('login') }}">Start over</a>
-    </p>
+      <a href="{{ url_for('home') }}"><button type="button" class="secondary">Back to homepage</button></a>
+    </div>
   </div>
 </div>
-<script nonce="{{ csp_nonce() }}">
-  document.querySelector('.auth-form').addEventListener('submit', function (e) {
-    if (!e.target.checkValidity()) return;
-    var btn = e.target.querySelector('button[type="submit"]');
-    btn.disabled = true;
-    btn.textContent = 'Checking…';
-  });
-</script>
 </body>
 </html>

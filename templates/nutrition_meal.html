@@ -99,6 +99,7 @@
   <div class="card wide">
     <h3>{{ meal_label }} — {{ view_date }}</h3>
     {% if entries %}
+      <div class="table-scroll">
       <table class="table">
         <thead><tr><th>Food</th><th>Amount</th><th>Cal</th><th>Protein</th><th>Carbs</th><th>Fat</th><th>Fiber</th><th></th></tr></thead>
         <tbody>
@@ -121,6 +122,7 @@
         {% endfor %}
         </tbody>
       </table>
+      </div>
     {% else %}
       <p class="muted">Nothing logged for {{ meal_label | lower }} yet — search above to add something.</p>
     {% endif %}

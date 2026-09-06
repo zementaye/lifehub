@@ -138,6 +138,15 @@ def handle_upload_too_large(e):
     return redirect(request.referrer or url_for("dashboard"))
 
 
+@app.errorhandler(404)
+def handle_not_found(e):
+    # Custom branded 404 instead of Werkzeug's bare default page. API
+    # callers still want JSON, not HTML, so keep that path unchanged.
+    if request.path.startswith("/api/"):
+        return jsonify(ok=False, error="Not found."), 404
+    return render_template("404.html"), 404
+
+
 @app.errorhandler(Exception)
 def handle_unexpected_error(e):
     # No catch-all existed before this: any unhandled exception anywhere
@@ -1107,6 +1116,8 @@ def add_weight():
                 (g.user_id, d, w, db.now()),
             )
         flash("Weight logged.")
+    else:
+        flash("Enter a weight between 1 and 500 kg.")
     return redirect(url_for("health"))
 
 
@@ -1272,6 +1283,8 @@ def log_food():
                  fields["fiber_g"], db.now()),
             )
         flash(f"Logged {name}.")
+    else:
+        flash("Couldn't log that entry — no food name was given.")
     return redirect(url_for("nutrition_meal", meal=meal, date=d))
 
 
@@ -1312,6 +1325,8 @@ def add_custom_food():
                  db.now()),
             )
         flash(f"Added custom food: {name}")
+    else:
+        flash("Enter a name for the custom food.")
     if meal in MEAL_LABELS:
         return redirect(url_for("nutrition_meal", meal=meal, date=d))
     return redirect(url_for("nutrition"))
@@ -2250,6 +2265,11 @@ def add_transaction():
                 args=(user_id, txn_id, description),
                 daemon=True,
             ).start()
+    else:
+        # amount was missing, non-numeric, zero, or negative-to-zero — the
+        # transaction was silently dropped here before with no feedback at
+        # all, leaving the person to wonder why nothing showed up. Tell them.
+        flash("Enter a valid, non-zero amount to log a transaction.")
     return redirect(url_for("budget", month=month))
 
 
@@ -2370,6 +2390,8 @@ def add_recurring_transaction():
                  next_run.isoformat(), db.now()),
             )
         flash(f"Recurring {ttype} set up: {title} — first run {next_run.isoformat()}")
+    else:
+        flash("Enter a title and a valid amount to set up a recurring transaction.")
     return redirect(url_for("budget"))
 
 
@@ -2413,6 +2435,8 @@ def add_savings_goal():
                 (user_id, name, target_amount, target_date, db.now()),
             )
         flash(f"Savings goal created: {name}")
+    else:
+        flash("Enter a name for the savings goal.")
     return redirect(url_for("budget"))
 
 
@@ -2458,6 +2482,8 @@ def contribute_savings_goal(goal_id):
                     (amount, goal_id),
                 )
         flash(f"Added {amount:.0f} to savings")
+    else:
+        flash("Enter a valid, positive amount to contribute.")
     return redirect(url_for("budget"))
 
 
@@ -2491,6 +2517,8 @@ def withdraw_savings_goal(goal_id):
                     (amount, goal_id),
                 )
         flash(f"Withdrew {amount:.0f} from savings")
+    else:
+        flash("Enter a valid, positive amount to withdraw.")
     return redirect(url_for("budget"))
 
 

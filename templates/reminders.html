@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}To Do — Life Hub{% endblock %}
+{% block meta_description %}Manage your to-dos and dated reminders in Life Hub.{% endblock %}
 {% block content %}
 <h1>To Do</h1>
 
@@ -23,6 +24,7 @@
 <div class="card wide">
   <h3>With a due date</h3>
   {% if reminders %}
+    <div class="table-scroll">
     <table class="table">
       <thead><tr><th>Title</th><th>Next due</th><th>Repeats</th><th>Status</th><th></th></tr></thead>
       <tbody>
@@ -52,6 +54,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
   {% else %}
     <p class="muted">Nothing with a due date yet.</p>
   {% endif %}

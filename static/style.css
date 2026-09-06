@@ -99,6 +99,12 @@ body[data-palette][data-theme="light"]:not([data-palette="amber"]) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
 
+/* Belt-and-suspenders guard against horizontal page scroll: anything that
+   slips past a component's own responsive handling (a stray fixed width,
+   an unwrapped wide table, etc.) gets clipped here instead of widening the
+   viewport and letting the whole page scroll sideways on mobile. */
+html, body { max-width: 100%; overflow-x: hidden; }
+
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; forced-color-adjust: none; }
 button { -webkit-tap-highlight-color: transparent; outline: none; background-clip: padding-box; }
 button:focus-visible,
@@ -1222,6 +1228,17 @@ button.btn-icon:hover {
 hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
 /* Tables */
+/* Tables (transactions, weight log, users, audit log, etc.) can have more
+   columns than a phone screen is wide. Scope the horizontal scroll to the
+   table itself instead of letting it widen the whole page. The admin
+   partials already wrapped their tables in a `.table-scroll` div, but the
+   matching CSS rule was never written — meaning it did nothing and those
+   tables (plus every other <table class="table"> with no wrapper at all)
+   were free to force the whole page to scroll sideways on mobile. Defining
+   it here fixes the admin tables and gives every other table the same
+   wrapper to opt into. */
+.table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll .table { margin-top: 0; }
 .table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.88rem; }
 .table th {
   text-align: left; padding: 8px 10px; font-size: 0.68rem;
@@ -1256,6 +1273,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   white-space: nowrap;
 }
 .save-indicator.show { opacity: 1; transform: translateY(0); }
+.save-indicator.save-indicator-error { color: var(--danger, #e35d5d); }
 .habit-reminder-form select[name="reminder_hour"],
 .habit-reminder-form select[name="reminder_day"] {
   width: auto;
@@ -2723,6 +2741,32 @@ body[data-theme="light"] .calendar-note-form select { color-scheme: light; }
     height: min(70vh, calc(100vh - 116px));
   }
   #ai-fab { right: 16px; bottom: 16px; }
+}
+
+/* ── General mobile pass: bigger tap targets, tighter side padding ─────
+   Icon-only buttons (row delete/edit actions, close buttons) were sized
+   for a mouse cursor (~24px). Below 700px, where taps replace clicks,
+   pad them out toward the ~44px target Apple/Google guidelines call for,
+   without touching their desktop density. */
+@media (max-width: 700px) {
+  .content { padding: 18px 16px 32px; }
+  button.btn-icon {
+    padding: 10px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .sidebar-close,
+  #ai-fab,
+  #ai-popup-close,
+  #confirm-modal-cancel,
+  #confirm-modal-ok {
+    min-height: 40px;
+  }
+  .table th, .table td { padding: 9px 10px; }
+  /* Padding (not min-height) so text stays vertically centred — buttons
+     aren't flex containers, so a bare min-height would leave the label
+     hugging the top instead of growing evenly around it. */
+  button:not(.btn-icon), .link-btn, input[type="submit"] { padding-top: 12px; padding-bottom: 12px; }
 }
 
 /* Shared dates — sharing specific calendar dates with another account

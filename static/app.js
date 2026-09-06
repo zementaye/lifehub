@@ -206,11 +206,12 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
     form.querySelectorAll('select[name]').forEach((sel) => params.set(sel.name, sel.value));
 
     const indicator = form.querySelector('.save-indicator');
-    const showSaved = () => {
+    const showStatus = (ok) => {
       if (!indicator) return;
-      indicator.textContent = 'Saved';
+      indicator.textContent = ok ? 'Saved' : 'Could not save — try again';
+      indicator.classList.toggle('save-indicator-error', !ok);
       indicator.classList.add('show');
-      setTimeout(() => indicator.classList.remove('show'), 1400);
+      setTimeout(() => indicator.classList.remove('show'), ok ? 1400 : 3000);
     };
 
     if (useBeacon && navigator.sendBeacon) {
@@ -225,8 +226,11 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
           'X-CSRFToken': window.LIFEHUB_CSRF_TOKEN || '',
         },
         body: params.toString(),
-      }).then(showSaved).catch(() => {
-        // Best-effort — if this fails the select just reverts on next reload.
+      }).then((res) => showStatus(res.ok)).catch(() => {
+        // Network failure (offline, etc.) — the select value itself hasn't
+        // changed, so surface it rather than letting the user believe a
+        // choice was saved when it wasn't.
+        showStatus(false);
       });
     }
   }

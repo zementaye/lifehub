@@ -566,3 +566,87 @@ the generic overlay is off for these two forms no matter what (animation
 played, reduced-motion, whatever), so there's nothing relying on timing
 anymore. Removed the now-redundant runtime toggle from `app.js`.
 Changed files: `templates/notes.html`, `static/app.js`.
+
+## 2026-09-06 (20-point site audit)
+
+Ran the whole site against a 20-point launch checklist (horizontal
+scroll, placeholder text, dead nav, broken links, mobile menu, favicon,
+titles/meta descriptions, footer links, 404 page, dynamic copyright,
+image compression, broken buttons, success/error messaging, mobile
+overflow, clickable logo/phone/email, general mobile pass). Most items
+were already solid (mobile menu, favicon, footer links, dynamic
+copyright year, mailto emails — no phone numbers exist). Real fixes:
+
+**Horizontal scroll / mobile overflow.** Root cause: wide tables (up to
+8 columns) on `budget.html`, `health.html`, `reminders.html`,
+`nutrition_meal.html` had no scroll container, and the admin table
+partials (`_admin_users_table.html`, `_admin_audit_log_table.html`)
+already wrapped their tables in a `table-scroll` div but the matching
+CSS class was never defined — it silently did nothing. Defined
+`.table-scroll { overflow-x: auto; }` in `style.css` (fixes the admin
+tables for free) and wrapped every other table in it. Added a global
+`overflow-x:hidden` safety net on `html, body` too.
+
+**Custom 404 page.** Was falling through to Flask's bare default page.
+Added `templates/404.html` (matches the auth-page visual style) and
+`@app.errorhandler(404)` in `app.py` — HTML for browsers, JSON for
+`/api/*` callers.
+
+**Meta descriptions.** Only `home.html` had one. Added a default in
+`base.html`/`admin_base.html` plus specific descriptions on 17 app
+pages and all 6 standalone auth pages; added `noindex` alongside since
+these are private logged-in pages.
+
+**Clickable logo on auth pages.** `login.html`, `register.html`,
+`forgot_password.html`, `reset_password.html`, `login_2fa.html`,
+`admin_verify.html` had the LIFEHUB brand as a plain non-clickable
+`<div>` — now all link to `home`.
+
+**Mobile touch targets.** Icon buttons (`.btn-icon`, delete/pause/etc.)
+were ~24×24px. Added a `max-width:700px` pass bumping them toward
+40px, plus larger table-cell and button padding at that breakpoint.
+
+**Silent form-validation failures (the main find).** Six POST handlers
+used `request.form.get(..., type=float)`, which returns `None` on
+non-numeric input — and the code just silently skipped the insert with
+*no flash message at all* when that happened: `add_transaction`,
+`add_weight`, `add_recurring_transaction`, `add_savings_goal`,
+`contribute_savings_goal`, `withdraw_savings_goal`, plus `log_food` /
+`add_custom_food` on a blank name. All eight now flash a clear error
+("Enter a valid, non-zero amount...", etc.) instead of doing nothing.
+Verified with real POST requests via the Flask test client.
+
+**False "Saved" on autosave failure.** The habit-reminder autosave in
+`app.js` called `.then(showSaved)` directly on the fetch promise, which
+resolves even on HTTP error responses — so a failed save still showed
+"Saved." Now checks `response.ok` and shows a red "Could not save — try
+again" indicator (new `.save-indicator-error` class in `style.css`) on
+failure or network error.
+
+**Image compression.** `static/images/og-image.png` losslessly
+quantized 71KB → 31KB, visually identical (only used as the OG/Twitter
+share-card image, not rendered on-page).
+
+Verified everything by running the app under a real Flask test client:
+registered a user, hit every major page (200s across the board), added
+a transaction/weight entry through both the valid and invalid paths,
+confirmed the 404 handler on both HTML and `/api/*` routes, and
+confirmed logout correctly re-gates `/dashboard`. All templates compile
+under the app's real Jinja env; `app.py` and `static/app.js` both parse
+clean.
+
+Changed files: `app.py`, `static/app.js`, `static/style.css`,
+`static/images/og-image.png`, `templates/404.html` (new),
+`templates/base.html`, `templates/admin_base.html`,
+`templates/admin_verify.html`, `templates/login.html`,
+`templates/register.html`, `templates/forgot_password.html`,
+`templates/reset_password.html`, `templates/login_2fa.html`,
+`templates/dashboard.html`, `templates/budget.html`,
+`templates/health.html`, `templates/nutrition.html`,
+`templates/nutrition_meal.html`, `templates/habits.html`,
+`templates/reminders.html`, `templates/calendar.html`,
+`templates/notes.html`, `templates/vault.html`,
+`templates/passwords.html`, `templates/profile.html`,
+`templates/settings.html`, `templates/notifications.html`,
+`templates/totp_setup.html`, `templates/ai_chat.html`,
+`templates/ai_quick_add.html`, `templates/shared_preview.html`.

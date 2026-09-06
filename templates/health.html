@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Health — Life Hub{% endblock %}
+{% block meta_description %}Track your weight and workout sessions over time in Life Hub.{% endblock %}
 {% block content %}
 <h1>Health</h1>
 
@@ -70,6 +71,7 @@
   <div class="card wide">
     <h3>Weight History</h3>
     {% if weights %}
+      <div class="table-scroll">
       <table class="table">
         <thead><tr><th>Date</th><th>Weight (kg)</th><th></th></tr></thead>
         <tbody>
@@ -86,6 +88,7 @@
         {% endfor %}
         </tbody>
       </table>
+      </div>
     {% else %}
       <p class="muted">No weight entries yet.</p>
     {% endif %}
@@ -94,6 +97,7 @@
   <div class="card wide">
     <h3>Session History</h3>
     {% if sessions %}
+      <div class="table-scroll">
       <table class="table">
         <thead><tr><th>Date</th><th>Type</th><th>Duration</th><th>Notes</th><th></th></tr></thead>
         <tbody>
@@ -112,6 +116,7 @@
         {% endfor %}
         </tbody>
       </table>
+      </div>
     {% else %}
       <p class="muted">No sessions logged yet.</p>
     {% endif %}

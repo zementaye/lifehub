@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Budget — Life Hub{% endblock %}
+{% block meta_description %}Track income, expenses, recurring bills, and savings goals in Life Hub.{% endblock %}
 {% block content %}
 <h1>Budget</h1>
 
@@ -165,6 +166,7 @@
     </form>
 
     {% if recurring %}
+      <div class="table-scroll">
       <table class="table" style="margin-top:14px;">
         <thead><tr><th>Title</th><th>Type</th><th>Amount</th><th>Frequency</th><th>Next run</th><th>Status</th><th></th></tr></thead>
         <tbody>
@@ -194,6 +196,7 @@
         {% endfor %}
         </tbody>
       </table>
+      </div>
     {% else %}
       <p class="muted">No recurring jobs/bills set up yet.</p>
     {% endif %}
@@ -265,6 +268,7 @@
   <div class="card wide">
     <h3>Transactions — {{ month }}</h3>
     {% if txns %}
+      <div class="table-scroll">
       <table class="table">
         <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Amount</th><th></th></tr></thead>
         <tbody>
@@ -285,6 +289,7 @@
         {% endfor %}
         </tbody>
       </table>
+      </div>
     {% else %}
       <p class="muted">No transactions for this month yet.</p>
     {% endif %}
@@ -292,6 +297,7 @@
 
   <div class="card wide">
     <h3>Yearly Detail — {{ year }}</h3>
+    <div class="table-scroll">
     <table class="table">
       <thead><tr><th>Month</th><th>Income</th><th>Expenses</th><th>Net</th></tr></thead>
       <tbody>
@@ -305,6 +311,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
 
     {% if yearly_category_totals %}
       <h4 style="margin-top:20px;">Spend by Category — {{ year }}</h4>
