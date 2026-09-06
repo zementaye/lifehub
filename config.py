@@ -137,14 +137,28 @@ if not SECRET_KEY:
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "20"))
 MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
 
+# ── Cross-origin frontend (Vercel) support ───────────────────────────────
+# Set this to the deployed frontend's exact origin (e.g.
+# https://lifehub.vercel.app, no trailing slash) once the separate
+# frontend exists. It's read by app.py to configure flask-cors, and below
+# to switch the session cookie's SameSite policy. Leave unset and nothing
+# about the existing server-rendered app's behavior changes.
+CORS_ALLOWED_ORIGIN = os.environ.get("CORS_ALLOWED_ORIGIN", "").strip()
+
 # ── Session cookie hardening ─────────────────────────────────────────────
-# HTTPONLY blocks JS access (mitigates XSS session theft), SAMESITE=Lax
-# blocks the cookie being sent on most cross-site requests (CSRF defense in
-# depth, on top of CSRFProtect below), SECURE requires HTTPS in production
-# (Render terminates TLS in front of the app, so this is safe to require
-# there; left off in dev so http://localhost still works).
+# HTTPONLY blocks JS access (mitigates XSS session theft). SECURE requires
+# HTTPS in production (Render terminates TLS in front of the app, so this
+# is safe to require there; left off in dev so http://localhost still
+# works). SAMESITE is normally "Lax" (blocks the cookie on most cross-site
+# requests — CSRF defense in depth on top of CSRFProtect below), but a
+# separate frontend on another origin (Vercel) needs the browser to send
+# the cookie on its cross-origin fetch() calls, which SameSite=Lax blocks —
+# so this flips to "None" once CORS_ALLOWED_ORIGIN is set. Browsers reject
+# SameSite=None on a non-Secure cookie, which is why testing the
+# cross-origin flow needs HTTPS on both sides (the deployed Render URL,
+# not plain http://localhost).
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SAMESITE = "None" if CORS_ALLOWED_ORIGIN else "Lax"
 SESSION_COOKIE_SECURE = IS_PRODUCTION
 # Sessions guard a password vault and ID documents — Flask's 31-day default
 # is too long-lived for that. 7 days, refreshed on activity (default

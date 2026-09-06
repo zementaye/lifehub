@@ -16,6 +16,7 @@ from flask import (
     Flask, render_template, request, redirect, url_for, flash,
     send_from_directory, make_response, session, g, jsonify,
 )
+from flask_cors import CORS
 from flask_wtf import CSRFProtect
 from flask_wtf.csrf import CSRFError, generate_csrf
 from flask_limiter import Limiter
@@ -33,6 +34,8 @@ import scheduler
 import storage
 import telegram_notify
 import totp
+from api_auth import bp as api_auth_bp
+from api_core import bp as api_core_bp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -54,6 +57,18 @@ app.config.update(
 # base.html renders); the two raw fetch()/sendBeacon() calls in app.js send
 # it explicitly. See CSRFError handler below for the user-facing failure page.
 csrf = CSRFProtect(app)
+
+# Only active once CORS_ALLOWED_ORIGIN (the deployed frontend's URL) is set
+# — see config.py. supports_credentials=True is required for the browser
+# to send/receive the session cookie on cross-origin fetch() calls.
+if config.CORS_ALLOWED_ORIGIN:
+    CORS(app, supports_credentials=True, origins=[config.CORS_ALLOWED_ORIGIN])
+
+# JSON API for the separate frontend — see api_auth.py / api_core.py.
+# Registered unconditionally (harmless with no frontend yet); CORS above
+# is what actually gates cross-origin access to them.
+app.register_blueprint(api_auth_bp)
+app.register_blueprint(api_core_bp)
 
 # Brute-force protection. In-memory storage is fine for this app's single
 # small deployment (1 gunicorn worker per scheduler.py's own lock — see
