@@ -650,3 +650,28 @@ Changed files: `app.py`, `static/app.js`, `static/style.css`,
 `templates/settings.html`, `templates/notifications.html`,
 `templates/totp_setup.html`, `templates/ai_chat.html`,
 `templates/ai_quick_add.html`, `templates/shared_preview.html`.
+
+## 2026-09-06 (note delete: closed the animation-to-reload gap)
+
+HP noticed the note delete shake+explode animation finishes but the page
+then waits a visible few extra seconds before actually reloading. Root
+cause: the real form submission only fired *after* the whole ~1.2s
+animation finished (`playNoteDeleteAnimation(form, () =>
+form.requestSubmit())`), so the total wait was animation time **plus**
+the full server round-trip stacked on top, with nothing shown on screen
+during that second wait (the loading overlay is intentionally off for
+these forms).
+
+Fixed by firing the real delete over `fetch()` in parallel with the
+animation instead of after it (`Promise.all([fetch(...), animationDone])`
+→ `location.reload()`), so the two overlap — the reload lands right as
+the animation finishes instead of stacking on top of it. Single-note
+delete has no server flash to worry about; bulk delete's "Deleted N
+notes." flash would otherwise be silently lost (fetch follows the
+redirect and consumes it on a response we never display) — added a
+small `sessionStorage` stash-and-replay so that message still shows up
+after the reload. Verified server-side behavior is unaffected by
+simulating the exact fetch a browser would send (multipart POST) via
+the Flask test client, for both single and bulk delete.
+
+Changed files: `static/app.js`.

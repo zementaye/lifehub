@@ -96,6 +96,30 @@ window.LIFEHUB_CSRF_TOKEN = (function () {
   });
 })();
 
+// One-off client-side flash message. Used only by the note delete-
+// animation handler above: since that submits over fetch() instead of a
+// normal form navigation (to run in parallel with the shake/explode
+// animation), it bypasses the server's usual flash-then-redirect — so the
+// bulk-delete count message gets stashed here and replayed on reload.
+// Runs before the auto-dismiss block below so the injected .flash-msg
+// gets picked up by it automatically.
+(function () {
+  document.addEventListener('DOMContentLoaded', () => {
+    const msg = sessionStorage.getItem('lifehub-pending-flash');
+    if (!msg) return;
+    sessionStorage.removeItem('lifehub-pending-flash');
+    const content = document.querySelector('.content');
+    if (!content) return;
+    const container = document.createElement('div');
+    container.className = 'flash';
+    const el = document.createElement('div');
+    el.className = 'flash-msg';
+    el.textContent = msg;
+    container.appendChild(el);
+    content.insertBefore(container, content.firstChild);
+  });
+})();
+
 // Auto-dismiss flash messages ("Note added: ...", etc.) after a few seconds
 // instead of leaving them sitting on screen until the next page load.
 (function () {
@@ -556,11 +580,48 @@ function playNoteDeleteAnimation(form, done) {
     const form = pendingForm;
     if (!form) return;
     close();
-    form.dataset.confirmed = '1';
-    playNoteDeleteAnimation(form, () => {
+
+    const explodingCards = getNoteDeleteCards(form);
+    if (explodingCards.length === 0) {
+      // Ordinary delete (habits, budget, users, etc.) — unchanged: submit
+      // right away and let the normal full-page navigation handle it.
+      form.dataset.confirmed = '1';
       form.requestSubmit ? form.requestSubmit() : form.submit();
+      return;
+    }
+
+    // Note delete(s): previously the real request only started AFTER the
+    // ~1.2s shake+explode finished playing, so the total wait was that
+    // animation time PLUS the full server round-trip stacked on top —
+    // a dead pause between "card explodes" and "page actually reloads".
+    // Firing the request now, in parallel with the animation, makes the
+    // two overlap instead: the reload lands right as the animation
+    // finishes (same total time on a fast connection, and never worse
+    // than the slower of the two on a slow one).
+    const isBulk = form.id === 'notes-bulk-form';
+    const noteCount = explodingCards.length;
+    const formData = new FormData(form);
+
+    const requestDone = fetch(form.action, { method: 'POST', body: formData })
+      .then((res) => ({ ok: res.ok }))
+      .catch(() => ({ ok: false }));
+    const animationDone = new Promise((resolve) => playNoteDeleteAnimation(form, resolve));
+
+    Promise.all([requestDone, animationDone]).then(([result]) => {
+      if (result.ok && isBulk) {
+        // bulk_delete_notes() normally flashes "Deleted N notes." on the
+        // redirect this fetch just followed silently — stash the same
+        // message so the reload below still shows it. (Single-note
+        // delete_note() has no flash to preserve here.)
+        sessionStorage.setItem(
+          'lifehub-pending-flash',
+          `Deleted ${noteCount} note${noteCount === 1 ? '' : 's'}.`
+        );
+      }
+      window.location.reload();
     });
   });
+
 
   // Safety net if the page is restored from bfcache mid-confirm.
   window.addEventListener('pageshow', close);
