@@ -198,6 +198,20 @@ def load_logged_in_user():
     # inline scripts that need it.
     g.csp_nonce = secrets.token_urlsafe(16)
     g.user_id = session.get("user_id")
+    # Browsers send a CORS preflight OPTIONS request without cookies, by
+    # design — it's just asking permission, not identifying a user. A
+    # redirect response to a preflight is explicitly rejected by browsers
+    # (they can't follow it), so this has to short-circuit before the
+    # login-redirect logic below, for every route, not just /api/*.
+    if request.method == "OPTIONS":
+        return
+    # /api/* routes (api_auth.py, api_core.py) return JSON and each already
+    # checks session state itself where it matters (see api_auth.py's /me).
+    # Redirecting them into an HTML /login page here — like the rest of
+    # this gate does — would hand the frontend a login page where it
+    # expects JSON.
+    if request.endpoint and (request.endpoint.startswith("api_auth.") or request.endpoint.startswith("api_core.")):
+        return
     if request.endpoint in _PUBLIC_ENDPOINTS or request.endpoint is None:
         return
     if not g.user_id:
