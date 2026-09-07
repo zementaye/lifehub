@@ -142,7 +142,12 @@ db.init_db()
 def handle_csrf_error(e):
     # Most commonly hit when a form was left open across a session timeout
     # (token no longer valid) rather than an actual attack — send them back
-    # to log in rather than showing a raw 400.
+    # to log in rather than showing a raw 400. /api/* callers get JSON
+    # instead, same reasoning as the 404/500 handlers below: a redirect
+    # response can't be parsed as JSON by fetch(), and a fetch() that
+    # follows it silently lands on an HTML page instead of an error.
+    if request.path.startswith("/api/"):
+        return jsonify(ok=False, error="Your session expired — reload and try again."), 400
     flash("Your session expired — please log in again and retry.")
     return redirect(url_for("login"))
 
