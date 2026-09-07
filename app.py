@@ -35,7 +35,6 @@ import storage
 import telegram_notify
 import totp
 from api_auth import bp as api_auth_bp
-from api_core import bp as api_core_bp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -64,11 +63,15 @@ csrf = CSRFProtect(app)
 if config.CORS_ALLOWED_ORIGIN:
     CORS(app, supports_credentials=True, origins=[config.CORS_ALLOWED_ORIGIN])
 
-# JSON API for the separate frontend — see api_auth.py / api_core.py.
-# Registered unconditionally (harmless with no frontend yet); CORS above
-# is what actually gates cross-origin access to them.
+# JSON API for the separate frontend — see api_auth.py. Registered
+# unconditionally (harmless with no frontend yet); CORS above is what
+# actually gates cross-origin access to it. Exempted from CSRFProtect:
+# CSRF defends against a browser automatically attaching ambient
+# credentials (cookies) to a forged request — this blueprint doesn't use
+# cookies at all (see api_auth.py's module docstring for why), so there's
+# no ambient credential for CSRF to exploit in the first place.
 app.register_blueprint(api_auth_bp)
-app.register_blueprint(api_core_bp)
+csrf.exempt(api_auth_bp)
 
 # Brute-force protection. In-memory storage is fine for this app's single
 # small deployment (1 gunicorn worker per scheduler.py's own lock — see
@@ -210,12 +213,12 @@ def load_logged_in_user():
     # login-redirect logic below, for every route, not just /api/*.
     if request.method == "OPTIONS":
         return
-    # /api/* routes (api_auth.py, api_core.py) return JSON and each already
-    # checks session state itself where it matters (see api_auth.py's /me).
-    # Redirecting them into an HTML /login page here — like the rest of
-    # this gate does — would hand the frontend a login page where it
-    # expects JSON.
-    if request.endpoint and (request.endpoint.startswith("api_auth.") or request.endpoint.startswith("api_core.")):
+    # /api/* routes (api_auth.py) return JSON and each already checks its
+    # own auth state itself (a Bearer token, not this cookie — see
+    # api_auth.py's module docstring). Redirecting them into an HTML
+    # /login page here — like the rest of this gate does — would hand the
+    # frontend a login page where it expects JSON.
+    if request.endpoint and request.endpoint.startswith("api_auth."):
         return
     if request.endpoint in _PUBLIC_ENDPOINTS or request.endpoint is None:
         return
