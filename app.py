@@ -36,6 +36,7 @@ import telegram_notify
 import totp
 from api_auth import bp as api_auth_bp
 from api_dashboard import bp as api_dashboard_bp
+from api_habits import bp as api_habits_bp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -75,8 +76,10 @@ if config.CORS_ALLOWED_ORIGIN:
 # exploit in the first place.
 app.register_blueprint(api_auth_bp)
 app.register_blueprint(api_dashboard_bp)
+app.register_blueprint(api_habits_bp)
 csrf.exempt(api_auth_bp)
 csrf.exempt(api_dashboard_bp)
+csrf.exempt(api_habits_bp)
 
 # Brute-force protection. In-memory storage is fine for this app's single
 # small deployment (1 gunicorn worker per scheduler.py's own lock — see

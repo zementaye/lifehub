@@ -42,7 +42,8 @@ rewrite.
      `fetch()`.
    - **This means a new `api_<feature>.py` blueprint just needs to be
      named `api_<feature>` and registered — the before_request hook
-     doesn't need editing again.**
+     doesn't need editing again.** (Confirmed working as-is for
+     `api_habits.py` in Phase 3 — no before_request edit was needed.)
 4. **CORS** is gated by the `CORS_ALLOWED_ORIGIN` env var in `config.py`
    (Render side), matched as an exact string (no trailing slash) against
    the Vercel frontend's origin. Currently set to
@@ -83,20 +84,29 @@ rewrite.
 - **Phase 1 — Auth** ✅: `api_auth.py` (register / login / login/2fa /
   logout / me, bearer token issuance). Frontend: `/login`, `/register`
   pages, `lib/api.js` (`apiFetch` + `auth` object), `components/AuthShell.js`.
-- **Phase 2 — Dashboard** ✅ (backend + frontend written, verify live
-  before starting Phase 3): `api_dashboard.py` (`GET /api/dashboard`) —
+- **Phase 2 — Dashboard** ✅: `api_dashboard.py` (`GET /api/dashboard`) —
   mirrors `app.py`'s `dashboard()` route, **except** the "Next Up" card
   (deliberately deferred — pulls from 4 tables + a recurrence-expansion
   helper, more to duplicate than seemed worth it for this slice).
-  Frontend: `/dashboard` rewritten to show Body / Today's Nutrition /
-  Today's Habits / Focus / Upcoming To-Dos from real data.
+  Frontend: `/dashboard` shows Body / Today's Nutrition / Today's Habits
+  / Focus / Upcoming To-Dos from real data. Added `components/AppNav.js`
+  (shared top nav — Dashboard/Habits links + user email + logout) here
+  too, used by every authenticated page from this point on.
+- **Phase 3 — Habits** ✅ (backend + frontend written, verify live before
+  starting Phase 4): `api_habits.py` (list, add, checkin, uncheck,
+  delete, set-reminder). Frontend: `/habits` page — add form, grouped by
+  frequency (Daily/Weekly/Monthly), checkbox toggle, streak badge,
+  delete. **Deliberately NOT built:** the per-habit reminder-time picker
+  UI (route exists on the backend — `set_habit_reminder` — but no
+  frontend form calls it yet; noted in-page that reminder scheduling
+  still requires the old HTML site for now).
 
 ## Remaining roadmap (rough order — matches how the app links together)
 
 1. ~~Auth~~ ✅
 2. ~~Dashboard~~ ✅ (minus the "Next Up" card)
-3. **Habits** (list, check-in, streak, create/edit/delete) ← next up
-4. Reminders / to-dos (list, create/edit/delete, mark done)
+3. ~~Habits~~ ✅ (minus the reminder-time picker UI)
+4. **Reminders / to-dos** (list, create/edit/delete, mark done) ← next up
 5. Calendar (view + note creation, recurrence)
 6. Budget (transactions, savings goals)
 7. Nutrition (food log, food search, meal breakdown)
@@ -108,8 +118,9 @@ rewrite.
 13. Admin panel (users, audit log)
 14. AI features (chat, quick-add)
 15. "Next Up" dashboard card (deferred from step 2)
-16. Settings / profile page
-17. Email verification & forgot-password flows on the new frontend
+16. Habit reminder-time picker (deferred from step 3)
+17. Settings / profile page
+18. Email verification & forgot-password flows on the new frontend
     (currently only exist on the old HTML side)
 
 ## Repo/deploy state
