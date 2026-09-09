@@ -35,6 +35,7 @@ import storage
 import telegram_notify
 import totp
 from api_auth import bp as api_auth_bp
+from api_dashboard import bp as api_dashboard_bp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -63,15 +64,19 @@ csrf = CSRFProtect(app)
 if config.CORS_ALLOWED_ORIGIN:
     CORS(app, supports_credentials=True, origins=[config.CORS_ALLOWED_ORIGIN])
 
-# JSON API for the separate frontend — see api_auth.py. Registered
-# unconditionally (harmless with no frontend yet); CORS above is what
-# actually gates cross-origin access to it. Exempted from CSRFProtect:
-# CSRF defends against a browser automatically attaching ambient
-# credentials (cookies) to a forged request — this blueprint doesn't use
-# cookies at all (see api_auth.py's module docstring for why), so there's
-# no ambient credential for CSRF to exploit in the first place.
+# JSON API for the separate frontend — see api_auth.py, api_dashboard.py,
+# and any future api_<feature>.py blueprint. Registered unconditionally
+# (harmless with no frontend yet); CORS above is what actually gates
+# cross-origin access to them. Every api_* blueprint is exempted from
+# CSRFProtect below: CSRF defends against a browser automatically
+# attaching ambient credentials (cookies) to a forged request — these
+# blueprints don't use cookies at all (see api_auth.py's module
+# docstring for why), so there's no ambient credential for CSRF to
+# exploit in the first place.
 app.register_blueprint(api_auth_bp)
+app.register_blueprint(api_dashboard_bp)
 csrf.exempt(api_auth_bp)
+csrf.exempt(api_dashboard_bp)
 
 # Brute-force protection. In-memory storage is fine for this app's single
 # small deployment (1 gunicorn worker per scheduler.py's own lock — see
@@ -213,12 +218,16 @@ def load_logged_in_user():
     # login-redirect logic below, for every route, not just /api/*.
     if request.method == "OPTIONS":
         return
-    # /api/* routes (api_auth.py) return JSON and each already checks its
-    # own auth state itself (a Bearer token, not this cookie — see
+    # /api/* routes (api_auth.py, api_dashboard.py, and any future
+    # api_*.py blueprint) return JSON and each already checks its own
+    # auth state itself (a Bearer token, not this cookie — see
     # api_auth.py's module docstring). Redirecting them into an HTML
     # /login page here — like the rest of this gate does — would hand the
-    # frontend a login page where it expects JSON.
-    if request.endpoint and request.endpoint.startswith("api_auth."):
+    # frontend a login page where it expects JSON. Checking the blueprint
+    # name's prefix (rather than listing each blueprint) means a new
+    # api_<feature>.py blueprint is exempted automatically, without
+    # needing this hook edited again each time.
+    if request.blueprint and request.blueprint.startswith("api_"):
         return
     if request.endpoint in _PUBLIC_ENDPOINTS or request.endpoint is None:
         return
