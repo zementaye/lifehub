@@ -101,13 +101,23 @@ rewrite.
   frontend form calls it yet; noted in-page that reminder scheduling
   still requires the old HTML site for now).
 
+- **Phase 4 — Reminders / To-Dos** ✅ (backend + frontend written, verify
+  live before starting Phase 5): `api_reminders.py` — one blueprint
+  covering both reminders (dated, recurring) and todos (undated,
+  one-off), matching how the HTML "To Do" page already pairs them (and
+  how `add_reminder()` in `app.py` already branches into a todos-table
+  insert when no due date is given). Frontend: `/todo` page — add form
+  (title/due-date/recurrence), reminders table (snooze 3d/7d, pause/
+  resume, delete), todos checklist (check/uncheck/delete). Added to
+  `AppNav`.
+
 ## Remaining roadmap (rough order — matches how the app links together)
 
 1. ~~Auth~~ ✅
 2. ~~Dashboard~~ ✅ (minus the "Next Up" card)
 3. ~~Habits~~ ✅ (minus the reminder-time picker UI)
-4. **Reminders / to-dos** (list, create/edit/delete, mark done) ← next up
-5. Calendar (view + note creation, recurrence)
+4. ~~Reminders / to-dos~~ ✅
+5. **Calendar** (view + note creation, recurrence) ← next up
 6. Budget (transactions, savings goals)
 7. Nutrition (food log, food search, meal breakdown)
 8. Health (weight entries, BMI history, sessions)
