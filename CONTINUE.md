@@ -111,26 +111,39 @@ rewrite.
   resume, delete), todos checklist (check/uncheck/delete). Added to
   `AppNav`.
 
+- **Phase 5 — Calendar** ✅ (backend + frontend written, verify live
+  before starting Phase 6): `api_calendar.py` (`GET /api/calendar?month=YYYY-MM`)
+  — month grid + events from reminders/todos/documents/notes/shared-notes,
+  mirroring `app.py`'s `calendar_view()`. **Deliberately READ-ONLY**: note
+  creation (with image/voice attachments) is left for the separate
+  "Notes" slice later in the roadmap, so this didn't have to duplicate
+  file-upload handling it doesn't need yet — `add_note()` etc. in
+  `app.py` are untouched. Frontend: `/calendar` — month grid, prev/next/
+  today nav, event icons per type/state, "+N more" for busy days (no
+  expand-on-click yet, just a count). Added to `AppNav`.
+
 ## Remaining roadmap (rough order — matches how the app links together)
 
 1. ~~Auth~~ ✅
 2. ~~Dashboard~~ ✅ (minus the "Next Up" card)
 3. ~~Habits~~ ✅ (minus the reminder-time picker UI)
 4. ~~Reminders / to-dos~~ ✅
-5. **Calendar** (view + note creation, recurrence) ← next up
-6. Budget (transactions, savings goals)
+5. ~~Calendar~~ ✅ (read-only — no note creation yet)
+6. **Budget** (transactions, savings goals) ← next up
 7. Nutrition (food log, food search, meal breakdown)
 8. Health (weight entries, BMI history, sessions)
 9. Vault (documents — needs multipart file upload handling + presigned URLs)
 10. Notifications
-11. Notes
+11. Notes (create/edit/delete, with image + voice-memo attachments —
+    calendar's read-only note display depends on this being done well)
 12. Passwords (password manager feature)
 13. Admin panel (users, audit log)
 14. AI features (chat, quick-add)
 15. "Next Up" dashboard card (deferred from step 2)
 16. Habit reminder-time picker (deferred from step 3)
-17. Settings / profile page
-18. Email verification & forgot-password flows on the new frontend
+17. Calendar "+N more" expand-on-click (deferred from step 5)
+18. Settings / profile page
+19. Email verification & forgot-password flows on the new frontend
     (currently only exist on the old HTML side)
 
 ## Repo/deploy state
