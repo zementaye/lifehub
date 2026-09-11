@@ -122,6 +122,23 @@ rewrite.
   today nav, event icons per type/state, "+N more" for busy days (no
   expand-on-click yet, just a count). Added to `AppNav`.
 
+- **Phase 6 — Budget** ✅ (backend + frontend written, verify live before
+  starting Phase 7): `api_budget.py` — monthly summary (income/expense/net,
+  category spend with limits), transactions (add/delete), categories
+  (add/delete), recurring transactions (add/toggle/delete), savings
+  goals (add/contribute/withdraw/delete/set-target). **Deliberately NOT
+  carried over:** the yearly summary/chart section from `app.py`'s
+  `budget()` (separate block of queries, left for later), and background
+  AI auto-categorization of blank-category expenses (left for the "AI
+  features" slice — this didn't need to duplicate `ai.py` integration
+  for one field; transactions just stay uncategorized if no category is
+  given, same as if the AI call had failed on the HTML side). Frontend:
+  `/budget` — month picker, summary stats, add-transaction form,
+  transactions table, categories with spend progress bars, savings goals
+  with progress/contribute/withdraw, recurring list (toggle/delete only
+  — **no add-recurring form built yet**, noted in-page). Added to
+  `AppNav`.
+
 ## Remaining roadmap (rough order — matches how the app links together)
 
 1. ~~Auth~~ ✅
@@ -129,8 +146,8 @@ rewrite.
 3. ~~Habits~~ ✅ (minus the reminder-time picker UI)
 4. ~~Reminders / to-dos~~ ✅
 5. ~~Calendar~~ ✅ (read-only — no note creation yet)
-6. **Budget** (transactions, savings goals) ← next up
-7. Nutrition (food log, food search, meal breakdown)
+6. ~~Budget~~ ✅ (minus yearly chart, AI auto-categorize, add-recurring UI)
+7. **Nutrition** (food log, food search, meal breakdown) ← next up
 8. Health (weight entries, BMI history, sessions)
 9. Vault (documents — needs multipart file upload handling + presigned URLs)
 10. Notifications
@@ -138,12 +155,13 @@ rewrite.
     calendar's read-only note display depends on this being done well)
 12. Passwords (password manager feature)
 13. Admin panel (users, audit log)
-14. AI features (chat, quick-add)
+14. AI features (chat, quick-add, budget auto-categorization)
 15. "Next Up" dashboard card (deferred from step 2)
 16. Habit reminder-time picker (deferred from step 3)
 17. Calendar "+N more" expand-on-click (deferred from step 5)
-18. Settings / profile page
-19. Email verification & forgot-password flows on the new frontend
+18. Budget yearly summary/chart + add-recurring-transaction form (deferred from step 6)
+19. Settings / profile page
+20. Email verification & forgot-password flows on the new frontend
     (currently only exist on the old HTML side)
 
 ## Repo/deploy state
@@ -151,7 +169,11 @@ rewrite.
 - **Backend:** HP's local LifeHub repo (Windows, `C:\Users\HP\LifeHub`) →
   `git push` → Render auto-deploys. Env var `CORS_ALLOWED_ORIGIN` is set
   to the Vercel URL above.
-- **Frontend:** not in a git repo yet — deployed straight from files via
-  the Vercel MCP connector each round. Source delivered each round as
-  `lifehub-frontend-scaffold.zip`; worth turning into a real GitHub repo
-  before this goes much further.
+- **Frontend:** not in a git repo yet — was deployed straight from files
+  via the Vercel MCP connector for Phases 1–6. **As of the Budget slice,
+  HP asked to stop that** — both sides are now delivered as zips each
+  round and HP pushes/deploys manually (PowerShell for the backend git
+  push; frontend deploy method is HP's call — Vercel CLI, a new GitHub
+  repo connected to the existing Vercel project, or dragging the folder
+  into the Vercel dashboard all work). Worth turning the frontend into a
+  real GitHub repo at some point regardless, same reasoning as before.
