@@ -139,6 +139,22 @@ rewrite.
   — **no add-recurring form built yet**, noted in-page). Added to
   `AppNav`.
 
+- **Phase 7 — Nutrition** ✅ (backend + frontend written, not yet
+  deployed/verified — HP now pushes both sides manually, see Repo/deploy
+  state below): `api_nutrition.py` — day summary (totals, meal
+  breakdown, goals, recommended-intake calc), per-meal detail (entries +
+  custom foods), food search (proxies `nutrition_api.search_foods`,
+  local-then-USDA fallback — untouched), log/delete food entries,
+  add/delete custom foods. Nothing deliberately deferred this slice —
+  it's a straight port. Frontend: `/nutrition` (day totals, goal
+  progress bars, recommended-intake card, meal cards linking out) and
+  `/nutrition/[meal]` (search-and-log, grams input, custom-food list and
+  add-form, per-entry delete). Added to `AppNav`. Note: the `[meal]` page
+  uses `useSearchParams` (for the `?date=` param) wrapped in a
+  `<Suspense>` boundary — Next.js App Router requires that or the build
+  can fail; worth remembering for any future page that reads query
+  params.
+
 ## Remaining roadmap (rough order — matches how the app links together)
 
 1. ~~Auth~~ ✅
@@ -147,8 +163,8 @@ rewrite.
 4. ~~Reminders / to-dos~~ ✅
 5. ~~Calendar~~ ✅ (read-only — no note creation yet)
 6. ~~Budget~~ ✅ (minus yearly chart, AI auto-categorize, add-recurring UI)
-7. **Nutrition** (food log, food search, meal breakdown) ← next up
-8. Health (weight entries, BMI history, sessions)
+7. ~~Nutrition~~ ✅
+8. **Health** (weight entries, BMI history, sessions) ← next up
 9. Vault (documents — needs multipart file upload handling + presigned URLs)
 10. Notifications
 11. Notes (create/edit/delete, with image + voice-memo attachments —
