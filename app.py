@@ -41,6 +41,7 @@ from api_reminders import bp as api_reminders_bp
 from api_calendar import bp as api_calendar_bp
 from api_budget import bp as api_budget_bp
 from api_nutrition import bp as api_nutrition_bp
+from api_health import bp as api_health_bp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -85,6 +86,7 @@ app.register_blueprint(api_reminders_bp)
 app.register_blueprint(api_calendar_bp)
 app.register_blueprint(api_budget_bp)
 app.register_blueprint(api_nutrition_bp)
+app.register_blueprint(api_health_bp)
 csrf.exempt(api_auth_bp)
 csrf.exempt(api_dashboard_bp)
 csrf.exempt(api_habits_bp)
@@ -92,6 +94,7 @@ csrf.exempt(api_reminders_bp)
 csrf.exempt(api_calendar_bp)
 csrf.exempt(api_budget_bp)
 csrf.exempt(api_nutrition_bp)
+csrf.exempt(api_health_bp)
 
 # Brute-force protection. In-memory storage is fine for this app's single
 # small deployment (1 gunicorn worker per scheduler.py's own lock — see

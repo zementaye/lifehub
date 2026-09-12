@@ -155,6 +155,19 @@ rewrite.
   can fail; worth remembering for any future page that reads query
   params.
 
+- **Phase 8 — Health** ✅ (backend + frontend written, not yet
+  deployed/verified — HP pushes both sides manually): `api_health.py` —
+  profile (height/birth date/sex), weight log (add/delete, BMI calc),
+  sessions log (add/delete). **Deliberately NOT carried over:** the
+  server-rendered inline SVG sparkline chart (`weight_sparkline_svg` in
+  app.py) — frontend gets the raw `weights` list instead and can draw
+  its own chart with a JS lib later if wanted; not worth duplicating
+  SVG-string-building for a chart style the new frontend won't render
+  the same way anyway. Frontend: `/health` — BMI card, profile form
+  (height/birth date/sex, feeds Nutrition's recommended-intake calc),
+  weight log table with add form, sessions log table with add form.
+  Added to `AppNav`.
+
 ## Remaining roadmap (rough order — matches how the app links together)
 
 1. ~~Auth~~ ✅
@@ -164,8 +177,8 @@ rewrite.
 5. ~~Calendar~~ ✅ (read-only — no note creation yet)
 6. ~~Budget~~ ✅ (minus yearly chart, AI auto-categorize, add-recurring UI)
 7. ~~Nutrition~~ ✅
-8. **Health** (weight entries, BMI history, sessions) ← next up
-9. Vault (documents — needs multipart file upload handling + presigned URLs)
+8. ~~Health~~ ✅ (minus the weight sparkline chart)
+9. **Vault** (documents — needs multipart file upload handling + presigned URLs) ← next up
 10. Notifications
 11. Notes (create/edit/delete, with image + voice-memo attachments —
     calendar's read-only note display depends on this being done well)
@@ -176,8 +189,9 @@ rewrite.
 16. Habit reminder-time picker (deferred from step 3)
 17. Calendar "+N more" expand-on-click (deferred from step 5)
 18. Budget yearly summary/chart + add-recurring-transaction form (deferred from step 6)
-19. Settings / profile page
-20. Email verification & forgot-password flows on the new frontend
+19. Weight sparkline chart (deferred from step 8)
+20. Settings / profile page
+21. Email verification & forgot-password flows on the new frontend
     (currently only exist on the old HTML side)
 
 ## Repo/deploy state
