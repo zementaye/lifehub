@@ -186,6 +186,22 @@ rewrite.
   with expiry-status coloring, download/acknowledge/renew/delete
   actions. Added to `AppNav`.
 
+- **Phase 10 — Notifications** ✅ (backend + frontend written, not yet
+  deployed/verified — HP pushes both sides manually): `api_notifications.py`
+  — list (marks all read on view, same behavior as the HTML page always
+  had) + a separate unread-count endpoint (the HTML side gets this for
+  free via a Jinja context processor on every page load; the frontend
+  needed its own lightweight endpoint for the nav badge without
+  triggering the mark-all-read side effect). Frontend: `AppNav` now
+  fetches unread count on every page navigation and shows a 🔔 badge;
+  `/notifications` lists them. **Known gap:** each notification's `link`
+  field (e.g. `url_for("calendar_view")`) points at the *old* HTML app's
+  URLs, not this frontend's routes — clicking through isn't wired up
+  yet, so the list is read-only/informational for now. Worth mapping
+  those old route names to new frontend paths in a follow-up once more
+  of the app is migrated (some link targets, like notes, don't have a
+  frontend page at all yet).
+
 ## Remaining roadmap (rough order — matches how the app links together)
 
 1. ~~Auth~~ ✅
@@ -197,9 +213,9 @@ rewrite.
 7. ~~Nutrition~~ ✅
 8. ~~Health~~ ✅ (minus the weight sparkline chart)
 9. ~~Vault~~ ✅
-10. **Notifications** ← next up
-11. Notes (create/edit/delete, with image + voice-memo attachments —
-    calendar's read-only note display depends on this being done well)
+10. ~~Notifications~~ ✅ (list is read-only — link targets not mapped yet)
+11. **Notes** (create/edit/delete, with image + voice-memo attachments —
+    calendar's read-only note display depends on this being done well) ← next up
 12. Passwords (password manager feature)
 13. Admin panel (users, audit log)
 14. AI features (chat, quick-add, budget auto-categorization)
@@ -208,8 +224,9 @@ rewrite.
 17. Calendar "+N more" expand-on-click (deferred from step 5)
 18. Budget yearly summary/chart + add-recurring-transaction form (deferred from step 6)
 19. Weight sparkline chart (deferred from step 8)
-20. Settings / profile page
-21. Email verification & forgot-password flows on the new frontend
+20. Notification link-through to frontend routes (deferred from step 10)
+21. Settings / profile page
+22. Email verification & forgot-password flows on the new frontend
     (currently only exist on the old HTML side)
 
 ## Repo/deploy state
