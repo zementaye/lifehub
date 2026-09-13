@@ -168,6 +168,24 @@ rewrite.
   weight log table with add form, sessions log table with add form.
   Added to `AppNav`.
 
+- **Phase 9 — Vault** ✅ (backend + frontend written, not yet deployed/
+  verified — HP pushes both sides manually): `api_vault.py` — the first
+  slice needing real file handling instead of plain JSON. List
+  documents (with expiry/days-left/acknowledged), multipart upload,
+  renew/acknowledge expiry, delete. **Download branches on
+  `config.USE_B2`**: B2/R2-backed storage returns a presigned URL as
+  JSON (self-authenticating, frontend just opens it); the local-disk
+  fallback streams file bytes back through this API instead of
+  redirecting, since a bare redirect would land the browser on a URL
+  with no way to prove who's asking (unlike the old cookie-auth
+  version). Frontend: `lib/api.js` gained `apiDownload()` (branches on
+  response content-type — JSON redirect vs raw bytes — so this is always
+  a single request) and `apiFetch()` now skips JSON-stringifying/
+  Content-Type-setting for `FormData` bodies, needed for the upload.
+  `/vault` page: upload form (label/file/expiry/notes), document grid
+  with expiry-status coloring, download/acknowledge/renew/delete
+  actions. Added to `AppNav`.
+
 ## Remaining roadmap (rough order — matches how the app links together)
 
 1. ~~Auth~~ ✅
@@ -178,8 +196,8 @@ rewrite.
 6. ~~Budget~~ ✅ (minus yearly chart, AI auto-categorize, add-recurring UI)
 7. ~~Nutrition~~ ✅
 8. ~~Health~~ ✅ (minus the weight sparkline chart)
-9. **Vault** (documents — needs multipart file upload handling + presigned URLs) ← next up
-10. Notifications
+9. ~~Vault~~ ✅
+10. **Notifications** ← next up
 11. Notes (create/edit/delete, with image + voice-memo attachments —
     calendar's read-only note display depends on this being done well)
 12. Passwords (password manager feature)
