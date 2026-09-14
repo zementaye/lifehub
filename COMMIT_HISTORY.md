@@ -6,10 +6,31 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-09-04 07:42
+Last updated: 2026-09-14 12:03
 
 ---
 
+- **2026-09-14** 5b74f13 - Add in-app self-ping job as alternative to external uptime pinger (Zemen)
+- **2026-09-14** f685a90 - Add passwords API (Zemen)
+- **2026-09-14** e2fe9fc - Add API blueprints through the Notes slice (auth, dashboard, habits, reminders, calendar, budget, nutrition, health, vault, notifications, notes) (Zemen)
+- **2026-09-14** fde9b46 - Add notes API (with image/voice attachments) (Zemen)
+- **2026-09-13** 719de29 - Add notifications API (Zemen)
+- **2026-09-13** 4a0bc56 - Add vault (documents) API (Zemen)
+- **2026-09-12** eedcf7a - Add health API (Zemen)
+- **2026-09-12** 98e673e - Add nutrition API (Zemen)
+- **2026-09-11** 714c8c6 - Add budget API (Zemen)
+- **2026-09-11** 1c830a9 - Add read-only calendar API (Zemen)
+- **2026-09-10** 79bed1c - Add reminders/todos API (Zemen)
+- **2026-09-09** 4c4dcce - Add habits API (list, add, checkin, uncheck, delete) (Zemen)
+- **2026-09-09** 97540e0 - Add dashboard summary API; generalize api_* CSRF/auth exemptions (Zemen)
+- **2026-09-07** 9ab0ea5 - Switch API auth from session cookies to bearer tokens (cross-site cookies were unreliable) (Zemen)
+- **2026-09-07** 05d933d - Return JSON on CSRF failure for /api/* requests instead of redirecting (Zemen)
+- **2026-09-07** 7fa370d - Exempt CORS preflight and /api/* routes from the HTML login redirect (Zemen)
+- **2026-09-06** 2e1d329 - Add JSON auth API + CORS for a separate frontend (Zemen)
+- **2026-09-06** ac70e0a - Note delete: stop blocking the response on B2/file cleanup, run it in the background (Zemen)
+- **2026-09-06** f50ea3a - Note delete: fire the request in parallel with the shake/explode animation instead of after it, closing the reload gap (Zemen)
+- **2026-09-06** eb0a1ae - 20-point audit: fix mobile table overflow, add 404 page, meta descriptions, clickable auth logos, silent form-validation failures, mobile touch targets (Zemen)
+- **2026-09-04** 0b6ab65 - Update commit history (Zemen)
 - **2026-09-04** 1d459be - Statically disable Deleting overlay for note delete forms (Zemen)
 - **2026-09-04** f0c02f7 - Accelerate shake and replace dissolve with explosion for note delete (Zemen)
 - **2026-09-04** ff51c12 - Add distress+disintegrate two-phase animation for note delete (Zemen)
