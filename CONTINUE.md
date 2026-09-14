@@ -229,6 +229,17 @@ rewrite.
   route (`edit_note`) exists and works, just no edit form built; only
   create/attach/delete are in the page. Added to `AppNav`.
 
+- **Phase 12 — Passwords** ✅ (backend + frontend written, not yet
+  deployed/verified — HP pushes both sides manually): `api_passwords.py`
+  — straight port, list/add/edit/delete, nothing deferred (small,
+  self-contained feature). Same trust boundary as the HTML version: the
+  list endpoint returns decrypted passwords in the JSON body, exactly
+  like the old page rendered them straight into HTML — nothing new
+  security-wise. Frontend: `/passwords` — add form, table with
+  click-to-reveal + copy-to-clipboard per password, inline edit (blank
+  password field on edit = keep existing, matching the backend's own
+  rule), delete. Added to `AppNav`.
+
 ## Remaining roadmap (rough order — matches how the app links together)
 
 1. ~~Auth~~ ✅
@@ -242,8 +253,8 @@ rewrite.
 9. ~~Vault~~ ✅
 10. ~~Notifications~~ ✅ (list is read-only — link targets not mapped yet)
 11. ~~Notes~~ ✅ (minus sharing, bulk-delete, and an edit-note UI)
-12. **Passwords** (password manager feature) ← next up
-13. Admin panel (users, audit log)
+12. ~~Passwords~~ ✅
+13. **Admin panel** (users, audit log) ← next up
 14. AI features (chat, quick-add, budget auto-categorization)
 15. "Next Up" dashboard card (deferred from step 2)
 16. Habit reminder-time picker (deferred from step 3)
