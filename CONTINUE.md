@@ -202,6 +202,26 @@ rewrite.
   of the app is migrated (some link targets, like notes, don't have a
   frontend page at all yet).
 
+- **Phase 11 — Notes** ✅ (backend + frontend written, not yet deployed/
+  verified — HP pushes both sides manually): `api_notes.py` — list (with
+  images/voice grouped per note), create (multipart, title/body/linked-
+  date/recurrence + optional images + voice clips), add images/voice to
+  an existing note, delete image/voice/note. Same download pattern as
+  Vault: branches on `config.USE_B2` (presigned URL vs streamed bytes).
+  **Deliberately NOT carried over:** sharing (`share_requests` — inviting
+  another user by email to specific dates, accept/decline/revoke; a
+  genuinely separate multi-user feature, left for a follow-up), bulk-
+  delete, and AI voice transcription (already happens client-side via a
+  separate endpoint elsewhere — an AI-features-slice concern, not a
+  notes-CRUD one). Frontend: `lib/api.js` gained `apiBlobUrl()` (like
+  `apiDownload` but returns an in-page blob URL for `<img>`/`<audio>`
+  preview instead of forcing a save) — images load on-demand per note
+  card (click to open full-size, right-click to delete) and voice clips
+  load on first "Play" tap rather than all fetching eagerly. **Editing an
+  existing note's title/body isn't wired into the UI yet** — the backend
+  route (`edit_note`) exists and works, just no edit form built; only
+  create/attach/delete are in the page. Added to `AppNav`.
+
 ## Remaining roadmap (rough order — matches how the app links together)
 
 1. ~~Auth~~ ✅
@@ -214,19 +234,20 @@ rewrite.
 8. ~~Health~~ ✅ (minus the weight sparkline chart)
 9. ~~Vault~~ ✅
 10. ~~Notifications~~ ✅ (list is read-only — link targets not mapped yet)
-11. **Notes** (create/edit/delete, with image + voice-memo attachments —
-    calendar's read-only note display depends on this being done well) ← next up
-12. Passwords (password manager feature)
+11. ~~Notes~~ ✅ (minus sharing, bulk-delete, and an edit-note UI)
+12. **Passwords** (password manager feature) ← next up
 13. Admin panel (users, audit log)
 14. AI features (chat, quick-add, budget auto-categorization)
 15. "Next Up" dashboard card (deferred from step 2)
 16. Habit reminder-time picker (deferred from step 3)
-17. Calendar "+N more" expand-on-click (deferred from step 5)
+17. Calendar "+N more" expand-on-click + linking Calendar to real note
+    creation (deferred from step 5, unblocked now that Notes exists)
 18. Budget yearly summary/chart + add-recurring-transaction form (deferred from step 6)
 19. Weight sparkline chart (deferred from step 8)
 20. Notification link-through to frontend routes (deferred from step 10)
-21. Settings / profile page
-22. Email verification & forgot-password flows on the new frontend
+21. Notes sharing, bulk-delete, edit-note UI (deferred from step 11)
+22. Settings / profile page
+23. Email verification & forgot-password flows on the new frontend
     (currently only exist on the old HTML side)
 
 ## Repo/deploy state
