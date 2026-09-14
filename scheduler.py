@@ -4,6 +4,7 @@ import logging
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import requests
 from apscheduler.schedulers.background import BackgroundScheduler
 
 import config
@@ -479,6 +480,29 @@ def prune_audit_log() -> None:
         logger.exception("prune_audit_log failed")
 
 
+def self_ping() -> None:
+    """In-process alternative/complement to an external uptime pinger (see
+    the /healthz route in app.py). Render's free tier spins a service down
+    after 15 minutes with no *incoming* HTTP request; this makes an
+    outbound GET to this app's own public URL, which round-trips back in
+    as a real incoming request to the same service and resets that idle
+    timer. Runs every 10 minutes — comfortably under the 15-minute window,
+    same margin the cron-job.org setup uses.
+
+    No-ops quietly if APP_BASE_URL isn't set (e.g. local dev, or a
+    deployment that isn't using this — plenty of people will just use an
+    external pinger against /healthz instead, which needs no code at all).
+    Never raises: a failed ping just means the next scheduled one, 10
+    minutes later, gets another shot.
+    """
+    if not config.APP_BASE_URL:
+        return
+    try:
+        requests.get(f"{config.APP_BASE_URL}/healthz", timeout=10)
+    except requests.RequestException:
+        logger.warning("self_ping to %s/healthz failed", config.APP_BASE_URL, exc_info=True)
+
+
 def start_scheduler():
     if not _acquire_singleton_lock():
         logger.info(
@@ -492,6 +516,7 @@ def start_scheduler():
     sched = BackgroundScheduler(timezone=config.TIMEZONE)
     sched.add_job(tick, "interval", minutes=15, id="tick", next_run_time=datetime.now())
     sched.add_job(prune_audit_log, "cron", hour=3, minute=30, id="prune_audit_log")
+    sched.add_job(self_ping, "interval", minutes=10, id="self_ping", next_run_time=datetime.now())
     sched.start()
     logger.info("Scheduler started — polling every 15 minutes.")
     return sched

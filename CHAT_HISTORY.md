@@ -700,3 +700,20 @@ immediately, and the background cleanup still completes and actually
 removes the files/db attachment rows shortly after.
 
 Changed files: `app.py`.
+
+## 2026-09-14
+
+**In-app self-ping as an alternative to the external uptime pinger.** The
+`/healthz` route (added 2026-08-xx) was built to be hit by an external
+service like cron-job.org. Added a second option that needs no
+third-party account: a new `self_ping()` job in `scheduler.py`, run every
+10 minutes via the existing APScheduler instance, that makes an outbound
+`requests.get()` to `config.APP_BASE_URL + "/healthz"`. That outbound
+request round-trips back in as real incoming traffic to the same Render
+service, which is what actually resets Render's 15-minute idle timer —
+so this only does anything useful once `APP_BASE_URL` is set to the
+live Render URL (it already needs to be, for password-reset email
+links); no-ops quietly otherwise. `requests` was already a dependency,
+so no new package needed.
+
+Changed files: `scheduler.py`.
