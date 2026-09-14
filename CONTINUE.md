@@ -78,6 +78,13 @@ rewrite.
   CSRF. (Now returns JSON for `/api/*` paths.)
 - Cross-site cookies are fundamentally unreliable for this split — don't
   reach for cookies again for any future auth-adjacent feature.
+- The frontend zip got delivered as `lifehub-frontend-scaffold.zip`
+  *every* round for a while, relying on the browser to silently rename
+  duplicates as `(2)`, `(3)`, etc. — which breaks HP's own stated rule
+  (every delivered zip needs a unique filename). Fixed by suffixing each
+  frontend zip with the slice name instead (e.g.
+  `lifehub-frontend-notes.zip`) — keep doing that going forward, never
+  reuse `lifehub-frontend-scaffold.zip` as a literal filename again.
 
 ## Completed slices
 
