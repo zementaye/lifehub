@@ -1401,7 +1401,7 @@ body[data-theme="light"] .habit-reminder-form select[name="reminder_day"] { colo
   display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px;
   margin-bottom: var(--gap-section);
 }
-.workout-session-meta-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.workout-session-meta-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; padding: 16px 18px; }
 .workout-session-meta-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .workout-session-meta-form input { min-width: 0; }
 .exercise-card { padding-top: 18px; }

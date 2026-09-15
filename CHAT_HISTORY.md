@@ -856,3 +856,29 @@ view) would need those added separately.
 Changed files: `app.py`, `templates/workouts.html` (new),
 `templates/workout_session.html`, `templates/health.html`,
 `templates/base.html`, `static/style.css`.
+
+## 2026-09-15 (workout page: two follow-up fixes)
+
+HP caught two things right after the workouts-section change above:
+
+1. The new date/duration/notes bar at the top of the workout page had no
+   visual styling — just bare inputs floating on the page background,
+   inconsistent with the card-based look everywhere else. Wrapped it in
+   `.card` (same treatment as the "Add Exercise" box right below it).
+2. Requested built-in exercise autocomplete: typing "be" into "Add
+   Exercise" should already suggest "Bench Press", etc., without needing
+   an exercise to have been logged before.
+
+Added `common_exercises.py` — a curated static list (~80 entries across
+chest/back/legs/shoulders/arms/core/olympic/cardio), same pattern as
+`common_foods.py` for nutrition. Wired it into a `<datalist>` on the
+exercise-name input via `workout_session()` in `app.py`. No search
+endpoint needed — it's a plain HTML datalist, browser handles the
+filtering client-side.
+
+Verified end-to-end with the Flask test client: registered a user,
+started a workout, confirmed the rendered page has the `.card` class on
+the meta form and a `Bench Press` option in the datalist.
+
+Changed files: `common_exercises.py` (new), `app.py`,
+`templates/workout_session.html`, `static/style.css`.

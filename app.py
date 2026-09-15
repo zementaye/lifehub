@@ -25,6 +25,7 @@ from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 from werkzeug.security import generate_password_hash
 
 import ai
+import common_exercises
 import config
 import crypto
 import db
@@ -1299,7 +1300,10 @@ def workout_session(session_id):
             flash("That session doesn't exist.")
             return redirect(url_for("health"))
         exercises = db.get_workout_exercises(conn, session_id, g.user_id)
-    return render_template("workout_session.html", session=session_row, exercises=exercises)
+    return render_template(
+        "workout_session.html", session=session_row, exercises=exercises,
+        common_exercises=common_exercises.COMMON_EXERCISES,
+    )
 
 
 @app.route("/health/session/<int:session_id>/update", methods=["POST"])
