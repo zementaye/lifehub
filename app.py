@@ -1120,9 +1120,17 @@ def dashboard():
             "SELECT * FROM weight_entries WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT 1",
             (user_id,),
         ).fetchone()
+        # "Upcoming" is capped at a real window instead of just "whatever
+        # the next 5 active reminders are, however far off" — otherwise a
+        # to-do due 6 months from now would happily fill this list (and
+        # the empty state below would then never honestly say "nothing
+        # due soon"). No lower bound: an overdue reminder still counts as
+        # due, arguably more urgently than "soon".
         upcoming_reminders = conn.execute(
-            "SELECT * FROM reminders WHERE user_id = ? AND active = 1 ORDER BY date(next_due) LIMIT 5",
-            (user_id,),
+            "SELECT * FROM reminders WHERE user_id = ? AND active = 1 "
+            "AND date(next_due) <= date(?, '+14 days') "
+            "ORDER BY date(next_due) LIMIT 5",
+            (user_id, today),
         ).fetchall()
         habits = conn.execute(
             "SELECT * FROM habits WHERE user_id = ? AND active = 1", (user_id,)

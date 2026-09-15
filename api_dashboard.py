@@ -65,9 +65,14 @@ def dashboard():
             "SELECT * FROM weight_entries WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT 1",
             (user_id,),
         ).fetchone()
+        # Same 14-day "soon" window as the server-rendered dashboard (see
+        # app.py's dashboard() for the reasoning) — keeps this API route's
+        # upcoming_reminders in sync with what the web UI actually shows.
         upcoming_reminders = conn.execute(
-            "SELECT * FROM reminders WHERE user_id = ? AND active = 1 ORDER BY date(next_due) LIMIT 5",
-            (user_id,),
+            "SELECT * FROM reminders WHERE user_id = ? AND active = 1 "
+            "AND date(next_due) <= date(?, '+14 days') "
+            "ORDER BY date(next_due) LIMIT 5",
+            (user_id, today),
         ).fetchall()
         habits = conn.execute(
             "SELECT * FROM habits WHERE user_id = ? AND active = 1", (user_id,)

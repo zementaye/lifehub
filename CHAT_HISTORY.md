@@ -743,3 +743,19 @@ Suggested testing with "Open in Browser" instead of tapping the link
 directly, to isolate whether that's what's actually going on.
 
 Changed files: `app.py`, `config.py`, `templates/login.html`.
+
+## 2026-09-15 (later)
+
+**"Nothing due soon" wasn't actually bound to any timeframe.** Dashboard's
+Upcoming To-Dos query just grabbed the 5 active reminders with the
+earliest `next_due`, with no date filter at all — so a to-do due 6 months
+out would show up as "upcoming," and the empty state ("Nothing due soon")
+would only ever appear if there were literally zero active reminders,
+never based on how far away the nearest one actually was. Added a real
+14-day window (`date(next_due) <= date(today, '+14 days')`, no lower
+bound so overdue items still show — arguably more urgent than "soon") to
+both `app.py`'s `dashboard()` and `api_dashboard.py`'s `/dashboard` route,
+so they stay in sync. UI text unchanged — no specific day count shown in
+the copy, same reasoning as the remember-me checkbox earlier today.
+
+Changed files: `app.py`, `api_dashboard.py`.
