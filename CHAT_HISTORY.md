@@ -793,3 +793,24 @@ separate frontend needs it.
 
 Changed files: `app.py`, `db.py`, `templates/health.html`,
 `templates/workout_session.html` (new), `static/style.css`.
+
+## 2026-09-15 (continued)
+
+**Closed the api_health.py gap flagged in the previous entry.** Added the
+equivalent workout endpoints to the JSON API blueprint so it isn't
+missing functionality the server-rendered app now has:
+`GET /api/health/session/<id>` (session + exercises + sets, same
+`db.get_workout_exercises()` PR computation as the HTML page),
+`POST /api/health/session/<id>/exercises`,
+`POST /api/health/exercise/<id>/sets`,
+`POST /api/health/exercise/<id>/delete`, and
+`POST /api/health/set/<id>/delete`. Also fixed `delete_session()` here to
+cascade-delete workout_exercises/workout_sets first — it was still doing
+the old single-table delete, which would have left orphaned workout rows
+behind for any Gym session deleted through the API. Verified the whole
+flow end-to-end with the Flask test client (bearer-token auth via
+`api_auth._issue_token`): add session → add exercise → add three sets →
+fetch back and confirm only the heaviest set is flagged PR → delete
+session → confirm a follow-up fetch 404s.
+
+Changed files: `api_health.py`.

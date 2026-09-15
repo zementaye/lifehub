@@ -1,6 +1,9 @@
 """JSON API for health — the eighth slice of the Vercel frontend
 migration. Mirrors app.py's health()/set_height()/add_weight()/
-delete_weight()/add_session()/delete_session() routes.
+delete_weight()/add_session()/delete_session() routes, plus the
+exercise/set-level workout endpoints added alongside workout_session()
+in app.py (session/<id>, session/<id>/exercises, exercise/<id>/sets,
+exercise/<id>/delete, set/<id>/delete).
 
 Deliberately NOT included: app.py's `weight_sparkline_svg` (a server-
 rendered inline SVG chart) — the frontend gets the raw weight_entries
@@ -185,7 +188,144 @@ def delete_session(session_id):
     if err:
         return err
     with db.get_conn() as conn:
+        # No ON DELETE CASCADE relied on here (see workout_exercises'
+        # schema comment in db.py) — same explicit-cascade shape as
+        # app.py's delete_session().
+        exercise_rows = conn.execute(
+            "SELECT id FROM workout_exercises WHERE session_id = ? AND user_id = ?",
+            (session_id, user["id"]),
+        ).fetchall()
+        for ex in exercise_rows:
+            conn.execute(
+                "DELETE FROM workout_sets WHERE exercise_id = ? AND user_id = ?",
+                (ex["id"], user["id"]),
+            )
+        conn.execute(
+            "DELETE FROM workout_exercises WHERE session_id = ? AND user_id = ?",
+            (session_id, user["id"]),
+        )
         conn.execute(
             "DELETE FROM sessions WHERE id = ? AND user_id = ?", (session_id, user["id"])
+        )
+    return jsonify({"ok": True}), 200
+
+
+@bp.get("/session/<int:session_id>")
+def get_workout_session(session_id):
+    user, err = _require_user()
+    if err:
+        return err
+    user_id = user["id"]
+
+    with db.get_conn() as conn:
+        session_row = conn.execute(
+            "SELECT * FROM sessions WHERE id = ? AND user_id = ?", (session_id, user_id)
+        ).fetchone()
+        if not session_row:
+            return jsonify({"error": "Session not found."}), 404
+        exercises = db.get_workout_exercises(conn, session_id, user_id)
+
+    return jsonify({
+        "session": dict(session_row),
+        "exercises": [
+            {"exercise": dict(item["exercise"]), "sets": item["sets"]}
+            for item in exercises
+        ],
+    }), 200
+
+
+@bp.post("/session/<int:session_id>/exercises")
+def add_workout_exercise(session_id):
+    user, err = _require_user()
+    if err:
+        return err
+    user_id = user["id"]
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Enter an exercise name."}), 400
+
+    with db.get_conn() as conn:
+        owns_session = conn.execute(
+            "SELECT id FROM sessions WHERE id = ? AND user_id = ?", (session_id, user_id)
+        ).fetchone()
+        if not owns_session:
+            return jsonify({"error": "Session not found."}), 404
+        cur = conn.execute(
+            "INSERT INTO workout_exercises (session_id, user_id, name, created_at) VALUES (?,?,?,?)",
+            (session_id, user_id, name, db.now()),
+        )
+        new_row = conn.execute(
+            "SELECT * FROM workout_exercises WHERE id = ?", (cur.lastrowid,)
+        ).fetchone()
+    return jsonify({"exercise": dict(new_row)}), 201
+
+
+@bp.post("/exercise/<int:exercise_id>/sets")
+def add_workout_set(exercise_id):
+    user, err = _require_user()
+    if err:
+        return err
+    user_id = user["id"]
+
+    data = request.get_json(silent=True) or {}
+    try:
+        weight = float(data.get("weight_kg"))
+        reps = int(data.get("reps"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Enter a weight and rep count."}), 400
+    is_drop_set = 1 if data.get("is_drop_set") else 0
+
+    with db.get_conn() as conn:
+        exercise = conn.execute(
+            "SELECT session_id FROM workout_exercises WHERE id = ? AND user_id = ?",
+            (exercise_id, user_id),
+        ).fetchone()
+        if not exercise:
+            return jsonify({"error": "Exercise not found."}), 404
+        cur = conn.execute(
+            "INSERT INTO workout_sets (exercise_id, user_id, weight_kg, reps, is_drop_set, created_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (exercise_id, user_id, weight, reps, is_drop_set, db.now()),
+        )
+        new_row = conn.execute(
+            "SELECT * FROM workout_sets WHERE id = ?", (cur.lastrowid,)
+        ).fetchone()
+    return jsonify({"set": dict(new_row)}), 201
+
+
+@bp.post("/exercise/<int:exercise_id>/delete")
+def delete_workout_exercise(exercise_id):
+    user, err = _require_user()
+    if err:
+        return err
+    user_id = user["id"]
+
+    with db.get_conn() as conn:
+        exercise = conn.execute(
+            "SELECT session_id FROM workout_exercises WHERE id = ? AND user_id = ?",
+            (exercise_id, user_id),
+        ).fetchone()
+        if exercise:
+            conn.execute(
+                "DELETE FROM workout_sets WHERE exercise_id = ? AND user_id = ?",
+                (exercise_id, user_id),
+            )
+            conn.execute(
+                "DELETE FROM workout_exercises WHERE id = ? AND user_id = ?",
+                (exercise_id, user_id),
+            )
+    return jsonify({"ok": True}), 200
+
+
+@bp.post("/set/<int:set_id>/delete")
+def delete_workout_set(set_id):
+    user, err = _require_user()
+    if err:
+        return err
+    with db.get_conn() as conn:
+        conn.execute(
+            "DELETE FROM workout_sets WHERE id = ? AND user_id = ?", (set_id, user["id"])
         )
     return jsonify({"ok": True}), 200
