@@ -46,6 +46,7 @@ from api_vault import bp as api_vault_bp
 from api_notifications import bp as api_notifications_bp
 from api_notes import bp as api_notes_bp
 from api_passwords import bp as api_passwords_bp
+from api_admin import bp as api_admin_bp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -95,6 +96,7 @@ app.register_blueprint(api_vault_bp)
 app.register_blueprint(api_notifications_bp)
 app.register_blueprint(api_notes_bp)
 app.register_blueprint(api_passwords_bp)
+app.register_blueprint(api_admin_bp)
 csrf.exempt(api_auth_bp)
 csrf.exempt(api_dashboard_bp)
 csrf.exempt(api_habits_bp)
@@ -107,6 +109,7 @@ csrf.exempt(api_vault_bp)
 csrf.exempt(api_notifications_bp)
 csrf.exempt(api_notes_bp)
 csrf.exempt(api_passwords_bp)
+csrf.exempt(api_admin_bp)
 
 # Brute-force protection. In-memory storage is fine for this app's single
 # small deployment (1 gunicorn worker per scheduler.py's own lock — see

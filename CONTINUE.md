@@ -240,6 +240,35 @@ rewrite.
   password field on edit = keep existing, matching the backend's own
   rule), delete. Added to `AppNav`.
 
+- **Phase 13 — Admin Panel** ✅ (backend + frontend written, not yet
+  deployed/verified — HP pushes both sides manually): `api_admin.py` —
+  the first slice needing its own auth layer on top of the normal bearer
+  token. **Step-up re-authentication**: admin routes require a password
+  re-check (`POST /api/admin/verify`) that issues a second, short-lived
+  "elevation" token (itsdangerous, different salt, `config.ADMIN_ELEVATION_LIFETIME`
+  — 15 min by default), sent as `X-Admin-Token` alongside the normal
+  `Authorization: Bearer` header. **Deliberate simplification from the
+  HTML version**: the elevation token's validity window is fixed from
+  issuance, not a sliding one that renews on activity like the
+  cookie-session version does — a genuinely-idle-but-open admin session
+  expires on a strict timer here instead of staying alive through
+  activity. Revisit if 15 minutes proves too short in practice.
+  Endpoints: overview stats, user list/search, update user (email/
+  password), toggle-admin, toggle-suspend, delete user (best-effort
+  vault file cleanup, same as the HTML version), audit log
+  (list + CSV export). Frontend: `lib/api.js` gained a small `admin`
+  object wrapping an `adminFetch()` that attaches the elevation token and
+  clears it on an "expired" error so the next admin action re-prompts.
+  `/admin` page: password re-verify gate first, then overview stats,
+  Users tab (search, promote/demote, suspend/unsuspend, delete), Audit
+  Log tab (search). "Admin" link only shows in `AppNav` for
+  `user.is_admin` accounts. **Deliberately NOT built:** the
+  edit-user-email/password form (`update_user` backend route exists,
+  unused by the UI) and a reason prompt for suspending someone (currently
+  always sends an empty reason) — both minor, left for a follow-up.
+  CSV export of the audit log also isn't wired to a button yet, though
+  the endpoint works.
+
 ## Remaining roadmap (rough order — matches how the app links together)
 
 1. ~~Auth~~ ✅
@@ -254,8 +283,8 @@ rewrite.
 10. ~~Notifications~~ ✅ (list is read-only — link targets not mapped yet)
 11. ~~Notes~~ ✅ (minus sharing, bulk-delete, and an edit-note UI)
 12. ~~Passwords~~ ✅
-13. **Admin panel** (users, audit log) ← next up
-14. AI features (chat, quick-add, budget auto-categorization)
+13. ~~Admin panel~~ ✅ (minus edit-user form, suspend-reason prompt, CSV export button)
+14. **AI features** (chat, quick-add, budget auto-categorization) ← next up
 15. "Next Up" dashboard card (deferred from step 2)
 16. Habit reminder-time picker (deferred from step 3)
 17. Calendar "+N more" expand-on-click + linking Calendar to real note
@@ -264,8 +293,9 @@ rewrite.
 19. Weight sparkline chart (deferred from step 8)
 20. Notification link-through to frontend routes (deferred from step 10)
 21. Notes sharing, bulk-delete, edit-note UI (deferred from step 11)
-22. Settings / profile page
-23. Email verification & forgot-password flows on the new frontend
+22. Admin edit-user form, suspend-reason prompt, audit CSV export button (deferred from step 13)
+23. Settings / profile page
+24. Email verification & forgot-password flows on the new frontend
     (currently only exist on the old HTML side)
 
 ## Repo/deploy state
