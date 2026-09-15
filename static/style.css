@@ -1345,6 +1345,15 @@ body[data-theme="light"] .habit-reminder-form select[name="reminder_day"] { colo
   display: inline-block;
   animation: flame-pulse 1.8s ease-in-out infinite;
 }
+.pr-badge {
+  font-family: var(--font-mono);
+  font-size: 0.72rem; font-weight: 700; color: var(--success);
+  background: color-mix(in srgb, var(--success) 16%, transparent); padding: 2px 7px; border-radius: 4px;
+  display: inline-block;
+}
+.drop-set-tag {
+  font-size: 0.72rem; margin-left: 6px;
+}
 @keyframes flame-pulse {
   0%, 100% { text-shadow: 0 0 0 transparent; transform: scale(1); }
   50% { text-shadow: 0 0 8px color-mix(in srgb, var(--primary) 55%, transparent); transform: scale(1.05); }

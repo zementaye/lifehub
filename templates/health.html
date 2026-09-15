@@ -104,7 +104,13 @@
         {% for s in sessions %}
           <tr>
             <td>{{ s.date }}</td>
-            <td>{{ s.type }}</td>
+            <td>
+              {% if s.type|lower == 'gym' %}
+                <a href="{{ url_for('workout_session', session_id=s.id) }}">{{ s.type }}</a>
+              {% else %}
+                {{ s.type }}
+              {% endif %}
+            </td>
             <td>{{ s.duration_minutes or '—' }} min</td>
             <td class="muted">{{ s.notes or '' }}</td>
             <td>

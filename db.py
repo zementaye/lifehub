@@ -80,6 +80,38 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at REAL NOT NULL
 );
 
+-- Detailed strength-training breakdown for a Gym-type `sessions` row —
+-- "Bench Press", "Pullover", etc. Kept as its own table rather than a
+-- text blob on the session so individual sets stay queryable (that's
+-- what makes PR detection in db.get_workout_exercises() possible at
+-- all). Deleting the parent session must also delete these explicitly
+-- (see delete_session() in app.py) — same no-FK-cascade convention as
+-- the rest of this schema (see the comment on the account-deletion
+-- sweep further down for why).
+CREATE TABLE IF NOT EXISTS workout_exercises (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    user_id INTEGER,
+    name TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
+
+-- One row per set. is_drop_set just flags "this set was a drop set" for
+-- display — it doesn't change PR math, which only cares about weight_kg.
+-- No `set_number` column on purpose: renumbering after a mid-workout
+-- delete would mean either leaving gaps or rewriting every later set's
+-- number, so "Set N" is instead just this row's position (by id) within
+-- its exercise, computed at render time in db.get_workout_exercises().
+CREATE TABLE IF NOT EXISTS workout_sets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exercise_id INTEGER NOT NULL,
+    user_id INTEGER,
+    weight_kg REAL NOT NULL,
+    reps INTEGER NOT NULL,
+    is_drop_set INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS custom_foods (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
@@ -392,6 +424,7 @@ _USER_SCOPED_TABLES = [
     "documents", "reminders", "habits", "todos", "settings",
     "budget_categories", "transactions", "recurring_transactions",
     "savings_goals", "passwords", "notes", "note_images", "note_voice", "notifications",
+    "workout_exercises", "workout_sets",
 ]
 
 # These four tables carried a table-level constraint in the old single-user
@@ -1155,6 +1188,55 @@ def admin_delete_user(user_id: int):
         conn.execute("DELETE FROM email_verifications WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
     return filenames
+
+
+# ── Workouts ─────────────────────────────────────────────────────────────
+
+def get_workout_exercises(conn, session_id: int, user_id: int):
+    """Returns this session's exercises, each with its sets in the shape
+    `{"exercise": <row>, "sets": [<row dict + is_pr + display_number>, ...]}`.
+
+    PR isn't a stored column — a set is flagged as a PR if its weight beats
+    every earlier set logged for an exercise of the same name (case-
+    insensitive), checked against the user's *entire* history, not just
+    this session. "Earlier" means by the workout's calendar date, then by
+    logging order for same-day entries — so backdating an old heavier
+    session after the fact still reshuffles the badge correctly, and nothing
+    needs to be recomputed or kept in sync when a set is edited or deleted.
+    The very first time an exercise is ever logged, its heaviest set counts
+    as a PR too (there's nothing earlier to have beaten)."""
+    exercises = conn.execute(
+        "SELECT * FROM workout_exercises WHERE session_id = ? AND user_id = ? ORDER BY id",
+        (session_id, user_id),
+    ).fetchall()
+    result = []
+    for ex in exercises:
+        sets = conn.execute(
+            "SELECT * FROM workout_sets WHERE exercise_id = ? AND user_id = ? ORDER BY id",
+            (ex["id"], user_id),
+        ).fetchall()
+        history = conn.execute(
+            """SELECT ws.id, ws.weight_kg FROM workout_sets ws
+               JOIN workout_exercises we ON we.id = ws.exercise_id
+               JOIN sessions s ON s.id = we.session_id
+               WHERE we.user_id = ? AND we.name = ? COLLATE NOCASE
+               ORDER BY date(s.date), ws.id""",
+            (user_id, ex["name"]),
+        ).fetchall()
+        pr_set_ids = set()
+        running_max = 0
+        for row in history:
+            if row["weight_kg"] > running_max:
+                pr_set_ids.add(row["id"])
+                running_max = row["weight_kg"]
+        result.append({
+            "exercise": ex,
+            "sets": [
+                dict(s, is_pr=(s["id"] in pr_set_ids), display_number=i + 1)
+                for i, s in enumerate(sets)
+            ],
+        })
+    return result
 
 
 # ── Shared dates ─────────────────────────────────────────────────────────

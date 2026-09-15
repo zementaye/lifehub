@@ -759,3 +759,37 @@ so they stay in sync. UI text unchanged — no specific day count shown in
 the copy, same reasoning as the remember-me checkbox earlier today.
 
 Changed files: `app.py`, `api_dashboard.py`.
+
+## 2026-09-15 (later still)
+
+**Real exercise/set-level workout logging for Gym sessions, with automatic
+PR detection.** The old "Log a Session" form was one flat entry (type,
+duration, notes) — fine for Football/Tennis/Running, but useless for
+actually tracking strength progress (no per-exercise sets, weights, reps).
+Added two new tables, `workout_exercises` and `workout_sets` (see their
+schema comments in `db.py`), and a dedicated workout page: logging a
+session with type "Gym" now redirects straight to `/health/session/<id>`
+instead of back to `/health`, where exercises ("Bench Press") can be added
+and each given its own sets (weight, reps, optional "drop set" flag).
+Existing Gym rows in Session History link to the same page.
+
+PRs aren't a stored/manually-toggled column — `db.get_workout_exercises()`
+computes them on read by walking a user's entire history for an exercise
+name (case-insensitive, ordered by the workout's calendar date) and
+flagging any set that beat everything logged before it. So in the
+motivating example (bench press: 100kg for set 1, 90kg for the next two),
+only the 100kg set gets the 🏆 PR badge, automatically, and it stays
+correct if a later session logs something heavier or an old heavier set
+gets deleted — nothing to keep in sync.
+
+Deleting a session, an exercise, or a single set all cascade correctly
+(no reliance on `ON DELETE CASCADE`, same convention as the rest of the
+schema — see `delete_session()`/`delete_workout_exercise()` in `app.py`).
+
+Flagged, not done: `api_health.py` (the JSON API mirror used by the
+Vercel frontend slice) was NOT updated with equivalent workout endpoints
+— this only went into the server-rendered app. Worth doing later if the
+separate frontend needs it.
+
+Changed files: `app.py`, `db.py`, `templates/health.html`,
+`templates/workout_session.html` (new), `static/style.css`.

@@ -1240,13 +1240,21 @@ def add_session():
     stype = request.form.get("type", "").strip()
     duration = request.form.get("duration_minutes", type=int)
     notes = request.form.get("notes", "").strip()
-    if stype:
-        with db.get_conn() as conn:
-            conn.execute(
-                "INSERT INTO sessions (user_id, date, type, duration_minutes, notes, created_at) VALUES (?,?,?,?,?,?)",
-                (g.user_id, d, stype, duration, notes, db.now()),
-            )
-        flash("Session logged.")
+    if not stype:
+        return redirect(url_for("health"))
+    with db.get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO sessions (user_id, date, type, duration_minutes, notes, created_at) VALUES (?,?,?,?,?,?)",
+            (g.user_id, d, stype, duration, notes, db.now()),
+        )
+        session_id = cur.lastrowid
+    flash("Session logged.")
+    # Gym sessions get their own page to break the workout down into
+    # exercises and sets. Everything else (Football, Tennis, Running,
+    # Other) is just a single log entry with nothing further to add, so
+    # it goes back to the Health page same as before.
+    if stype.lower() == "gym":
+        return redirect(url_for("workout_session", session_id=session_id))
     return redirect(url_for("health"))
 
 
@@ -1254,8 +1262,115 @@ def add_session():
 @login_required
 def delete_session(session_id):
     with db.get_conn() as conn:
+        # No ON DELETE CASCADE relied on here (see workout_exercises'
+        # schema comment in db.py) — the exercises/sets under this
+        # session are deleted explicitly first.
+        exercise_rows = conn.execute(
+            "SELECT id FROM workout_exercises WHERE session_id = ? AND user_id = ?",
+            (session_id, g.user_id),
+        ).fetchall()
+        for ex in exercise_rows:
+            conn.execute(
+                "DELETE FROM workout_sets WHERE exercise_id = ? AND user_id = ?",
+                (ex["id"], g.user_id),
+            )
+        conn.execute(
+            "DELETE FROM workout_exercises WHERE session_id = ? AND user_id = ?",
+            (session_id, g.user_id),
+        )
         conn.execute("DELETE FROM sessions WHERE id = ? AND user_id = ?", (session_id, g.user_id))
     return redirect(url_for("health"))
+
+
+@app.route("/health/session/<int:session_id>")
+@login_required
+def workout_session(session_id):
+    with db.get_conn() as conn:
+        session_row = conn.execute(
+            "SELECT * FROM sessions WHERE id = ? AND user_id = ?", (session_id, g.user_id)
+        ).fetchone()
+        if not session_row:
+            flash("That session doesn't exist.")
+            return redirect(url_for("health"))
+        exercises = db.get_workout_exercises(conn, session_id, g.user_id)
+    return render_template("workout_session.html", session=session_row, exercises=exercises)
+
+
+@app.route("/health/session/<int:session_id>/exercises", methods=["POST"])
+@login_required
+def add_workout_exercise(session_id):
+    name = request.form.get("name", "").strip()
+    with db.get_conn() as conn:
+        owns_session = conn.execute(
+            "SELECT id FROM sessions WHERE id = ? AND user_id = ?", (session_id, g.user_id)
+        ).fetchone()
+        if owns_session and name:
+            conn.execute(
+                "INSERT INTO workout_exercises (session_id, user_id, name, created_at) VALUES (?,?,?,?)",
+                (session_id, g.user_id, name, db.now()),
+            )
+    return redirect(url_for("workout_session", session_id=session_id))
+
+
+@app.route("/health/exercise/<int:exercise_id>/sets", methods=["POST"])
+@login_required
+def add_workout_set(exercise_id):
+    weight = request.form.get("weight_kg", type=float)
+    reps = request.form.get("reps", type=int)
+    is_drop_set = 1 if request.form.get("is_drop_set") == "1" else 0
+    with db.get_conn() as conn:
+        exercise = conn.execute(
+            "SELECT session_id FROM workout_exercises WHERE id = ? AND user_id = ?",
+            (exercise_id, g.user_id),
+        ).fetchone()
+        if exercise and weight and reps:
+            conn.execute(
+                "INSERT INTO workout_sets (exercise_id, user_id, weight_kg, reps, is_drop_set, created_at) "
+                "VALUES (?,?,?,?,?,?)",
+                (exercise_id, g.user_id, weight, reps, is_drop_set, db.now()),
+            )
+    if not exercise:
+        return redirect(url_for("health"))
+    return redirect(url_for("workout_session", session_id=exercise["session_id"]))
+
+
+@app.route("/health/exercise/<int:exercise_id>/delete", methods=["POST"])
+@login_required
+def delete_workout_exercise(exercise_id):
+    with db.get_conn() as conn:
+        exercise = conn.execute(
+            "SELECT session_id FROM workout_exercises WHERE id = ? AND user_id = ?",
+            (exercise_id, g.user_id),
+        ).fetchone()
+        if exercise:
+            conn.execute(
+                "DELETE FROM workout_sets WHERE exercise_id = ? AND user_id = ?",
+                (exercise_id, g.user_id),
+            )
+            conn.execute(
+                "DELETE FROM workout_exercises WHERE id = ? AND user_id = ?",
+                (exercise_id, g.user_id),
+            )
+    if not exercise:
+        return redirect(url_for("health"))
+    return redirect(url_for("workout_session", session_id=exercise["session_id"]))
+
+
+@app.route("/health/set/<int:set_id>/delete", methods=["POST"])
+@login_required
+def delete_workout_set(set_id):
+    with db.get_conn() as conn:
+        owning_set = conn.execute(
+            "SELECT we.session_id FROM workout_sets ws "
+            "JOIN workout_exercises we ON we.id = ws.exercise_id "
+            "WHERE ws.id = ? AND ws.user_id = ?",
+            (set_id, g.user_id),
+        ).fetchone()
+        if owning_set:
+            conn.execute("DELETE FROM workout_sets WHERE id = ? AND user_id = ?", (set_id, g.user_id))
+    if not owning_set:
+        return redirect(url_for("health"))
+    return redirect(url_for("workout_session", session_id=owning_set["session_id"]))
 
 
 # ── Nutrition ────────────────────────────────────────────────────────────
