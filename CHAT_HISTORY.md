@@ -814,3 +814,45 @@ fetch back and confirm only the heaviest set is flagged PR → delete
 session → confirm a follow-up fetch 404s.
 
 Changed files: `api_health.py`.
+
+## 2026-09-15 (workouts got their own section)
+
+**HP's feedback:** the gym-logging flow was bad — the only way in was the
+generic "Log a Session" form on the Health page (buried among weight
+tracking, had to fill in date/type/duration before you even reached
+exercise logging), and the workout page itself needed a UI pass.
+
+Split gym workouts out into their own section entirely, separate from
+Health:
+
+- New `/workouts` page with a one-click **Start Workout** button (no form
+  fields — creates today's session immediately and redirects straight into
+  exercise/set logging; date/duration/notes get filled in afterwards
+  instead of upfront) plus a "This month / Total logged" stat row and a
+  history list (date, duration or "in progress", exercise/set counts, PR
+  badges, delete).
+- New `/health/session/<id>/update` route so date/duration/notes can be
+  edited after the fact from the workout page itself.
+- Health page: "Log a Session" → "Log Activity", "Gym" removed from the
+  type dropdown (Football/Tennis/Running/Other only), a link over to
+  Workouts added, and its session list/history now excludes gym rows
+  (`health()` view filters `type != 'gym'`).
+- `workout_session.html` redesigned: editable date/duration/notes bar at
+  the top, cleaner exercise cards.
+- Nav (`base.html`, both the topnav dropdown and the sidebar): added a
+  "Workouts" link under the Health group.
+- New CSS for the hero button, workout row list, and session header —
+  reused existing tokens (`--accent`, `--success`, `--border`, `--radius`,
+  etc.), no new colors introduced.
+
+No DB migration — reuses the existing `sessions` / `workout_exercises` /
+`workout_sets` tables as-is.
+
+Flagged, not done: same gap as the 2026-09-15 API entry above but for
+this feature — `api_health.py` has no equivalent for `/workouts` or
+`/workouts/start`, so the Vercel frontend slice (if it grows a workouts
+view) would need those added separately.
+
+Changed files: `app.py`, `templates/workouts.html` (new),
+`templates/workout_session.html`, `templates/health.html`,
+`templates/base.html`, `static/style.css`.

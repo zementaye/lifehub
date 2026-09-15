@@ -1176,8 +1176,14 @@ def health():
             "SELECT * FROM weight_entries WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT 30",
             (user_id,),
         ).fetchall()
+        # Gym sessions have their own dedicated Workouts section now (see
+        # /workouts below) — they're excluded here so this page's "Log a
+        # Session" / history stay focused on one-off activities
+        # (Football, Tennis, Running, Other) instead of mixing in
+        # multi-exercise workouts.
         sessions = conn.execute(
-            "SELECT * FROM sessions WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT 30",
+            "SELECT * FROM sessions WHERE user_id = ? AND lower(type) != 'gym' "
+            "ORDER BY date DESC, id DESC LIMIT 30",
             (user_id,),
         ).fetchall()
 
@@ -1294,6 +1300,87 @@ def workout_session(session_id):
             return redirect(url_for("health"))
         exercises = db.get_workout_exercises(conn, session_id, g.user_id)
     return render_template("workout_session.html", session=session_row, exercises=exercises)
+
+
+@app.route("/health/session/<int:session_id>/update", methods=["POST"])
+@login_required
+def update_session_meta(session_id):
+    # Lets a session's date/duration/notes be filled in after the fact —
+    # used on the workout log page, since a workout's duration isn't known
+    # until it's over and "Start Workout" no longer asks for it up front.
+    d = request.form.get("date") or date.today().isoformat()
+    duration = request.form.get("duration_minutes", type=int)
+    notes = request.form.get("notes", "").strip()
+    with db.get_conn() as conn:
+        owns = conn.execute(
+            "SELECT id, type FROM sessions WHERE id = ? AND user_id = ?", (session_id, g.user_id)
+        ).fetchone()
+        if owns:
+            conn.execute(
+                "UPDATE sessions SET date = ?, duration_minutes = ?, notes = ? WHERE id = ? AND user_id = ?",
+                (d, duration, notes, session_id, g.user_id),
+            )
+    if not owns:
+        return redirect(url_for("health"))
+    if owns["type"].lower() == "gym":
+        return redirect(url_for("workout_session", session_id=session_id))
+    return redirect(url_for("health"))
+
+
+# ── Workouts (Gym sessions) ─────────────────────────────────────────────
+# Split out from the general Health page: gym sessions are the only
+# session type with anything further to add (exercises/sets), so they get
+# their own section with a one-click "Start Workout" entry point instead
+# of being buried behind the generic "Log a Session" form.
+
+@app.route("/workouts")
+@login_required
+def workouts_page():
+    user_id = g.user_id
+    with db.get_conn() as conn:
+        gym_sessions = conn.execute(
+            "SELECT * FROM sessions WHERE user_id = ? AND lower(type) = 'gym' "
+            "ORDER BY date DESC, id DESC LIMIT 30",
+            (user_id,),
+        ).fetchall()
+        # Reuses the same PR-aware helper the workout detail page uses, so
+        # the PR count shown here always matches what you'd see if you
+        # opened the workout.
+        sessions_view = []
+        for s in gym_sessions:
+            exercises = db.get_workout_exercises(conn, s["id"], user_id)
+            pr_count = sum(1 for item in exercises for st in item["sets"] if st["is_pr"])
+            sessions_view.append({
+                "row": s,
+                "exercise_count": len(exercises),
+                "set_count": sum(len(item["sets"]) for item in exercises),
+                "pr_count": pr_count,
+            })
+        this_month = date.today().strftime("%Y-%m")
+        workouts_this_month = sum(1 for s in gym_sessions if s["date"].startswith(this_month))
+    return render_template(
+        "workouts.html",
+        sessions=sessions_view,
+        workouts_this_month=workouts_this_month,
+        total_workouts=len(gym_sessions),
+        today=date.today().isoformat(),
+    )
+
+
+@app.route("/workouts/start", methods=["POST"])
+@login_required
+def start_workout():
+    # One click, no form fields: creates today's session immediately and
+    # drops straight into exercise/set logging. Date, duration, and notes
+    # can all be filled in afterwards from the workout page.
+    with db.get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO sessions (user_id, date, type, duration_minutes, notes, created_at) "
+            "VALUES (?, ?, 'Gym', NULL, '', ?)",
+            (g.user_id, date.today().isoformat(), db.now()),
+        )
+        session_id = cur.lastrowid
+    return redirect(url_for("workout_session", session_id=session_id))
 
 
 @app.route("/health/session/<int:session_id>/exercises", methods=["POST"])

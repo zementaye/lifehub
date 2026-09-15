@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Workouts — Life Hub{% endblock %}
+{% block meta_description %}Start and track gym workouts, exercises, sets, and PRs in Life Hub.{% endblock %}
+{% block content %}
+<h1>Workouts</h1>
+
+<div class="card wide workout-hero">
+  <div class="workout-hero-copy">
+    <h3>Ready to lift?</h3>
+    <p class="muted">Starts a session for today — add exercises and sets as you go, no setup needed.</p>
+  </div>
+  <form method="post" action="{{ url_for('start_workout') }}">
+    <button type="submit" class="workout-start-btn">🏋️ Start Workout</button>
+  </form>
+</div>
+
+<div class="card wide">
+  <div class="stat-row">
+    <div class="stat"><span class="stat-value">{{ workouts_this_month }}</span><span class="stat-label">This month</span></div>
+    <div class="stat"><span class="stat-value">{{ total_workouts }}</span><span class="stat-label">Total logged</span></div>
+  </div>
+</div>
+
+<div class="card wide">
+  <h3>Recent Workouts</h3>
+  {% if sessions %}
+    <div class="workout-list">
+      {% for item in sessions %}
+        {% set s = item.row %}
+        <div class="workout-row">
+          <a class="workout-row-link" href="{{ url_for('workout_session', session_id=s.id) }}">
+            <span class="workout-row-date">{{ s.date }}</span>
+            <span class="workout-row-meta">
+              {% if s.duration_minutes %}
+                <span class="workout-chip">{{ s.duration_minutes }} min</span>
+              {% else %}
+                <span class="workout-chip in-progress">in progress</span>
+              {% endif %}
+              <span class="workout-chip">{{ item.exercise_count }} exercise{{ '' if item.exercise_count == 1 else 's' }}</span>
+              <span class="workout-chip">{{ item.set_count }} set{{ '' if item.set_count == 1 else 's' }}</span>
+              {% if item.pr_count %}
+                <span class="pr-badge">🏆 {{ item.pr_count }} PR{{ '' if item.pr_count == 1 else 's' }}</span>
+              {% endif %}
+              {% if s.notes %}<span class="muted">{{ s.notes }}</span>{% endif %}
+            </span>
+          </a>
+          <form method="post" action="{{ url_for('delete_session', session_id=s.id) }}" data-confirm="Delete this workout from {{ s.date }} and all its exercises/sets?">
+            <button class="btn-icon" title="Delete workout">🗑️</button>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="workout-empty">
+      <p class="muted">No workouts logged yet — hit "Start Workout" above to log your first one.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
