@@ -74,17 +74,84 @@
   <div class="card add-exercise-card">
     <h3>+ Add Exercise</h3>
     <form method="post" action="{{ url_for('add_workout_exercise', session_id=session.id) }}" class="inline-form">
-      <label>Name
-        <input type="text" name="name" placeholder="e.g. Bench Press" required autofocus
-               list="common-exercises" autocomplete="off">
+      <label class="autocomplete-wrap">Name
+        <input type="text" name="name" id="exercise-name-input" placeholder="e.g. Bench Press" required autofocus autocomplete="off">
+        <div class="autocomplete-list" id="exercise-suggestions" hidden></div>
       </label>
       <button type="submit">Add</button>
     </form>
-    <datalist id="common-exercises">
-      {% for name in common_exercises %}
-        <option value="{{ name }}">
-      {% endfor %}
-    </datalist>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script type="application/json" id="common-exercises-data">{{ common_exercises | tojson }}</script>
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  const input = document.getElementById('exercise-name-input');
+  const list = document.getElementById('exercise-suggestions');
+  if (!input || !list) return;
+
+  const allExercises = JSON.parse(document.getElementById('common-exercises-data').textContent);
+  let activeIndex = -1;
+
+  function render(matches) {
+    list.innerHTML = '';
+    matches.forEach((name, i) => {
+      const item = document.createElement('div');
+      item.className = 'autocomplete-item';
+      item.textContent = name;
+      item.addEventListener('mousedown', (e) => {
+        // mousedown (not click) so this fires before the input's blur hides the list
+        e.preventDefault();
+        select(name);
+      });
+      list.appendChild(item);
+    });
+    activeIndex = -1;
+    list.hidden = matches.length === 0;
+  }
+
+  function select(name) {
+    input.value = name;
+    list.hidden = true;
+    input.focus();
+  }
+
+  function highlight(index) {
+    Array.from(list.children).forEach((el, i) => el.classList.toggle('active', i === index));
+    if (list.children[index]) list.children[index].scrollIntoView({ block: 'nearest' });
+  }
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { list.hidden = true; return; }
+    const matches = allExercises.filter((name) => name.toLowerCase().includes(q)).slice(0, 8);
+    render(matches);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (list.hidden || !list.children.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeIndex = Math.min(activeIndex + 1, list.children.length - 1);
+      highlight(activeIndex);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeIndex = Math.max(activeIndex - 1, 0);
+      highlight(activeIndex);
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      select(list.children[activeIndex].textContent);
+    } else if (e.key === 'Escape') {
+      list.hidden = true;
+    }
+  });
+
+  input.addEventListener('blur', () => { list.hidden = true; });
+  input.addEventListener('focus', () => {
+    if (input.value.trim()) input.dispatchEvent(new Event('input'));
+  });
+})();
+</script>
 {% endblock %}

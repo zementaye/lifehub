@@ -882,3 +882,31 @@ the meta form and a `Bench Press` option in the datalist.
 
 Changed files: `common_exercises.py` (new), `app.py`,
 `templates/workout_session.html`, `static/style.css`.
+
+## 2026-09-15 (workout page: exercise autocomplete redo)
+
+HP didn't like the look of the native `<datalist>` dropdown from the
+previous entry — it renders as a plain OS-styled popup that browsers
+don't let you skin with CSS, so it looked completely out of place next
+to the rest of the app's theme.
+
+Replaced it with a custom-built dropdown, same idea as the nutrition
+page's food search (`.search-result` in `style.css`) but styled as a
+floating list anchored under the input instead of an inline block:
+
+- Removed the `<datalist>`/`list=` attribute entirely.
+- The exercise-name field is now wrapped in `.autocomplete-wrap`, with a
+  `.autocomplete-list` div (new CSS, matches `.card`'s
+  background/border/radius/shadow) absolutely positioned under it.
+- The exercise list itself is embedded once as JSON
+  (`<script type="application/json">`, filled from the same
+  `common_exercises.COMMON_EXERCISES`) and filtered client-side in JS on
+  every keystroke — substring match, top 8 shown, arrow keys to navigate,
+  Enter/click to select, Escape or blur to dismiss. No new backend
+  endpoint needed since the list is static and small.
+
+Verified end-to-end with the Flask test client: no `<datalist>` tag left
+in the rendered page, the new suggestion div and embedded JSON (with
+"Bench Press" in it) are both present.
+
+Changed files: `templates/workout_session.html`, `static/style.css`.

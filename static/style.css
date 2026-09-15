@@ -1416,6 +1416,38 @@ body[data-theme="light"] .habit-reminder-form select[name="reminder_day"] { colo
 }
 .add-exercise-card { border-style: dashed; }
 .add-exercise-card h3 { color: var(--muted); }
+
+/* Exercise name autocomplete (replaces the native <datalist> popup, which
+   can't be styled and looked like a bare OS dropdown against the app's
+   theme) */
+.autocomplete-wrap { position: relative; }
+.autocomplete-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 220px;
+  max-width: 320px;
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 20;
+  background: linear-gradient(165deg, var(--surface), var(--bg-glow));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 6px;
+}
+.autocomplete-item {
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.autocomplete-item:hover,
+.autocomplete-item.active {
+  background: color-mix(in srgb, var(--tab-color) 14%, transparent);
+  color: var(--tab-color);
+}
 @keyframes flame-pulse {
   0%, 100% { text-shadow: 0 0 0 transparent; transform: scale(1); }
   50% { text-shadow: 0 0 8px color-mix(in srgb, var(--primary) 55%, transparent); transform: scale(1.05); }
