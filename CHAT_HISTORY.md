@@ -910,3 +910,28 @@ in the rendered page, the new suggestion div and embedded JSON (with
 "Bench Press" in it) are both present.
 
 Changed files: `templates/workout_session.html`, `static/style.css`.
+
+## 2026-09-15 (workout page: meta-form inputs had no depth)
+
+Still on the date/duration/notes bar — HP still didn't like it after the
+card-wrapping fix; asked what specifically and got "fields look too
+plain/flat". They were using the same thin-single-border input style as
+every other form in the app, which reads fine spread across a page but
+looked bare packed into this compact toolbar-style row.
+
+Scoped the fix to just this form (didn't touch the global `.inline-form
+input` style used everywhere else, to avoid changing the look of every
+other form in the app on a one-off complaint):
+
+- Inputs now sit on `var(--bg)` (a notch darker than the card behind them)
+  with an inset shadow instead of a flat border, so they read as recessed
+  fields rather than plain boxes.
+- Focus state gets a glow ring in the page's accent color, consistent
+  with how buttons already glow on hover elsewhere.
+- Save button changed from the outlined `.secondary` style to the same
+  filled amber primary style as every other "Add"/"Save" button in the
+  app — it was the odd one out before.
+- Added 📅/⏱️/📝 icons to the Date/Duration/Notes labels for a bit more
+  visual distinction between the three fields.
+
+Changed files: `templates/workout_session.html`, `static/style.css`.

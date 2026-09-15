@@ -9,10 +9,10 @@
     <p class="muted"><a href="{{ url_for('workouts_page') }}">← Back to Workouts</a></p>
   </div>
   <form method="post" action="{{ url_for('update_session_meta', session_id=session.id) }}" class="card workout-session-meta-form">
-    <label>Date <input type="date" name="date" value="{{ session.date }}"></label>
-    <label>Duration (min) <input type="number" name="duration_minutes" min="0" max="1440" value="{{ session.duration_minutes or '' }}" placeholder="e.g. 60"></label>
-    <label>Notes <input type="text" name="notes" value="{{ session.notes or '' }}" placeholder="optional"></label>
-    <button type="submit" class="secondary">Save</button>
+    <label>📅 Date <input type="date" name="date" value="{{ session.date }}"></label>
+    <label>⏱️ Duration (min) <input type="number" name="duration_minutes" min="0" max="1440" value="{{ session.duration_minutes or '' }}" placeholder="e.g. 60"></label>
+    <label>📝 Notes <input type="text" name="notes" value="{{ session.notes or '' }}" placeholder="optional"></label>
+    <button type="submit">Save</button>
   </form>
 </div>
 

@@ -1401,9 +1401,24 @@ body[data-theme="light"] .habit-reminder-form select[name="reminder_day"] { colo
   display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px;
   margin-bottom: var(--gap-section);
 }
-.workout-session-meta-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; padding: 16px 18px; }
-.workout-session-meta-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.workout-session-meta-form input { min-width: 0; }
+.workout-session-meta-form { display: flex; flex-wrap: wrap; gap: 14px; align-items: end; padding: 16px 18px; }
+.workout-session-meta-form label { display: flex; flex-direction: column; gap: 5px; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.workout-session-meta-form input {
+  min-width: 0;
+  border: none;
+  border-radius: 7px;
+  padding: 10px 12px;
+  background: var(--bg);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.14), inset 0 0 0 1px var(--border);
+  transition: box-shadow 0.2s ease;
+}
+.workout-session-meta-form input:focus {
+  outline: none;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.14), inset 0 0 0 1px var(--tab-color),
+    0 0 0 3px color-mix(in srgb, var(--tab-color) 20%, transparent);
+}
+.workout-session-meta-form input[type="date"] { color-scheme: light; }
+body[data-theme="dark"] .workout-session-meta-form input[type="date"] { color-scheme: dark; }
 .exercise-card { padding-top: 18px; }
 .exercise-card-header {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
