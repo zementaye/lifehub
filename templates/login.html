@@ -33,7 +33,11 @@
     <form method="post" class="inline-form auth-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>Email <input type="text" name="email" inputmode="email" autocapitalize="none" autocomplete="username" required autofocus></label>
-      <label>Password <input type="password" name="password" required></label>
+      <label>Password <input type="password" name="password" required autocomplete="current-password"></label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="remember" value="1" checked>
+        Remember me for 2 weeks
+      </label>
       <button type="submit">Log In</button>
     </form>
     <p class="muted">

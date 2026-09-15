@@ -717,3 +717,29 @@ links); no-ops quietly otherwise. `requests` was already a dependency,
 so no new package needed.
 
 Changed files: `scheduler.py`.
+
+## 2026-09-15
+
+**"Remember me" checkbox on login, and raised the default session length.**
+HP reported that logging in via a link opened from a Telegram notification
+never stuck — kept landing back on the login screen. The session cookie
+was already set `permanent=True` on every login, just with a fairly short
+7-day lifetime, and with no way to opt into something longer. Added a
+"Remember me for 2 weeks" checkbox to `login.html`, checked by default;
+`login()` now reads it and passes it through `_finish_login(user, remember)`,
+which sets `session.permanent` accordingly — checked keeps the 14-day
+cookie (`PERMANENT_SESSION_LIFETIME`, bumped from 7 to 14 days by default
+in `config.py`; set `SESSION_LIFETIME_DAYS=30` on Render for a month
+instead), unchecked falls back to a plain browser-session cookie that
+clears when the browser fully closes. The 2FA pending-login step
+(`login_2fa()`) now carries the choice through via
+`session["pending_totp_remember"]` so it isn't lost mid-flow.
+
+Flagged but not fixed: if HP is actually opening the link inside
+Telegram's built-in in-app browser rather than Safari/Chrome, that
+embedded browser may still drop cookies between visits regardless of the
+cookie's expiry — a longer session won't help if that's the real cause.
+Suggested testing with "Open in Browser" instead of tapping the link
+directly, to isolate whether that's what's actually going on.
+
+Changed files: `app.py`, `config.py`, `templates/login.html`.

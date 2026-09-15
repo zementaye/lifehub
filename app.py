@@ -484,6 +484,12 @@ def login():
 
     email = request.form.get("email", "").strip()
     password = request.form.get("password", "")
+    # Checked by default in the template. Unchecked checkboxes simply
+    # aren't sent at all by browsers, so a *missing* "remember" means
+    # unchecked here — not the other way around — for someone logging in
+    # from a shared/public machine who doesn't want the long-lived cookie
+    # (see _finish_login).
+    remember = request.form.get("remember") == "1"
 
     # A trailing "/admin" on the email field (same password, no separate
     # credential) is just a routing shortcut straight to the admin panel
@@ -523,10 +529,11 @@ def login():
         session["pending_totp_user_id"] = user["id"]
         session["pending_totp_started_at"] = time.time()
         session["pending_totp_want_admin"] = want_admin
+        session["pending_totp_remember"] = remember
         session["pending_totp_next"] = _safe_next(request.args.get("next")) or ""
         return redirect(url_for("login_2fa"))
 
-    _finish_login(user)
+    _finish_login(user, remember)
     next_path = _safe_next(request.args.get("next"))
     return _post_login_response(user, next_path, want_admin)
 
@@ -548,6 +555,7 @@ def login_2fa():
         session.pop("pending_totp_user_id", None)
         session.pop("pending_totp_started_at", None)
         session.pop("pending_totp_want_admin", None)
+        session.pop("pending_totp_remember", None)
         session.pop("pending_totp_next", None)
         flash("That login attempt expired — log in again.")
         return redirect(url_for("login"))
@@ -579,25 +587,34 @@ def login_2fa():
         return render_template("login_2fa.html")
 
     want_admin = session.get("pending_totp_want_admin", False)
+    remember = session.get("pending_totp_remember", True)
     next_path = session.get("pending_totp_next") or None
     session.pop("pending_totp_user_id", None)
     session.pop("pending_totp_started_at", None)
     session.pop("pending_totp_want_admin", None)
+    session.pop("pending_totp_remember", None)
     session.pop("pending_totp_next", None)
 
-    _finish_login(user)
+    _finish_login(user, remember)
     if used_backup_code:
         remaining = db.count_unused_backup_codes(user["id"])
         flash(f"Logged in with a backup code — {remaining} left. Generate new ones from Settings when you can.")
     return _post_login_response(user, next_path, want_admin)
 
 
-def _finish_login(user) -> None:
+def _finish_login(user, remember: bool = True) -> None:
     """Establishes the real, logged-in session. Shared by the no-2FA path
     in login() and the post-code path in login_2fa() so both end up with
-    exactly the same session state."""
+    exactly the same session state.
+
+    `remember` controls how long it sticks: True (the default, and what
+    the login form's checked-by-default "Remember me" sends) makes the
+    session cookie permanent, lasting config.PERMANENT_SESSION_LIFETIME
+    (14 days by default — see config.py). False makes it a plain
+    browser-session cookie instead, which most browsers clear once fully
+    closed, for someone logging in from a shared/public machine."""
     session["user_id"] = user["id"]
-    session.permanent = True
+    session.permanent = bool(remember)
     # A fresh login is itself a password check, so it also counts as
     # admin elevation (see admin_required) — no need to immediately
     # re-prompt someone who just typed their password 2 seconds ago.

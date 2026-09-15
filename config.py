@@ -160,10 +160,13 @@ CORS_ALLOWED_ORIGIN = os.environ.get("CORS_ALLOWED_ORIGIN", "").strip()
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "None" if CORS_ALLOWED_ORIGIN else "Lax"
 SESSION_COOKIE_SECURE = IS_PRODUCTION
-# Sessions guard a password vault and ID documents — Flask's 31-day default
-# is too long-lived for that. 7 days, refreshed on activity (default
-# SESSION_REFRESH_EACH_REQUEST=True), configurable via env if needed.
-PERMANENT_SESSION_LIFETIME = int(os.environ.get("SESSION_LIFETIME_DAYS", "7")) * 24 * 60 * 60
+# Sessions guard a password vault and ID documents, so this isn't unlimited —
+# but "Remember me" on the login form (checked by default) is what actually
+# grants this lifetime; unchecking it falls back to a browser-session cookie
+# that clears when the browser fully closes. 14 days by default (raise to 30
+# via env for "reset monthly" instead), refreshed on activity (default
+# SESSION_REFRESH_EACH_REQUEST=True).
+PERMANENT_SESSION_LIFETIME = int(os.environ.get("SESSION_LIFETIME_DAYS", "14")) * 24 * 60 * 60
 
 # The regular login session above is long-lived on purpose (it's fine for
 # someone to stay logged in to their own dashboard for a week). Admin
