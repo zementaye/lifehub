@@ -1341,6 +1341,13 @@ def update_session_meta(session_id):
 @login_required
 def workouts_page():
     user_id = g.user_id
+    # How many Sun-Sat weeks back to look — 0 is the current week,
+    # negative goes further into the past. Clamped so you can't page
+    # into the future.
+    week_offset = request.args.get("week_offset", 0, type=int)
+    if week_offset > 0:
+        week_offset = 0
+
     with db.get_conn() as conn:
         gym_sessions = conn.execute(
             "SELECT * FROM sessions WHERE user_id = ? AND lower(type) = 'gym' "
@@ -1363,36 +1370,53 @@ def workouts_page():
         this_month = date.today().strftime("%Y-%m")
         workouts_this_month = sum(1 for s in gym_sessions if s["date"].startswith(this_month))
 
-        # Weekly activity strip: last 10 weeks (Mon-Sun), how many workouts
-        # landed in each. Pulls from all-time sessions, not just the 30
-        # shown above, so a quiet recent stretch doesn't look like a gap
-        # if the weeks are actually populated further back... actually
-        # simplest to bucket the same 30 we already have; good enough for
-        # a glanceable trend and avoids a second query.
+        # Weekly Activity: one Sun-Sat week at a time, a bar per day, with
+        # prev/next navigation via ?week_offset=. Queried directly by date
+        # range rather than reused from gym_sessions above, since paging
+        # back can go further than that list's 30-row cap.
         today = date.today()
-        this_monday = today - timedelta(days=today.weekday())
-        week_buckets = []
-        for i in range(9, -1, -1):
-            week_start = this_monday - timedelta(weeks=i)
-            week_end = week_start + timedelta(days=6)
-            count = sum(
-                1 for s in gym_sessions
-                if week_start.isoformat() <= s["date"] <= week_end.isoformat()
-            )
-            week_buckets.append({
-                "label": f"{week_start.strftime('%b')} {week_start.day}",
-                "count": count,
-                "is_current": i == 0,
+        this_sunday = today - timedelta(days=(today.weekday() + 1) % 7)
+        week_start = this_sunday + timedelta(weeks=week_offset)
+        week_end = week_start + timedelta(days=6)
+        day_rows = conn.execute(
+            "SELECT date, COUNT(*) AS cnt FROM sessions "
+            "WHERE user_id = ? AND lower(type) = 'gym' AND date BETWEEN ? AND ? "
+            "GROUP BY date",
+            (user_id, week_start.isoformat(), week_end.isoformat()),
+        ).fetchall()
+        counts_by_date = {r["date"]: r["cnt"] for r in day_rows}
+        day_buckets = []
+        for i in range(7):
+            d = week_start + timedelta(days=i)
+            day_buckets.append({
+                "date": d.isoformat(),
+                "day_name": d.strftime("%a").upper(),
+                "day_num": d.day,
+                "month": d.strftime("%b"),
+                "count": counts_by_date.get(d.isoformat(), 0),
+                "is_today": d == today,
             })
-        max_week_count = max((w["count"] for w in week_buckets), default=0)
+        max_day_count = max((d["count"] for d in day_buckets), default=0)
+        if week_start.year == week_end.year:
+            week_label = (
+                f"{week_start.strftime('%b')} {week_start.day} – "
+                f"{week_end.strftime('%b')} {week_end.day}, {week_end.year}"
+            )
+        else:
+            week_label = (
+                f"{week_start.strftime('%b')} {week_start.day}, {week_start.year} – "
+                f"{week_end.strftime('%b')} {week_end.day}, {week_end.year}"
+            )
     return render_template(
         "workouts.html",
         sessions=sessions_view,
         workouts_this_month=workouts_this_month,
         total_workouts=len(gym_sessions),
         today=date.today().isoformat(),
-        week_buckets=week_buckets,
-        max_week_count=max_week_count,
+        day_buckets=day_buckets,
+        max_day_count=max_day_count,
+        week_label=week_label,
+        week_offset=week_offset,
     )
 
 

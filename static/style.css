@@ -1137,7 +1137,8 @@ button.secondary:hover {
   box-shadow: inset 0 0 0 40px color-mix(in srgb, var(--accent) 100%, transparent), 0 0 16px color-mix(in srgb, var(--accent) 45%, transparent);
   transform: translateY(-1px);
 }
-button.btn-icon {
+button.btn-icon,
+a.btn-icon {
   background: none;
   padding: 4px 8px;
   font-size: 1rem;
@@ -1148,7 +1149,8 @@ button.btn-icon {
   border-radius: 6px;
 }
 button.btn-icon::before { display: none; }
-button.btn-icon:hover {
+button.btn-icon:hover,
+a.btn-icon:hover {
   background: color-mix(in srgb, var(--tab-color) 14%, transparent);
   color: var(--ink);
   box-shadow: 0 0 12px color-mix(in srgb, var(--tab-color) 30%, transparent);
@@ -1366,13 +1368,12 @@ body[data-theme="light"] .habit-reminder-form select[name="reminder_day"] { colo
   border-radius: 8px !important;
   letter-spacing: 0.03em !important;
   white-space: nowrap;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 80%, white 20%), var(--primary)) !important;
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--primary) 50%, transparent),
-    inset 0 1px 0 rgba(255,255,255,0.35);
+  background: linear-gradient(135deg, #FFCB80, #FF9A3D) !important;
+  color: #1A1006 !important;
+  box-shadow: 0 6px 20px rgba(255, 154, 61, 0.55), inset 0 1px 0 rgba(255,255,255,0.55);
 }
 .workout-start-btn:hover {
-  box-shadow: 0 6px 22px color-mix(in srgb, var(--primary) 65%, transparent),
-    inset 0 1px 0 rgba(255,255,255,0.4);
+  box-shadow: 0 8px 26px rgba(255, 154, 61, 0.7), inset 0 1px 0 rgba(255,255,255,0.6);
 }
 .workout-empty {
   text-align: center; padding: 30px 16px; color: var(--muted);
@@ -1384,13 +1385,17 @@ body[data-theme="light"] .habit-reminder-form select[name="reminder_day"] { colo
 }
 .workout-chip.in-progress { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 
-.weekly-chart { display: flex; align-items: flex-end; gap: 8px; margin-top: 16px; height: 130px; }
-.weekly-chart-col {
-  flex: 1; height: 100%;
+.weekly-chart-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.weekly-chart-header h3 { margin: 0; }
+.weekly-chart-nav { display: flex; align-items: center; gap: 10px; }
+.weekly-chart-range { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+.weekly-chart-nav .btn-icon.disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+.weekly-chart { display: flex; align-items: flex-end; gap: 10px; margin-top: 18px; height: 150px; }
+.weekly-chart-col { flex: 1; height: 100%;
   display: flex; flex-direction: column; align-items: center; gap: 4px;
 }
-.weekly-chart-count { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; color: var(--muted); }
-.weekly-chart-bar-track { flex: 1; width: 100%; max-width: 26px; display: flex; align-items: flex-end; }
+.weekly-chart-count { font-family: var(--font-mono); font-size: 0.76rem; font-weight: 700; color: var(--muted); }
+.weekly-chart-bar-track { flex: 1; width: 100%; max-width: 36px; display: flex; align-items: flex-end; }
 .weekly-chart-bar {
   width: 100%; min-height: 3px;
   border-radius: 4px 4px 0 0;
@@ -1401,7 +1406,7 @@ body[data-theme="light"] .habit-reminder-form select[name="reminder_day"] { colo
   background: linear-gradient(180deg, var(--primary), color-mix(in srgb, var(--primary) 45%, transparent));
   box-shadow: 0 0 10px color-mix(in srgb, var(--primary) 55%, transparent);
 }
-.weekly-chart-label { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+.weekly-chart-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; text-align: center; line-height: 1.5; }
 .weekly-chart-col.current .weekly-chart-label { color: var(--primary); font-weight: 700; }
 
 /* ── Workout session (single workout log) ────────────────────────── */

@@ -970,3 +970,40 @@ the new table markup renders instead of the old card-row markup, and the
 `overflow: visible` rule is present in the shipped CSS.
 
 Changed files: `app.py`, `templates/workouts.html`, `static/style.css`.
+
+## 2026-09-16 (Weekly Activity: rebuilt as a navigable Sun-Sat view; two more fixes)
+
+1. **Past sessions with nothing logged shouldn't say "in progress"** — that
+   label only makes sense for something ongoing. Recent Workouts' status
+   column now checks the session date against today: a past date with 0
+   exercises shows "No session" (muted text, not a chip); a past date
+   *with* exercises but no duration recorded shows "Logged" instead
+   (still real data, just don't call finished-and-in-the-past workouts
+   "in progress"); only today-or-later with no duration still shows the
+   "in progress" chip.
+2. **Start Workout button still read dark** — the previous fix lightened
+   the existing `--primary` gradient, but light theme's `--primary` is a
+   muted brown to begin with, so "lighter than muted" was still muted.
+   This time gave the button fixed, theme-independent bright
+   orange/gold hex stops (`#FFCB80` → `#FF9A3D`) instead of deriving from
+   `--primary` at all, so it doesn't inherit either theme's dimness.
+3. **Weekly Activity redone per HP's spec** — was a 10-week overview bar
+   chart; now it's a single Sun-Sat week (7 day-bars, current day
+   highlighted) with ← / → navigation to page through past weeks via
+   `?week_offset=` (0 = this week, more negative = further back; can't
+   page into the future). `workouts_page()` now queries `sessions`
+   directly by date range for the selected week (not reused from the
+   30-row list above it, since paging back can exceed that cap) and
+   passes `day_buckets` / `max_day_count` / `week_label` / `week_offset`.
+   Extended `button.btn-icon`'s CSS to also match `a.btn-icon` so the
+   prev/next controls (plain links, not forms/buttons) pick up the same
+   hover styling as the delete icons elsewhere.
+
+Verified end-to-end (Flask test client, server clock 2026-09-16 which is
+a Wednesday): current week resolves to Sep 13–19 with the day-of-week
+column order Sun/Mon/Tue/Wed/Thu/Fri/Sat and today's workout landing in
+the Wednesday bar; `?week_offset=-1` resolves to Sep 6–12 with a working
+"next" link back to the current week; a manually-inserted past session
+with 0 exercises renders "No session".
+
+Changed files: `app.py`, `templates/workouts.html`, `static/style.css`.

@@ -22,16 +22,27 @@
 </div>
 
 <div class="card wide">
-  <h3>Weekly Activity</h3>
+  <div class="weekly-chart-header">
+    <h3>Weekly Activity</h3>
+    <div class="weekly-chart-nav">
+      <a href="{{ url_for('workouts_page', week_offset=week_offset - 1) }}" class="btn-icon" title="Previous week">←</a>
+      <span class="weekly-chart-range">{{ week_label }}</span>
+      {% if week_offset < 0 %}
+        <a href="{{ url_for('workouts_page', week_offset=week_offset + 1) }}" class="btn-icon" title="Next week">→</a>
+      {% else %}
+        <span class="btn-icon disabled" title="This is the current week">→</span>
+      {% endif %}
+    </div>
+  </div>
   <div class="weekly-chart">
-    {% for w in week_buckets %}
-      <div class="weekly-chart-col {{ 'current' if w.is_current }}">
-        <span class="weekly-chart-count">{{ w.count }}</span>
+    {% for d in day_buckets %}
+      <div class="weekly-chart-col {{ 'current' if d.is_today }}">
+        <span class="weekly-chart-count">{{ d.count }}</span>
         <div class="weekly-chart-bar-track">
-          <div class="weekly-chart-bar" style="height: {{ ((w.count / max_week_count * 100) if max_week_count else 0) | round(1) }}%;"
-               title="{{ w.count }} workout{{ '' if w.count == 1 else 's' }} — week of {{ w.label }}"></div>
+          <div class="weekly-chart-bar" style="height: {{ ((d.count / max_day_count * 100) if max_day_count else 0) | round(1) }}%;"
+               title="{{ d.count }} workout{{ '' if d.count == 1 else 's' }} — {{ d.day_name }} {{ d.month }} {{ d.day_num }}"></div>
         </div>
-        <span class="weekly-chart-label">{{ w.label }}</span>
+        <span class="weekly-chart-label">{{ d.day_name }}<br>{{ d.month }} {{ d.day_num }}</span>
       </div>
     {% endfor %}
   </div>
@@ -51,6 +62,10 @@
           <td>
             {% if s.duration_minutes %}
               {{ s.duration_minutes }} min
+            {% elif s.date < today and item.exercise_count == 0 %}
+              <span class="muted">No session</span>
+            {% elif s.date < today %}
+              <span class="muted">Logged</span>
             {% else %}
               <span class="workout-chip in-progress">in progress</span>
             {% endif %}
