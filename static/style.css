@@ -1397,31 +1397,45 @@ body[data-theme="light"] .habit-reminder-form select[name="reminder_day"] { colo
 }
 .workout-chip.in-progress { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 
-.weekly-chart-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
-.weekly-chart-header h3 { margin: 0; }
-.week-nav {
-  display: inline-flex; align-items: center; gap: 2px;
-  background: var(--surface-raised);
+.week-nav-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1), inset 0 0 0 1px var(--border);
+}
+.week-nav-edge-btn {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 4px;
-}
-.week-nav-btn {
-  width: 28px; height: 28px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 50%;
-  font-size: 1.05rem; font-weight: 700; line-height: 1;
-  color: var(--muted);
-  transition: background 0.15s ease, color 0.15s ease;
-}
-.week-nav-btn:hover {
-  background: color-mix(in srgb, var(--tab-color) 18%, transparent);
+  font-family: var(--font-mono); font-size: 0.76rem; font-weight: 700;
   color: var(--ink);
+  text-transform: uppercase; letter-spacing: 0.03em;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
-.week-nav-btn.disabled { opacity: 0.3; cursor: default; pointer-events: none; }
-.week-nav-label {
-  font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; color: var(--ink);
-  padding: 0 12px; white-space: nowrap;
+.week-nav-edge-btn:hover {
+  border-color: var(--tab-color);
+  color: var(--tab-color);
+  background: color-mix(in srgb, var(--tab-color) 10%, var(--surface));
+}
+.week-nav-edge-btn.disabled {
+  opacity: 0.35; pointer-events: none; color: var(--muted);
+}
+.week-nav-center {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  flex: 1; min-width: 0;
+}
+.week-nav-range {
+  font-family: var(--font-mono); font-size: 1rem; font-weight: 700; color: var(--ink);
+  white-space: nowrap;
+}
+.week-nav-today {
+  font-size: 0.7rem; color: var(--tab-color); text-decoration: underline;
+  white-space: nowrap;
 }
 .weekly-chart { display: flex; align-items: flex-end; gap: 10px; margin-top: 18px; height: 150px; }
 .weekly-chart-col { flex: 1; height: 100%;
@@ -2737,6 +2751,10 @@ body[data-theme="light"] .calendar-note-form select { color-scheme: light; }
   .calendar-weekdays span { font-size: 0.6rem; }
   .calendar-legend { font-size: 0.7rem; gap: 8px 12px; margin-top: 14px; padding-top: 10px; }
   .calendar-day-modal-events .calendar-evt-text { display: inline; }
+  .week-nav-bar { padding: 8px; gap: 6px; }
+  .week-nav-edge-btn { padding: 8px 10px; font-size: 0; } /* icon-only on narrow screens */
+  .week-nav-edge-btn::before { content: attr(data-icon); font-size: 0.95rem; }
+  .week-nav-range { font-size: 0.82rem; }
 }
 
 /* ── Floating AI assistant ──────────────────────────────────────────── */

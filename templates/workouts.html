@@ -22,17 +22,20 @@
 </div>
 
 <div class="card wide">
-  <div class="weekly-chart-header">
-    <h3>Weekly Activity</h3>
-    <div class="week-nav">
-      <a href="{{ url_for('workouts_page', week_offset=week_offset - 1) }}" class="week-nav-btn" title="Previous week">‹</a>
-      <span class="week-nav-label">{{ week_label }}</span>
+  <h3>Weekly Activity</h3>
+  <div class="week-nav-bar">
+    <a href="{{ url_for('workouts_page', week_offset=week_offset - 1) }}" class="week-nav-edge-btn" data-icon="‹">‹ Prev Week</a>
+    <div class="week-nav-center">
+      <span class="week-nav-range">{{ week_label }}</span>
       {% if week_offset < 0 %}
-        <a href="{{ url_for('workouts_page', week_offset=week_offset + 1) }}" class="week-nav-btn" title="Next week">›</a>
-      {% else %}
-        <span class="week-nav-btn disabled" title="This is the current week">›</span>
+        <a href="{{ url_for('workouts_page') }}" class="week-nav-today">Jump to today</a>
       {% endif %}
     </div>
+    {% if week_offset < 0 %}
+      <a href="{{ url_for('workouts_page', week_offset=week_offset + 1) }}" class="week-nav-edge-btn" data-icon="›">Next Week ›</a>
+    {% else %}
+      <span class="week-nav-edge-btn disabled" data-icon="›">Next Week ›</span>
+    {% endif %}
   </div>
   <div class="weekly-chart">
     {% for d in day_buckets %}

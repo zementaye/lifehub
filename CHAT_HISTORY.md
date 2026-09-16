@@ -1041,3 +1041,38 @@ and leaves the real session untouched (1 session remaining in the DB
 afterward), and the note disappears once there's nothing left to clear.
 
 Changed files: `app.py`, `templates/workouts.html`, `static/style.css`.
+
+## 2026-09-16 (week nav: third attempt, went with a full-width bar this time)
+
+HP still didn't like the pill-style prev/next control from the last
+entry. Asked what specifically twice — got "the weekly switch the
+previous and next" and then "dont like the UI" both times without a
+more specific direction, so rather than keep guessing at small variations
+of the same small-pill-in-the-corner idea, rebuilt it as a different,
+more conventional pattern: a full-width date-range navigator (the same
+shape as a calendar app's month switcher) —
+
+- `.week-nav-bar` spans the card width, sitting on the same recessed
+  inset-shadow treatment as the workout meta-form inputs from earlier
+  (`var(--bg)` + inset shadow, for visual consistency across the two
+  toolbars on the workouts pages).
+- Labeled, bordered "‹ Prev Week" / "Next Week ›" buttons on each edge
+  (text labels, not bare glyphs) — the date range is centered and large
+  between them.
+- Added a "Jump to today" link under the date range, shown only when
+  you've paged away from the current week, so getting back doesn't mean
+  clicking "Next Week" repeatedly.
+- Added a matching mobile rule (700px breakpoint, same one the calendar
+  page's toolbar already uses) that collapses the edge buttons to
+  icon-only via a `data-icon` attribute + `::before`, so the labels don't
+  overflow on a phone-width screen.
+
+Removed the old `.week-nav`/`.week-nav-btn` pill CSS, replaced by the
+above.
+
+Verified end-to-end: current week (offset 0) shows "Prev Week" enabled,
+"Next Week" disabled, and no "Jump to today" link; a past week
+(`?week_offset=-1`) shows both edge buttons enabled plus the "Jump to
+today" link.
+
+Changed files: `templates/workouts.html`, `static/style.css`.
