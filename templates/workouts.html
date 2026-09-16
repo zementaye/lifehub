@@ -24,13 +24,13 @@
 <div class="card wide">
   <div class="weekly-chart-header">
     <h3>Weekly Activity</h3>
-    <div class="weekly-chart-nav">
-      <a href="{{ url_for('workouts_page', week_offset=week_offset - 1) }}" class="btn-icon" title="Previous week">←</a>
-      <span class="weekly-chart-range">{{ week_label }}</span>
+    <div class="week-nav">
+      <a href="{{ url_for('workouts_page', week_offset=week_offset - 1) }}" class="week-nav-btn" title="Previous week">‹</a>
+      <span class="week-nav-label">{{ week_label }}</span>
       {% if week_offset < 0 %}
-        <a href="{{ url_for('workouts_page', week_offset=week_offset + 1) }}" class="btn-icon" title="Next week">→</a>
+        <a href="{{ url_for('workouts_page', week_offset=week_offset + 1) }}" class="week-nav-btn" title="Next week">›</a>
       {% else %}
-        <span class="btn-icon disabled" title="This is the current week">→</span>
+        <span class="week-nav-btn disabled" title="This is the current week">›</span>
       {% endif %}
     </div>
   </div>
@@ -62,8 +62,6 @@
           <td>
             {% if s.duration_minutes %}
               {{ s.duration_minutes }} min
-            {% elif s.date < today and item.exercise_count == 0 %}
-              <span class="muted">No session</span>
             {% elif s.date < today %}
               <span class="muted">Logged</span>
             {% else %}
@@ -86,6 +84,15 @@
   {% else %}
     <div class="workout-empty">
       <p class="muted">No workouts logged yet — hit "Start Workout" above to log your first one.</p>
+    </div>
+  {% endif %}
+  {% if hidden_empty_count %}
+    <div class="empty-sessions-note">
+      <span class="muted">{{ hidden_empty_count }} abandoned session{{ '' if hidden_empty_count == 1 else 's' }} hidden (started, nothing logged)</span>
+      <form method="post" action="{{ url_for('clear_empty_workouts') }}"
+            data-confirm="Permanently delete {{ hidden_empty_count }} empty session{{ '' if hidden_empty_count == 1 else 's' }}?">
+        <button type="submit">Clear them</button>
+      </form>
     </div>
   {% endif %}
 </div>

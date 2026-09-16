@@ -1007,3 +1007,37 @@ the Wednesday bar; `?week_offset=-1` resolves to Sep 6–12 with a working
 with 0 exercises renders "No session".
 
 Changed files: `app.py`, `templates/workouts.html`, `static/style.css`.
+
+## 2026-09-16 (week toggle redesign + actually decluttering the log)
+
+1. **Week prev/next toggle UI** — was plain arrow glyphs and a mono-font
+   label sitting bare on the page. Rebuilt as a pill-shaped segmented
+   control (`.week-nav`): rounded container, circular hover targets for
+   ‹ / ›, bold centered label. Extended `button.btn-icon`'s hover styling
+   to also match `a.btn-icon` in an earlier pass, but switched this
+   control to its own dedicated `.week-nav-btn` class instead, since it
+   needed a filled pill container the generic icon-button style doesn't
+   have.
+2. **Recent Workouts "still too messy" — actually fixed the underlying
+   cause this time**, per the standing offer from two sessions ago:
+   `workouts_page()` now splits fetched sessions into real ones (shown)
+   and abandoned ones (past date, no exercises ever added, no duration
+   recorded — i.e. a "Start Workout" click nobody followed through on),
+   which are filtered out of the main table entirely rather than
+   rendered as "No session" rows. A small note below the table shows the
+   hidden count with a "Clear them" button
+   (`/workouts/clear-empty`, new route) that bulk-deletes exactly that
+   set — re-checks each candidate still has zero exercises at delete
+   time (not just at page-render time) before removing it, so a real
+   workout can never be swept up by this even if the counts are stale.
+   Today's fresh empty session (the one you just started) is exempted
+   from "abandoned" — it's expected to be empty until you add exercises.
+
+Verified end-to-end (Flask test client): a real past workout (with an
+exercise) stays visible; two manually-inserted empty past sessions are
+excluded from the table and correctly counted in the "2 abandoned
+sessions hidden" note; posting to `/workouts/clear-empty` deletes both
+and leaves the real session untouched (1 session remaining in the DB
+afterward), and the note disappears once there's nothing left to clear.
+
+Changed files: `app.py`, `templates/workouts.html`, `static/style.css`.

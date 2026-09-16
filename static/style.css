@@ -1378,6 +1378,18 @@ body[data-theme="light"] .habit-reminder-form select[name="reminder_day"] { colo
 .workout-empty {
   text-align: center; padding: 30px 16px; color: var(--muted);
 }
+.empty-sessions-note {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border);
+  font-size: 0.8rem;
+}
+.empty-sessions-note button {
+  background: none; box-shadow: none; color: var(--muted);
+  text-transform: none; letter-spacing: normal; font-weight: 600;
+  padding: 2px 4px; text-decoration: underline; font-size: 0.78rem;
+}
+.empty-sessions-note button::before { display: none; }
+.empty-sessions-note button:hover { color: var(--ink); background: none; transform: none; }
 .workout-chip {
   font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; color: var(--muted);
   background: color-mix(in srgb, var(--border) 60%, transparent);
@@ -1387,9 +1399,30 @@ body[data-theme="light"] .habit-reminder-form select[name="reminder_day"] { colo
 
 .weekly-chart-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .weekly-chart-header h3 { margin: 0; }
-.weekly-chart-nav { display: flex; align-items: center; gap: 10px; }
-.weekly-chart-range { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
-.weekly-chart-nav .btn-icon.disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+.week-nav {
+  display: inline-flex; align-items: center; gap: 2px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+}
+.week-nav-btn {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font-size: 1.05rem; font-weight: 700; line-height: 1;
+  color: var(--muted);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.week-nav-btn:hover {
+  background: color-mix(in srgb, var(--tab-color) 18%, transparent);
+  color: var(--ink);
+}
+.week-nav-btn.disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+.week-nav-label {
+  font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; color: var(--ink);
+  padding: 0 12px; white-space: nowrap;
+}
 .weekly-chart { display: flex; align-items: flex-end; gap: 10px; margin-top: 18px; height: 150px; }
 .weekly-chart-col { flex: 1; height: 100%;
   display: flex; flex-direction: column; align-items: center; gap: 4px;

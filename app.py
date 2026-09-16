@@ -1358,9 +1358,22 @@ def workouts_page():
         # the PR count shown here always matches what you'd see if you
         # opened the workout.
         sessions_view = []
+        hidden_empty_count = 0
+        today_iso = date.today().isoformat()
         for s in gym_sessions:
             exercises = db.get_workout_exercises(conn, s["id"], user_id)
             pr_count = sum(1 for item in exercises for st in item["sets"] if st["is_pr"])
+            # A past session with nothing ever logged in it and no
+            # duration recorded is just an abandoned "Start Workout"
+            # click — noise, not a workout. Today's fresh one is kept
+            # visible since that's the one you're actively about to fill
+            # in.
+            is_empty_abandoned = (
+                not exercises and not s["duration_minutes"] and s["date"] < today_iso
+            )
+            if is_empty_abandoned:
+                hidden_empty_count += 1
+                continue
             sessions_view.append({
                 "row": s,
                 "exercise_count": len(exercises),
@@ -1417,7 +1430,35 @@ def workouts_page():
         max_day_count=max_day_count,
         week_label=week_label,
         week_offset=week_offset,
+        hidden_empty_count=hidden_empty_count,
     )
+
+
+@app.route("/workouts/clear-empty", methods=["POST"])
+@login_required
+def clear_empty_workouts():
+    # Bulk-deletes past gym sessions with nothing logged and no duration —
+    # the abandoned "Start Workout" clicks that workouts_page() hides
+    # from the main list. Scoped to gym/no-exercises/no-duration/past-date
+    # so it can never touch a real workout, even an unfinished-looking one.
+    today_iso = date.today().isoformat()
+    user_id = g.user_id
+    with db.get_conn() as conn:
+        candidates = conn.execute(
+            "SELECT id FROM sessions WHERE user_id = ? AND lower(type) = 'gym' "
+            "AND date < ? AND (duration_minutes IS NULL OR duration_minutes = 0)",
+            (user_id, today_iso),
+        ).fetchall()
+        deleted = 0
+        for row in candidates:
+            exercises = db.get_workout_exercises(conn, row["id"], user_id)
+            if not exercises:
+                conn.execute(
+                    "DELETE FROM sessions WHERE id = ? AND user_id = ?", (row["id"], user_id)
+                )
+                deleted += 1
+    flash(f"Cleared {deleted} empty session{'' if deleted == 1 else 's'}.")
+    return redirect(url_for("workouts_page"))
 
 
 @app.route("/workouts/start", methods=["POST"])
