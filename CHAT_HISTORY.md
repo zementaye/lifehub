@@ -1094,3 +1094,13 @@ Two small things on the new "Prev Week"/"Next Week" edge buttons:
   page's palette instead of clashing with an unrelated cyan.
 
 Changed files: `static/style.css`.
+
+## 2026-09-16 (week nav: "Jump to today" too bright/underlined)
+
+Same class of fix as the Prev/Next buttons just before this — "Jump to
+today" had a permanent underline and used the bright cyan `--tab-color`.
+Switched it to muted gray by default (underline only appears on hover,
+color shifts to the page's amber on hover too), so it reads as a quiet
+secondary action instead of shouting for attention.
+
+Changed files: `static/style.css`.
