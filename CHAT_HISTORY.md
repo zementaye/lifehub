@@ -1076,3 +1076,21 @@ Verified end-to-end: current week (offset 0) shows "Prev Week" enabled,
 today" link.
 
 Changed files: `templates/workouts.html`, `static/style.css`.
+
+## 2026-09-16 (week nav: hover underline + color)
+
+Two small things on the new "Prev Week"/"Next Week" edge buttons:
+
+- The underline on hover was a real bug, not intentional styling — a
+  global `a:hover { text-decoration: underline; }` rule (meant for plain
+  inline text links) was bleeding through onto these button-styled
+  anchors since nothing had overridden it locally. Added explicit
+  `text-decoration: none` on both the base and `:hover` state.
+- The hover color was `var(--tab-color)`, which defaults to the app's
+  cyan accent on this page (no `page-workouts_page` override exists in
+  the `--tab-color` rules, so it falls through to root default). Swapped
+  it to `var(--primary)` (the amber already used for the Start Workout
+  button and PR badges) so the hover state matches the rest of this
+  page's palette instead of clashing with an unrelated cyan.
+
+Changed files: `static/style.css`.

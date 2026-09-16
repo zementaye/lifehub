@@ -1415,12 +1415,14 @@ body[data-theme="light"] .habit-reminder-form select[name="reminder_day"] { colo
   font-family: var(--font-mono); font-size: 0.76rem; font-weight: 700;
   color: var(--ink);
   text-transform: uppercase; letter-spacing: 0.03em;
+  text-decoration: none;
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 .week-nav-edge-btn:hover {
-  border-color: var(--tab-color);
-  color: var(--tab-color);
-  background: color-mix(in srgb, var(--tab-color) 10%, var(--surface));
+  text-decoration: none;
+  border-color: var(--primary);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
 }
 .week-nav-edge-btn.disabled {
   opacity: 0.35; pointer-events: none; color: var(--muted);
