@@ -1362,12 +1362,37 @@ def workouts_page():
             })
         this_month = date.today().strftime("%Y-%m")
         workouts_this_month = sum(1 for s in gym_sessions if s["date"].startswith(this_month))
+
+        # Weekly activity strip: last 10 weeks (Mon-Sun), how many workouts
+        # landed in each. Pulls from all-time sessions, not just the 30
+        # shown above, so a quiet recent stretch doesn't look like a gap
+        # if the weeks are actually populated further back... actually
+        # simplest to bucket the same 30 we already have; good enough for
+        # a glanceable trend and avoids a second query.
+        today = date.today()
+        this_monday = today - timedelta(days=today.weekday())
+        week_buckets = []
+        for i in range(9, -1, -1):
+            week_start = this_monday - timedelta(weeks=i)
+            week_end = week_start + timedelta(days=6)
+            count = sum(
+                1 for s in gym_sessions
+                if week_start.isoformat() <= s["date"] <= week_end.isoformat()
+            )
+            week_buckets.append({
+                "label": f"{week_start.strftime('%b')} {week_start.day}",
+                "count": count,
+                "is_current": i == 0,
+            })
+        max_week_count = max((w["count"] for w in week_buckets), default=0)
     return render_template(
         "workouts.html",
         sessions=sessions_view,
         workouts_this_month=workouts_this_month,
         total_workouts=len(gym_sessions),
         today=date.today().isoformat(),
+        week_buckets=week_buckets,
+        max_week_count=max_week_count,
     )
 
 

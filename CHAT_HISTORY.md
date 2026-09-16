@@ -935,3 +935,38 @@ other form in the app on a one-off complaint):
   visual distinction between the three fields.
 
 Changed files: `templates/workout_session.html`, `static/style.css`.
+
+## 2026-09-16 (three more workout-page fixes)
+
+Three separate issues from HP, one real bug in the mix:
+
+1. **Start Workout button "too dim"** — light theme's `--primary` (`#B8781E`,
+   a muted brown-amber) read as flat/low-contrast against the near-white
+   hero card. Didn't touch the global `--primary` token (used by every
+   button in the app); instead gave just `.workout-start-btn` a lighter
+   gradient plus a colored glow shadow so it reads as a hero CTA rather
+   than a regular action button.
+2. **Exercise-name dropdown invisible (actual bug)** — `.card` sets
+   `overflow: hidden` (needed for its corner-bracket/scan-line decoration),
+   which was silently clipping the absolutely-positioned
+   `.autocomplete-list` from the previous autocomplete rework since it's
+   nested inside `.add-exercise-card`. The suggestions were rendering,
+   just invisible. Added `overflow: visible` scoped to
+   `.add-exercise-card` only.
+3. **Recent Workouts "too many logs and boring"** — replaced the
+   repeated full-width card-per-workout list with: (a) a new "Weekly
+   Activity" bar chart (10 weeks, workout count per week, current week
+   highlighted in the primary color) for an at-a-glance trend instead of
+   scrolling text, and (b) a compact table (same `.table`/`.table-scroll`
+   pattern as Health's activity history) for the actual row-by-row list,
+   replacing the boxy repeated cards. `workouts_page()` in `app.py` now
+   also buckets the fetched sessions into ISO weeks (Monday-start,
+   last 10 weeks) and passes `week_buckets`/`max_week_count` to the
+   template.
+
+Verified end-to-end (Flask test client): a session created this week
+lands in the correct (rightmost/"current") weekly bucket with count 1,
+the new table markup renders instead of the old card-row markup, and the
+`overflow: visible` rule is present in the shipped CSS.
+
+Changed files: `app.py`, `templates/workouts.html`, `static/style.css`.

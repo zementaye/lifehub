@@ -22,33 +22,51 @@
 </div>
 
 <div class="card wide">
+  <h3>Weekly Activity</h3>
+  <div class="weekly-chart">
+    {% for w in week_buckets %}
+      <div class="weekly-chart-col {{ 'current' if w.is_current }}">
+        <span class="weekly-chart-count">{{ w.count }}</span>
+        <div class="weekly-chart-bar-track">
+          <div class="weekly-chart-bar" style="height: {{ ((w.count / max_week_count * 100) if max_week_count else 0) | round(1) }}%;"
+               title="{{ w.count }} workout{{ '' if w.count == 1 else 's' }} — week of {{ w.label }}"></div>
+        </div>
+        <span class="weekly-chart-label">{{ w.label }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card wide">
   <h3>Recent Workouts</h3>
   {% if sessions %}
-    <div class="workout-list">
+    <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>Date</th><th>Status</th><th>Exercises</th><th>Sets</th><th>PRs</th><th></th></tr></thead>
+      <tbody>
       {% for item in sessions %}
         {% set s = item.row %}
-        <div class="workout-row">
-          <a class="workout-row-link" href="{{ url_for('workout_session', session_id=s.id) }}">
-            <span class="workout-row-date">{{ s.date }}</span>
-            <span class="workout-row-meta">
-              {% if s.duration_minutes %}
-                <span class="workout-chip">{{ s.duration_minutes }} min</span>
-              {% else %}
-                <span class="workout-chip in-progress">in progress</span>
-              {% endif %}
-              <span class="workout-chip">{{ item.exercise_count }} exercise{{ '' if item.exercise_count == 1 else 's' }}</span>
-              <span class="workout-chip">{{ item.set_count }} set{{ '' if item.set_count == 1 else 's' }}</span>
-              {% if item.pr_count %}
-                <span class="pr-badge">🏆 {{ item.pr_count }} PR{{ '' if item.pr_count == 1 else 's' }}</span>
-              {% endif %}
-              {% if s.notes %}<span class="muted">{{ s.notes }}</span>{% endif %}
-            </span>
-          </a>
-          <form method="post" action="{{ url_for('delete_session', session_id=s.id) }}" data-confirm="Delete this workout from {{ s.date }} and all its exercises/sets?">
-            <button class="btn-icon" title="Delete workout">🗑️</button>
-          </form>
-        </div>
+        <tr>
+          <td><a href="{{ url_for('workout_session', session_id=s.id) }}">{{ s.date }}</a></td>
+          <td>
+            {% if s.duration_minutes %}
+              {{ s.duration_minutes }} min
+            {% else %}
+              <span class="workout-chip in-progress">in progress</span>
+            {% endif %}
+          </td>
+          <td>{{ item.exercise_count }}</td>
+          <td>{{ item.set_count }}</td>
+          <td>{% if item.pr_count %}<span class="pr-badge">🏆 {{ item.pr_count }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>
+            <form method="post" action="{{ url_for('delete_session', session_id=s.id) }}" data-confirm="Delete this workout from {{ s.date }} and all its exercises/sets?">
+              <button class="btn-icon" title="Delete workout">🗑️</button>
+            </form>
+          </td>
+        </tr>
       {% endfor %}
+      </tbody>
+    </table>
     </div>
   {% else %}
     <div class="workout-empty">
