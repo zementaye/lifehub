@@ -2174,12 +2174,15 @@ def _next_up_summary(user_id: int):
     }
 
 
-@app.route("/calendar")
-@login_required
-def calendar_view():
+def _build_calendar_month_context(user_id):
+    """All the data calendar.html needs for one month — split out so both
+    the full-page route and the AJAX fragment route (used for instant
+    month-to-month navigation, see calendar_view() below) render from the
+    exact same computation. Keeping this in one place, server-side, means
+    the recurrence/timezone logic for reminders/todos/docs/notes/shared
+    dates never has to be duplicated in JS."""
     import calendar as calendar_mod
 
-    user_id = g.user_id
     tz = scheduler.get_tz(user_id)
     today = scheduler.today_local(user_id)
 
@@ -2303,8 +2306,7 @@ def calendar_view():
         trailing_day += 1
     weeks = [cells[i:i + 7] for i in range(0, len(cells), 7)]
 
-    return render_template(
-        "calendar.html",
+    return dict(
         weeks=weeks,
         events_by_day=events_by_day,
         month_label=first_of_month.strftime("%B %Y"),
@@ -2315,6 +2317,20 @@ def calendar_view():
         next_month=next_month.strftime("%Y-%m"),
         this_month=today.strftime("%Y-%m"),
     )
+
+
+@app.route("/calendar")
+@login_required
+def calendar_view():
+    ctx = _build_calendar_month_context(g.user_id)
+    # Prev/Next/Today are fetched via JS as this fragment instead of a
+    # full page navigation, so switching months doesn't re-render the
+    # nav/sidebar/footer or re-run any of the other pages' queries — just
+    # this one partial. A normal (non-AJAX) request, or a browser with JS
+    # off, still gets the full page and works exactly as before.
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return render_template("_calendar_grid.html", **ctx)
+    return render_template("calendar.html", **ctx)
 
 
 # ── Habits ───────────────────────────────────────────────────────────────

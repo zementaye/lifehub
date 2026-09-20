@@ -4,105 +4,9 @@
 {% block content %}
 <h1>Calendar</h1>
 
-<div class="card wide calendar-card">
-  <div class="calendar-toolbar">
-    <div class="calendar-nav">
-      <a class="calendar-nav-btn" href="{{ url_for('calendar_view', month=prev_month) }}" title="Previous month" aria-label="Previous month">
-        <svg viewBox="0 0 20 20" width="16" height="16"><path d="M12 4l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
-      <h2 class="calendar-month-label">{{ month_label }}</h2>
-      <a class="calendar-nav-btn" href="{{ url_for('calendar_view', month=next_month) }}" title="Next month" aria-label="Next month">
-        <svg viewBox="0 0 20 20" width="16" height="16"><path d="M8 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
-    </div>
-    {% if not is_current_month %}
-      <a class="btn-secondary calendar-today-btn" href="{{ url_for('calendar_view', month=this_month) }}">Today</a>
-    {% endif %}
-  </div>
-
-  <div class="calendar-grid calendar-weekdays">
-    <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span class="calendar-weekend-label">Sat</span><span class="calendar-weekend-label">Sun</span>
-  </div>
-
-  <div class="calendar-grid calendar-days">
-    {% for week in weeks %}
-      {% for cell in week %}
-        {% if not cell.in_month %}
-          <div class="calendar-cell calendar-cell-empty">
-            <div class="calendar-cell-top">
-              <span class="calendar-day-num calendar-day-num-outside">{{ cell.day }}</span>
-            </div>
-          </div>
-        {% else %}
-          {% set day = cell.day %}
-          {% set day_events = events_by_day[day] %}
-          {% set overflow_count = (day_events | length) - 3 %}
-          <div class="calendar-cell {{ 'calendar-cell-today' if is_current_month and day == today.day }}" data-date="{{ cell.date }}">
-            <div class="calendar-cell-top">
-              <span class="calendar-day-num">{{ day }}</span>
-              {% if overflow_count > 0 %}<span class="calendar-evt-count">{{ day_events | length }}</span>{% endif %}
-            </div>
-            {% if day_events %}
-              <div class="calendar-events">
-                {% for ev in day_events[:3] %}
-                  <a class="calendar-evt calendar-evt-{{ ev.type }}-{{ ev.state }}"
-                     href="{{ url_for('vault') if ev.type == 'doc' else (url_for('notes') if ev.type == 'note' else (url_for('calendar_view') if ev.type == 'shared' else url_for('reminders'))) }}"
-                     title="{{ ev.title }} — {{ ev.sublabel }}">
-                    <span class="calendar-evt-icon">
-                      {%- if ev.type == 'reminder' -%}📌
-                      {%- elif ev.type == 'todo' -%}{{ '✅' if ev.state == 'done' else '🔲' }}
-                      {%- elif ev.type == 'note' -%}📝
-                      {%- elif ev.type == 'shared' -%}🤝
-                      {%- elif ev.state == 'added' -%}📄
-                      {%- elif ev.state == 'overdue' -%}⛔
-                      {%- elif ev.state == 'soon' -%}⚠️
-                      {%- else -%}📄
-                      {%- endif -%}
-                    </span>
-                    <span class="calendar-evt-text">{{ ev.title }}</span>
-                  </a>
-                {% endfor %}
-                {% if overflow_count > 0 %}
-                  <button type="button" class="calendar-evt-more-btn" data-day-label="{{ day }} {{ month_label }}">
-                    +{{ overflow_count }} more
-                  </button>
-                  <template>
-                    {% for ev in day_events %}
-                      <a class="calendar-evt calendar-evt-{{ ev.type }}-{{ ev.state }}"
-                         href="{{ url_for('vault') if ev.type == 'doc' else (url_for('notes') if ev.type == 'note' else (url_for('calendar_view') if ev.type == 'shared' else url_for('reminders'))) }}">
-                        <span class="calendar-evt-icon">
-                          {%- if ev.type == 'reminder' -%}📌
-                          {%- elif ev.type == 'todo' -%}{{ '✅' if ev.state == 'done' else '🔲' }}
-                          {%- elif ev.type == 'note' -%}📝
-                          {%- elif ev.type == 'shared' -%}🤝
-                          {%- elif ev.state == 'added' -%}📄
-                          {%- elif ev.state == 'overdue' -%}⛔
-                          {%- elif ev.state == 'soon' -%}⚠️
-                          {%- else -%}📄
-                          {%- endif -%}
-                        </span>
-                        <span class="calendar-evt-text">{{ ev.title }}</span>
-                        <span class="calendar-evt-sub">{{ ev.sublabel }}</span>
-                      </a>
-                    {% endfor %}
-                  </template>
-                {% endif %}
-              </div>
-            {% endif %}
-          </div>
-        {% endif %}
-      {% endfor %}
-    {% endfor %}
-  </div>
-
-  <div class="calendar-legend">
-    <span><span class="calendar-dot calendar-evt-reminder-active"></span> Due to-do</span>
-    <span><span class="calendar-dot calendar-evt-todo-open"></span> Added to-do</span>
-    <span><span class="calendar-dot calendar-evt-doc-added"></span> Added to vault</span>
-    <span><span class="calendar-dot calendar-evt-note-added"></span> Note</span>
-    <span><span class="calendar-dot calendar-evt-shared-added"></span> Shared with you</span>
-    <span><span class="calendar-dot calendar-evt-doc-soon"></span> Expiring soon</span>
-    <span><span class="calendar-dot calendar-evt-doc-overdue"></span> Expired</span>
+<div class="card wide calendar-card" id="calendarCard">
+  <div id="calendarBody" data-month="{{ month_value }}">
+    {% include "_calendar_grid.html" %}
   </div>
 </div>
 
@@ -149,11 +53,19 @@
 // "+N more" button and get cloned into a single shared modal on click,
 // rather than growing the cell itself (which used to throw the whole
 // month's row heights out of alignment).
+//
+// The toolbar/grid/legend inside #calendarBody get replaced wholesale on
+// every month switch (see the AJAX nav block further down), so none of
+// these listeners are bound to elements inside it — they're delegated
+// from #calendarCard, which is never replaced, so they keep working no
+// matter how many times the body underneath gets swapped out.
 (function () {
+  var card = document.getElementById('calendarCard');
   var backdrop = document.getElementById('calendarDayModalBackdrop');
   var titleEl = document.getElementById('calendarDayModalTitle');
   var eventsEl = document.getElementById('calendarDayModalEvents');
   var closeBtn = document.getElementById('calendarDayModalClose');
+  if (!card) return;
 
   function openModal(dayLabel, templateEl) {
     titleEl.textContent = dayLabel;
@@ -165,14 +77,12 @@
     backdrop.hidden = true;
   }
 
-  document.querySelectorAll('.calendar-days').forEach(function (grid) {
-    grid.addEventListener('click', function (e) {
-      var btn = e.target.closest('.calendar-evt-more-btn');
-      if (!btn) return;
-      var template = btn.nextElementSibling;
-      if (!template || template.tagName !== 'TEMPLATE') return;
-      openModal(btn.dataset.dayLabel, template);
-    });
+  card.addEventListener('click', function (e) {
+    var btn = e.target.closest('.calendar-evt-more-btn');
+    if (!btn) return;
+    var template = btn.nextElementSibling;
+    if (!template || template.tagName !== 'TEMPLATE') return;
+    openModal(btn.dataset.dayLabel, template);
   });
   closeBtn.addEventListener('click', closeModal);
   backdrop.addEventListener('click', function (e) {
@@ -187,6 +97,7 @@
 // to jot a quick note for that date — e.g. "Zemen's Birthday" — which is
 // saved straight into Notes, tagged with the date it was added from.
 (function () {
+  var card = document.getElementById('calendarCard');
   var noteBackdrop = document.getElementById('calendarNoteModalBackdrop');
   var noteTitleEl = document.getElementById('calendarNoteModalTitle');
   var noteInput = document.getElementById('calendarNoteTitleInput');
@@ -194,7 +105,7 @@
   var noteDateInput = document.getElementById('calendarNoteDateInput');
   var noteRecurrenceInput = document.getElementById('calendarNoteRecurrenceInput');
   var noteCloseBtn = document.getElementById('calendarNoteModalClose');
-  if (!noteBackdrop) return;
+  if (!noteBackdrop || !card) return;
 
   function formatDate(dateStr) {
     var d = new Date(dateStr + 'T00:00:00');
@@ -216,13 +127,11 @@
     noteBackdrop.hidden = true;
   }
 
-  document.querySelectorAll('.calendar-days').forEach(function (grid) {
-    grid.addEventListener('click', function (e) {
-      if (e.target.closest('.calendar-evt, .calendar-evt-more-btn')) return;
-      var cell = e.target.closest('.calendar-cell');
-      if (!cell || !cell.dataset.date) return;
-      openNoteModal(cell.dataset.date);
-    });
+  card.addEventListener('click', function (e) {
+    if (e.target.closest('.calendar-evt, .calendar-evt-more-btn, .calendar-nav-btn, .calendar-today-btn')) return;
+    var cell = e.target.closest('.calendar-cell');
+    if (!cell || !cell.dataset.date) return;
+    openNoteModal(cell.dataset.date);
   });
   noteCloseBtn.addEventListener('click', closeNoteModal);
   noteBackdrop.addEventListener('click', function (e) {
@@ -230,6 +139,46 @@
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !noteBackdrop.hidden) closeNoteModal();
+  });
+})();
+
+// Prev/Next/Today: fetch just the toolbar+grid+legend fragment instead of
+// a full page reload, and swap it into #calendarBody. All the recurrence/
+// timezone logic stays server-side (same route, same computation as the
+// full page) — this only skips re-rendering the surrounding page chrome
+// and re-running every other page's queries, which is what made switching
+// months feel slow. Falls back to a normal navigation if the fetch fails
+// for any reason, and still updates the URL via pushState so the back
+// button and direct links to a given month keep working.
+(function () {
+  var card = document.getElementById('calendarCard');
+  var body = document.getElementById('calendarBody');
+  if (!card || !body) return;
+
+  function loadMonth(url, push) {
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (res) {
+        if (!res.ok) throw new Error('bad response');
+        return res.text();
+      })
+      .then(function (html) {
+        body.innerHTML = html;
+        if (push) history.pushState({ calendarUrl: url }, '', url);
+      })
+      .catch(function () {
+        window.location.href = url; // JS/network hiccup — fall back to a real navigation
+      });
+  }
+
+  card.addEventListener('click', function (e) {
+    var link = e.target.closest('.calendar-nav-btn, .calendar-today-btn');
+    if (!link) return;
+    e.preventDefault();
+    loadMonth(link.href, true);
+  });
+
+  window.addEventListener('popstate', function (e) {
+    if (e.state && e.state.calendarUrl) loadMonth(e.state.calendarUrl, false);
   });
 })();
 </script>

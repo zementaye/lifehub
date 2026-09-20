@@ -1156,3 +1156,45 @@ dates used in earlier Python tests — offsets 0 / -1 / -3 from a
 labels as the Python route already produces.
 
 Changed files: `app.py`, `templates/workouts.html`.
+
+## 2026-09-20 (Calendar: instant month switching, AJAX fragment not full JS port)
+
+Same complaint as the workouts weekly chart — switching months meant a
+full page reload. Different fix here though: the calendar pulls from
+five sources (reminders, todos, documents with expiry, notes, and shared
+dates with their own recurrence rules — weekly/monthly/yearly, computed
+by `_note_occurrences_in_range`, all in the user's timezone via
+`scheduler`). Reimplementing that in JS the way the workouts chart's
+date-count dict was preloaded would mean duplicating real business logic
+(risky) client-side — the workouts case was a simple aggregate,
+this one determines what's actually shown to the user across several
+tables.
+
+Went with an AJAX partial-render instead: `calendar_view()`'s month-
+computation logic (previously all in the route) is now a helper
+`_build_calendar_month_context()` that both the normal request and a new
+AJAX path share. A new template `_calendar_grid.html` holds the toolbar +
+weekday header + day grid + legend — `calendar.html` renders it via
+`{% include %}` for a normal page load, and `calendar_view()` renders
+*just* that partial (no base.html layout) when the request carries
+`X-Requested-With: XMLHttpRequest`. Same computation, same template
+either way — no duplicated logic, no drift risk between the two paths.
+
+`calendar.html`'s JS: Prev/Next/Today links now get intercepted, fetched
+with that header, and swapped into `#calendarBody`'s innerHTML instead of
+navigating; `history.pushState`/`popstate` keep the URL and back button
+working. The existing day-modal and add-note-modal listeners were
+previously delegated from `.calendar-days` (which gets replaced on every
+swap, so those listeners would've gone stale after the first month
+change) — moved them to delegate from `#calendarCard`, which is never
+replaced, so they keep working across any number of swaps. Falls back to
+a real navigation if the fetch fails for any reason.
+
+Verified end-to-end: a normal request for a month returns the full page
+(has `<html>`, nav chrome, `#calendarBody`); the same month requested
+with the AJAX header returns only the fragment (no `<html>`, no nav
+chrome) at roughly 40% the byte size, with identical event data in both
+(a seeded yearly-recurring note landed correctly in both responses).
+
+Changed files: `app.py`, `templates/calendar.html`,
+`templates/_calendar_grid.html` (new).
