@@ -24,20 +24,14 @@
 <div class="card wide">
   <h3>Weekly Activity</h3>
   <div class="week-nav-bar">
-    <a href="{{ url_for('workouts_page', week_offset=week_offset - 1) }}" class="week-nav-edge-btn" data-icon="‹">‹ Prev Week</a>
+    <a href="{{ url_for('workouts_page', week_offset=week_offset - 1) }}" class="week-nav-edge-btn" data-icon="‹" id="week-nav-prev">‹ Prev Week</a>
     <div class="week-nav-center">
-      <span class="week-nav-range">{{ week_label }}</span>
-      {% if week_offset < 0 %}
-        <a href="{{ url_for('workouts_page') }}" class="week-nav-today">Jump to today</a>
-      {% endif %}
+      <span class="week-nav-range" id="week-nav-range">{{ week_label }}</span>
+      <a href="{{ url_for('workouts_page') }}" class="week-nav-today" id="week-nav-today" {{ 'hidden' if week_offset == 0 }}>Jump to today</a>
     </div>
-    {% if week_offset < 0 %}
-      <a href="{{ url_for('workouts_page', week_offset=week_offset + 1) }}" class="week-nav-edge-btn" data-icon="›">Next Week ›</a>
-    {% else %}
-      <span class="week-nav-edge-btn disabled" data-icon="›">Next Week ›</span>
-    {% endif %}
+    <a href="{{ url_for('workouts_page', week_offset=week_offset + 1) }}" class="week-nav-edge-btn {{ 'disabled' if week_offset >= 0 }}" data-icon="›" id="week-nav-next">Next Week ›</a>
   </div>
-  <div class="weekly-chart">
+  <div class="weekly-chart" id="weekly-chart" data-today="{{ today }}" data-offset="{{ week_offset }}">
     {% for d in day_buckets %}
       <div class="weekly-chart-col {{ 'current' if d.is_today }}">
         <span class="weekly-chart-count">{{ d.count }}</span>
@@ -50,6 +44,7 @@
     {% endfor %}
   </div>
 </div>
+<script type="application/json" id="daily-counts-data">{{ daily_counts | tojson }}</script>
 
 <div class="card wide">
   <h3>Recent Workouts</h3>
@@ -61,7 +56,7 @@
       {% for item in sessions %}
         {% set s = item.row %}
         <tr>
-          <td><a href="{{ url_for('workout_session', session_id=s.id) }}">{{ s.date }}</a></td>
+          <td><a href="{{ url_for('workout_session', session_id=s.id) }}" title="{{ s.date }}">{{ item.display_date }}</a></td>
           <td>
             {% if s.duration_minutes %}
               {{ s.duration_minutes }} min
@@ -99,4 +94,108 @@
     </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  const chart = document.getElementById('weekly-chart');
+  const rangeEl = document.getElementById('week-nav-range');
+  const prevBtn = document.getElementById('week-nav-prev');
+  const nextBtn = document.getElementById('week-nav-next');
+  const todayLink = document.getElementById('week-nav-today');
+  if (!chart || !rangeEl || !prevBtn || !nextBtn) return;
+
+  const dailyCounts = JSON.parse(document.getElementById('daily-counts-data').textContent);
+  const today = new Date(chart.dataset.today + 'T00:00:00');
+  let offset = parseInt(chart.dataset.offset, 10) || 0;
+
+  const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function toISODate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function addDays(d, n) {
+    const copy = new Date(d);
+    copy.setDate(copy.getDate() + n);
+    return copy;
+  }
+
+  function isSameDate(a, b) {
+    return toISODate(a) === toISODate(b);
+  }
+
+  function weekLabel(weekStart, weekEnd) {
+    const sameYear = weekStart.getFullYear() === weekEnd.getFullYear();
+    const startStr = `${MONTH_NAMES[weekStart.getMonth()]} ${weekStart.getDate()}`;
+    if (sameYear) {
+      return `${startStr} – ${MONTH_NAMES[weekEnd.getMonth()]} ${weekEnd.getDate()}, ${weekEnd.getFullYear()}`;
+    }
+    return `${startStr}, ${weekStart.getFullYear()} – ${MONTH_NAMES[weekEnd.getMonth()]} ${weekEnd.getDate()}, ${weekEnd.getFullYear()}`;
+  }
+
+  function render(newOffset) {
+    if (newOffset > 0) newOffset = 0;
+    offset = newOffset;
+
+    const thisSunday = addDays(today, -today.getDay());
+    const weekStart = addDays(thisSunday, offset * 7);
+    const weekEnd = addDays(weekStart, 6);
+
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(weekStart, i);
+      days.push({
+        iso: toISODate(d),
+        dayName: DAY_NAMES[d.getDay()],
+        dayNum: d.getDate(),
+        month: MONTH_NAMES[d.getMonth()],
+        count: dailyCounts[toISODate(d)] || 0,
+        isToday: isSameDate(d, today),
+      });
+    }
+    const maxCount = Math.max(0, ...days.map((d) => d.count));
+
+    const cols = chart.querySelectorAll('.weekly-chart-col');
+    cols.forEach((col, i) => {
+      const d = days[i];
+      col.classList.toggle('current', d.isToday);
+      col.querySelector('.weekly-chart-count').textContent = d.count;
+      const bar = col.querySelector('.weekly-chart-bar');
+      bar.style.height = (maxCount ? (d.count / maxCount * 100) : 0).toFixed(1) + '%';
+      bar.title = `${d.count} workout${d.count === 1 ? '' : 's'} — ${d.dayName} ${d.month} ${d.dayNum}`;
+      col.querySelector('.weekly-chart-label').innerHTML = `${d.dayName}<br>${d.month} ${d.dayNum}`;
+    });
+
+    rangeEl.textContent = weekLabel(weekStart, weekEnd);
+    prevBtn.href = `?week_offset=${offset - 1}`;
+    nextBtn.href = `?week_offset=${offset + 1}`;
+    nextBtn.classList.toggle('disabled', offset >= 0);
+    if (todayLink) todayLink.hidden = offset === 0;
+
+    chart.dataset.offset = offset;
+  }
+
+  prevBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    render(offset - 1);
+  });
+  nextBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (offset >= 0) return;
+    render(offset + 1);
+  });
+  if (todayLink) {
+    todayLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      render(0);
+    });
+  }
+})();
+</script>
 {% endblock %}

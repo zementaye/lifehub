@@ -1359,7 +1359,13 @@ def workouts_page():
         # opened the workout.
         sessions_view = []
         hidden_empty_count = 0
-        today_iso = date.today().isoformat()
+        today = date.today()
+        today_iso = today.isoformat()
+        # For the "use the day name instead of the date if it's this
+        # week" ask below — always the actual current Sun-Sat week,
+        # independent of whatever week the chart above is paged to.
+        cur_week_start = today - timedelta(days=(today.weekday() + 1) % 7)
+        cur_week_end = cur_week_start + timedelta(days=6)
         for s in gym_sessions:
             exercises = db.get_workout_exercises(conn, s["id"], user_id)
             pr_count = sum(1 for item in exercises for st in item["sets"] if st["is_pr"])
@@ -1374,8 +1380,14 @@ def workouts_page():
             if is_empty_abandoned:
                 hidden_empty_count += 1
                 continue
+            s_date = date.fromisoformat(s["date"])
+            if cur_week_start <= s_date <= cur_week_end:
+                display_date = "Today" if s_date == today else s_date.strftime("%A")
+            else:
+                display_date = s["date"]
             sessions_view.append({
                 "row": s,
+                "display_date": display_date,
                 "exercise_count": len(exercises),
                 "set_count": sum(len(item["sets"]) for item in exercises),
                 "pr_count": pr_count,
@@ -1384,20 +1396,23 @@ def workouts_page():
         workouts_this_month = sum(1 for s in gym_sessions if s["date"].startswith(this_month))
 
         # Weekly Activity: one Sun-Sat week at a time, a bar per day, with
-        # prev/next navigation via ?week_offset=. Queried directly by date
-        # range rather than reused from gym_sessions above, since paging
-        # back can go further than that list's 30-row cap.
+        # prev/next navigation. Pulls ALL of this user's gym-session dates
+        # (grouped/aggregated, so the result set is one row per distinct
+        # workout date — small even after years of use) in a single query
+        # and embeds it in the page, so paging between weeks is instant
+        # client-side JS instead of a server round trip per click. The
+        # `week_offset`-driven server render below is what still happens
+        # on first load and is the no-JS fallback.
         today = date.today()
         this_sunday = today - timedelta(days=(today.weekday() + 1) % 7)
         week_start = this_sunday + timedelta(weeks=week_offset)
         week_end = week_start + timedelta(days=6)
-        day_rows = conn.execute(
+        all_day_rows = conn.execute(
             "SELECT date, COUNT(*) AS cnt FROM sessions "
-            "WHERE user_id = ? AND lower(type) = 'gym' AND date BETWEEN ? AND ? "
-            "GROUP BY date",
-            (user_id, week_start.isoformat(), week_end.isoformat()),
+            "WHERE user_id = ? AND lower(type) = 'gym' GROUP BY date",
+            (user_id,),
         ).fetchall()
-        counts_by_date = {r["date"]: r["cnt"] for r in day_rows}
+        counts_by_date = {r["date"]: r["cnt"] for r in all_day_rows}
         day_buckets = []
         for i in range(7):
             d = week_start + timedelta(days=i)
@@ -1431,6 +1446,7 @@ def workouts_page():
         week_label=week_label,
         week_offset=week_offset,
         hidden_empty_count=hidden_empty_count,
+        daily_counts=counts_by_date,
     )
 
 

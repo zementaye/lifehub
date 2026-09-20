@@ -1104,3 +1104,55 @@ color shifts to the page's amber on hover too), so it reads as a quiet
 secondary action instead of shouting for attention.
 
 Changed files: `static/style.css`.
+
+## 2026-09-16 (Recent Workouts: day names for this week)
+
+HP asked for the Date column to show the day name instead of the raw
+ISO date when a row falls within the current week. `workouts_page()`
+now computes the actual current Sun-Sat week (separately from whatever
+week the chart above might be paged to — those are independent) and, for
+each session in that range, sets `display_date` to "Today" for today's
+own row or the full weekday name (e.g. "Wednesday") otherwise; anything
+outside the current week keeps the plain `YYYY-MM-DD` as before. The
+link still points at the same session either way, and the raw date is
+kept as a hover tooltip (`title="..."`) so it's still available at a
+glance.
+
+Verified with three seeded sessions (this week's Wednesday, this week's
+Tuesday, and one from July): the two this-week rows rendered as
+"Wednesday"/"Tuesday", the July one stayed as its ISO date.
+
+Changed files: `app.py`, `templates/workouts.html`.
+
+## 2026-09-20 (Weekly Activity: instant client-side week paging)
+
+HP reported jumping between weeks was slow — Prev/Next were plain links,
+so every click was a full server round trip (page reload, DB query,
+whatever Render's free-tier cold-start adds on top).
+
+Fixed by loading the data once and doing the paging in JS:
+
+- `workouts_page()` now runs one grouped, all-time query for this user's
+  gym-session dates (`GROUP BY date` — one row per distinct workout date,
+  so the result stays small even after years of use) instead of a
+  per-week-ranged query, and embeds the result as
+  `daily_counts` → a `<script type="application/json">` block in the
+  page.
+- New JS in `workouts.html` reproduces the same Sun-Sat week math as the
+  Python side (`today.getDay()` for the week's Sunday, mirroring the
+  `(weekday()+1)%7` used server-side) and re-renders the 7 day-columns,
+  the date-range label, and the Prev/Next/"Jump to today" button states
+  directly from the embedded data on click — no network request.
+- Prev/Next/"Jump to today" are still real `<a href="?week_offset=...">`
+  links under the hood (JS calls `preventDefault()` and updates their
+  `href` after each render), so a hard refresh, a shared link, or a
+  no-JS browser all still work exactly as before — this is additive, not
+  a replacement for the server route.
+
+Sanity-checked the JS date math in isolation (Node, not a browser, since
+there's no headless browser available here) against the same fixture
+dates used in earlier Python tests — offsets 0 / -1 / -3 from a
+2026-09-16 "today" produced the identical week boundaries and weekday
+labels as the Python route already produces.
+
+Changed files: `app.py`, `templates/workouts.html`.
