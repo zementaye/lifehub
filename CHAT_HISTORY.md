@@ -1198,3 +1198,51 @@ chrome) at roughly 40% the byte size, with identical event data in both
 
 Changed files: `app.py`, `templates/calendar.html`,
 `templates/_calendar_grid.html` (new).
+
+## 2026-09-21 (voice input for the AI assistant popup)
+
+HP wanted the record-and-transcribe experience already working in Notes
+available for the AI section too — the floating assistant popup
+(`#ai-fab`/`#ai-popup` in base.html, Ask + Quick Add tabs), not the old
+standalone `/ai/chat` and `/ai/quick-add` pages, since the popup is
+what's actually used site-wide (it replaced those pages as the primary
+surface).
+
+This isn't the same component as Notes' recorder reused as-is — Notes'
+version records → previews → lets you either transcribe it or keep the
+raw clip attached to the note. Here there's nothing to keep; press the
+mic, speak, press again to stop, and the clip is transcribed straight
+into whichever tab's textarea. So it's a smaller, purpose-built version
+of the same record/upload flow (new `initMicToText()` in app.js) rather
+than a literal reuse of Notes' `initVoiceRecorder()`.
+
+Backend: extracted the validation+transcribe logic that
+`/api/notes/transcribe` already had into a shared `_handle_transcribe_upload()`,
+and added `/api/ai/transcribe` calling the same helper — one
+implementation behind both routes instead of two that could drift.
+Renamed `NOTE_VOICE_EXT` → `VOICE_AUDIO_EXT` since it's no longer
+notes-only. Both routes still use the same Groq Whisper transcription
+(`ai.transcribe_audio()`) Notes already relies on.
+
+Frontend: a 🎤 button was added to both `.ai-input-row` forms in
+base.html (next to the existing Send button — the row's flex layout
+already handled a third circular icon button with no changes needed), a
+small status line above the row for "Listening…"/"Transcribing…"/error
+text, and CSS reusing the existing `voice-record-pulse` animation Notes'
+mic button already had for the recording state.
+
+Verified end-to-end: `/api/ai/transcribe` requires login (anonymous
+request redirects rather than transcribing), rejects a missing file and
+an unsupported extension the same way `/api/notes/transcribe` does, and
+returns the mocked transcription text on a valid request — confirming
+the shared helper didn't change `/api/notes/transcribe`'s existing
+behavior. Also confirmed the mic buttons/status elements render in the
+popup markup on a normal page load once AI is configured.
+
+Not done (flagged, not requested): the two standalone fallback pages
+`/ai/chat` and `/ai/quick-add` (`ai_chat.html`, `ai_quick_add.html`)
+don't have mic input — only the popup does, since that's the surface
+actually in use. Say the word if those should get it too.
+
+Changed files: `app.py`, `templates/base.html`, `static/app.js`,
+`static/style.css`.

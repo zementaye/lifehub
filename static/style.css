@@ -2919,6 +2919,20 @@ body[data-theme="light"] .calendar-note-form select { color-scheme: light; }
   font-size: 1rem;
 }
 .ai-input-row button:disabled { opacity: 0.5; }
+.ai-mic-status {
+  padding: 0 14px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  min-height: 1em;
+}
+.ai-mic-status:empty { display: none; }
+.ai-input-row button.ai-mic-btn { color: var(--violet); }
+.ai-input-row button.ai-mic-btn:hover { color: var(--violet); background: color-mix(in srgb, var(--violet) 16%, transparent); }
+.ai-input-row button.ai-mic-btn.recording {
+  background: var(--danger);
+  color: #fff;
+  animation: voice-record-pulse 1.4s ease-in-out infinite;
+}
 
 @media (max-width: 520px) {
   .ai-popup {

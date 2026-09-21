@@ -893,4 +893,117 @@ function playNoteDeleteAnimation(form, done) {
       }
     },
   });
+
+  // Mic input for both tabs — press to record, press again to stop, and
+  // the clip is transcribed straight into the textarea. Unlike Notes'
+  // voice recorder (record → preview → optionally attach the file itself
+  // to the saved note), there's nothing to keep here: this always
+  // transcribes and only ever produces text, so it's a much smaller,
+  // single-purpose version of that same record/upload flow rather than a
+  // reuse of the Notes component itself.
+  function initMicToText(micBtn, textarea, statusEl) {
+    if (!micBtn || !textarea) return;
+    let mediaRecorder = null;
+    let stream = null;
+    let chunks = [];
+    let autoStopTimeout = null;
+
+    function setStatus(msg) {
+      if (statusEl) statusEl.textContent = msg || '';
+    }
+    function setRecordingUI(isRecording) {
+      micBtn.classList.toggle('recording', isRecording);
+      micBtn.title = isRecording ? 'Stop recording' : 'Record voice input';
+    }
+    function extensionFor(mimeType) {
+      if (!mimeType) return 'webm';
+      if (mimeType.indexOf('mp4') !== -1) return 'mp4';
+      if (mimeType.indexOf('ogg') !== -1) return 'ogg';
+      if (mimeType.indexOf('wav') !== -1) return 'wav';
+      return 'webm';
+    }
+    function stopStreamTracks() {
+      if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; }
+    }
+
+    function transcribe(blob, mimeType) {
+      setStatus('Transcribing…');
+      const formData = new FormData();
+      formData.append('audio', blob, 'voice-input.' + extensionFor(mimeType));
+      fetch('/api/ai/transcribe', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': window.LIFEHUB_CSRF_TOKEN || '' },
+        body: formData,
+      }).then((r) => r.text().then((bodyText) => ({ status: r.status, bodyText })))
+        .then(({ status, bodyText }) => {
+          let data;
+          try {
+            data = JSON.parse(bodyText);
+          } catch (parseErr) {
+            console.error('AI transcribe: non-JSON response, status', status, bodyText.slice(0, 500));
+            setStatus(status === 401 || status === 403
+              ? 'Session expired — reload and try again.'
+              : 'Unexpected server response — try again.');
+            return;
+          }
+          if (!data.ok) { setStatus(data.error || 'Transcription failed.'); return; }
+          if (!data.text) { setStatus('No speech detected.'); return; }
+          textarea.value = textarea.value.trim() ? textarea.value.trim() + ' ' + data.text : data.text;
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          setStatus('');
+          textarea.focus();
+        }).catch((err) => {
+          console.error('AI transcribe request error:', err);
+          setStatus('Transcription failed — check your connection.');
+        });
+    }
+
+    micBtn.addEventListener('click', () => {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        return;
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setStatus("Your browser doesn't support in-browser recording.");
+        return;
+      }
+      navigator.mediaDevices.getUserMedia({ audio: true }).then((mic) => {
+        stream = mic;
+        chunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.addEventListener('dataavailable', (e) => {
+          if (e.data.size > 0) chunks.push(e.data);
+        });
+        mediaRecorder.addEventListener('stop', () => {
+          stopStreamTracks();
+          setRecordingUI(false);
+          if (autoStopTimeout) { clearTimeout(autoStopTimeout); autoStopTimeout = null; }
+          if (!chunks.length) return;
+          const mimeType = mediaRecorder.mimeType || 'audio/webm';
+          transcribe(new Blob(chunks, { type: mimeType }), mimeType);
+        });
+        mediaRecorder.start();
+        setRecordingUI(true);
+        setStatus('Listening…');
+        // Safety cap so a forgotten open mic doesn't record indefinitely.
+        autoStopTimeout = window.setTimeout(() => {
+          if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+        }, 120000);
+      }).catch((err) => {
+        console.error('getUserMedia failed:', err && err.name, err && err.message, err);
+        setStatus("Couldn't access your microphone — check the browser permission.");
+      });
+    });
+  }
+
+  initMicToText(
+    document.getElementById('ai-ask-mic'),
+    document.getElementById('ai-ask-input'),
+    document.getElementById('ai-ask-mic-status')
+  );
+  initMicToText(
+    document.getElementById('ai-qa-mic'),
+    document.getElementById('ai-qa-input'),
+    document.getElementById('ai-qa-mic-status')
+  );
 })();

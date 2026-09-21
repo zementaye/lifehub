@@ -1775,8 +1775,10 @@ ALLOWED_EXT = {"png", "jpg", "jpeg", "webp", "heic", "pdf"}
 NOTE_IMAGE_EXT = {"png", "jpg", "jpeg", "webp", "heic"}
 # Covers both browser MediaRecorder output (webm/opus in Chrome & Firefox,
 # mp4/aac in Safari) and typical pre-recorded audio files someone might
-# upload instead of recording live.
-NOTE_VOICE_EXT = {"webm", "mp4", "m4a", "ogg", "mp3", "wav"}
+# upload instead of recording live. Shared by Notes' voice recorder and
+# the floating AI assistant's mic input (see VOICE_AUDIO_EXT's other
+# use-sites) — not notes-specific despite the historical name.
+VOICE_AUDIO_EXT = {"webm", "mp4", "m4a", "ogg", "mp3", "wav"}
 NOTE_RECURRENCES = {"once", "weekly", "monthly", "yearly"}
 
 
@@ -3143,7 +3145,7 @@ def _delete_note_voice_files(filenames):
 def _save_note_voice(note_id, user_id, files):
     """Uploads any valid audio files (recorded or pre-existing) onto an
     existing note. Returns (saved_count, skipped_count) — same shape as
-    _save_note_images above, just against NOTE_VOICE_EXT and note_voice.
+    _save_note_images above, just against VOICE_AUDIO_EXT and note_voice.
     (Transcription used to happen here on save; it's now done client-side
     via /api/notes/transcribe right after a clip is recorded/attached, so
     the transcript is already in the note body by the time this runs.)"""
@@ -3153,7 +3155,7 @@ def _save_note_voice(note_id, user_id, files):
         if not file or not file.filename:
             continue
         ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-        if ext not in NOTE_VOICE_EXT:
+        if ext not in VOICE_AUDIO_EXT:
             skipped += 1
             continue
 
@@ -3923,14 +3925,12 @@ def api_ai_quick_add():
     return jsonify(ok=True, messages=messages, redirect=redirect_target)
 
 
-@app.route("/api/notes/transcribe", methods=["POST"])
-@login_required
-def api_notes_transcribe():
-    """JSON endpoint backing the Notes page's "Transcribe to text" option.
-    Called via fetch() from templates/notes.html right after a recording
-    finishes or an audio file is attached — before the note is ever
-    saved — so the transcript can be dropped straight into the body
-    textarea instead of requiring a save/reload round-trip."""
+def _handle_transcribe_upload():
+    """Shared body behind both transcribe endpoints below — validate the
+    uploaded clip and hand it to ai.transcribe_audio(). Split out so
+    /api/notes/transcribe and /api/ai/transcribe (the floating assistant's
+    mic input) share one implementation instead of two copies that could
+    drift apart."""
     if not ai.transcription_available():
         return jsonify(ok=False, error="Transcription isn't configured on this server.")
 
@@ -3939,7 +3939,7 @@ def api_notes_transcribe():
         return jsonify(ok=False, error="No audio clip provided.")
 
     ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if ext not in NOTE_VOICE_EXT:
+    if ext not in VOICE_AUDIO_EXT:
         return jsonify(ok=False, error="Unsupported audio format.")
 
     try:
@@ -3952,6 +3952,29 @@ def api_notes_transcribe():
     if err:
         return jsonify(ok=False, error=err)
     return jsonify(ok=True, text=text)
+
+
+@app.route("/api/notes/transcribe", methods=["POST"])
+@login_required
+def api_notes_transcribe():
+    """JSON endpoint backing the Notes page's "Transcribe to text" option.
+    Called via fetch() from templates/notes.html right after a recording
+    finishes or an audio file is attached — before the note is ever
+    saved — so the transcript can be dropped straight into the body
+    textarea instead of requiring a save/reload round-trip."""
+    return _handle_transcribe_upload()
+
+
+@app.route("/api/ai/transcribe", methods=["POST"])
+@login_required
+def api_ai_transcribe():
+    """JSON endpoint backing the floating AI assistant's mic button (both
+    the Ask and Quick Add tabs — see the .ai-mic-btn wiring in app.js).
+    Same Groq Whisper transcription as Notes, just a separate route so the
+    two features stay easy to tell apart in the route list; the request
+    always transcribes and drops the text into the tab's textarea, unlike
+    Notes' recorder which can also keep the clip itself."""
+    return _handle_transcribe_upload()
 
 
 # ── Settings ─────────────────────────────────────────────────────────────
