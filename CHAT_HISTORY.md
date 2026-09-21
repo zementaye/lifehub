@@ -1246,3 +1246,43 @@ actually in use. Say the word if those should get it too.
 
 Changed files: `app.py`, `templates/base.html`, `static/app.js`,
 `static/style.css`.
+
+## 2026-09-21 (AI chat provider switch: Gemini or Grok)
+
+Follow-up to the voice-input entry just above — HP found Quick Add slow
+on Gemini and wanted to try xAI's Grok instead (confirmed it was Grok,
+the xAI chatbot, not Groq the transcription host already in use — easy
+to mix up, same sound).
+
+Added a provider switch rather than replacing Gemini outright, since
+losing Gemini's free tier is a real trade-off worth being able to back
+out of:
+
+- `config.AI_CHAT_PROVIDER` ("gemini", the default, or "grok") — one
+  switch governs Ask, Quick Add, and auto-categorize together; no
+  per-feature mixing.
+- `config.XAI_API_KEY` / `config.XAI_MODEL` (default `grok-4-fast`, xAI's
+  current cost/speed-optimized model) alongside the existing Gemini
+  settings.
+- `ai.py`: the old `_call()` (Gemini-specific) is now `_call_gemini()`,
+  and a new `_call_grok()` does the same (system_prompt, user_prompt,
+  want_json, temperature) → (result, error) job against xAI's
+  OpenAI-compatible `/v1/chat/completions` endpoint. `_call()` is now a
+  thin dispatcher that picks one of the two based on
+  `AI_CHAT_PROVIDER` — `ask()`, `parse_quick_add()`, and
+  `suggest_category()` didn't need to change at all, since they only
+  ever called `_call()`. `available()` now checks whichever provider's
+  key is actually relevant instead of always checking Gemini's.
+- Voice transcription is untouched — still always Groq/Whisper,
+  independent of this switch.
+
+Verified end-to-end: `_call()` dispatches to `_call_gemini`/`_call_grok`
+correctly for each provider setting; `available()` correctly reflects
+whichever provider is selected and its key state (e.g. Grok selected
+with no XAI key → unavailable, even with a Gemini key present); a
+mocked Grok response round-trips correctly in both plain-text and
+JSON-mode; and all three real callers (`ask`, `parse_quick_add`,
+`suggest_category`) route through to Grok with their existing
+temperature/want_json settings intact when the switch is flipped.
+
+Changed files: `config.py`, `ai.py`.

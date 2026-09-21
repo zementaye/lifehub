@@ -62,6 +62,33 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 # than always running on the current model.
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 
+# ── AI chat/quick-add provider switch (Gemini vs Grok) ───────────────────
+# Which provider actually answers Ask questions, parses Quick Add
+# sentences, and auto-categorizes transactions — auto-categorize and the
+# rest all share this one switch, there's no way to run them on different
+# providers. Defaults to "gemini" (above) for its free tier; set
+# AI_CHAT_PROVIDER=grok to run all three on xAI's Grok instead, which HP
+# found noticeably faster for Quick Add specifically (see CHAT_HISTORY.md,
+# 2026-09-21). Trade-off worth knowing before flipping this on a server
+# people actually rely on: unlike Gemini, Grok has no free tier — it's
+# billed per token from the first request (current pricing/models at
+# https://docs.x.ai/developers/models). Voice transcription is unaffected
+# either way — that's always Groq/Whisper (below), a different provider
+# from either of these two chat options despite the near-identical name.
+AI_CHAT_PROVIDER = os.environ.get("AI_CHAT_PROVIDER", "gemini").strip().lower()
+
+# Key (paid — see the note above) at https://console.x.ai. The default
+# model, grok-4-fast, is xAI's current cost/speed-optimized model (as of
+# this writing: ~2M token context, priced well below their flagship
+# grok-4.6) — a reasonable default for a snappy Quick Add specifically.
+# Override via XAI_MODEL if a different Grok model (e.g. their flagship,
+# for harder Ask questions) turns out to matter more than raw speed;
+# check https://docs.x.ai/developers/models for what's currently offered,
+# since xAI's lineup and pricing shift over time same as every other
+# provider here.
+XAI_API_KEY = os.environ.get("XAI_API_KEY", "").strip()
+XAI_MODEL = os.environ.get("XAI_MODEL", "grok-4-fast")
+
 # ── Voice note transcription (Groq) ──────────────────────────────────────
 # A deliberately separate provider from the Gemini features above — Gemini's
 # shared free-tier LLM capacity turned out to be too unreliable for voice

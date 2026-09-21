@@ -2,17 +2,24 @@
 quick-add (turn a typed sentence into a transaction/food-log/reminder/todo),
 auto-categorization of transactions, and voice note transcription.
 
-Two separate providers, on purpose:
-- Chat/quick-add/auto-categorize run on Google's Gemini API — picked over
-  Anthropic/OpenAI for having an actually-free tier (no credit card, no
-  expiring trial credit) that's generous enough for a single small personal
-  app. See config.py for GEMINI_API_KEY / GEMINI_MODEL.
-- Voice note transcription runs on Groq's hosted Whisper API instead (see
-  config.py for GROQ_API_KEY / GROQ_STT_MODEL) — Gemini's shared free-tier
-  LLM capacity proved too unreliable for that one feature specifically
-  (repeated "high demand" 503s; see CHAT_HISTORY.md, 2026-09-01), while
-  Whisper on Groq is a dedicated speech-to-text model on infrastructure
-  built for exactly that job, not a general-purpose chat model.
+Two separate concerns, two separate provider setups:
+- Chat/quick-add/auto-categorize run on either Google's Gemini API or
+  xAI's Grok API, picked via config.AI_CHAT_PROVIDER ("gemini", the
+  default, or "grok"). Gemini was the original choice for having an
+  actually-free tier (no credit card, no expiring trial credit); Grok is
+  the faster-in-practice option HP switched to for Quick Add specifically
+  (see CHAT_HISTORY.md, 2026-09-21) but is paid per token from the first
+  request. See config.py for GEMINI_API_KEY/GEMINI_MODEL and
+  XAI_API_KEY/XAI_MODEL.
+- Voice note transcription always runs on Groq's hosted Whisper API
+  instead (see config.py for GROQ_API_KEY / GROQ_STT_MODEL) — Gemini's
+  shared free-tier LLM capacity proved too unreliable for that one
+  feature specifically (repeated "high demand" 503s; see
+  CHAT_HISTORY.md, 2026-09-01), while Whisper on Groq is a dedicated
+  speech-to-text model on infrastructure built for exactly that job.
+  Groq (the inference host) and Grok (xAI's chatbot, above) are
+  unrelated products that happen to sound identical — this module talks
+  to both, so don't assume a mention of one is a typo for the other.
 
 Every public function here is best-effort and never raises: a missing key,
 a network hiccup, a rate limit, or a malformed model response all come back
@@ -33,6 +40,7 @@ import config
 logger = logging.getLogger(__name__)
 
 GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+XAI_API = "https://api.x.ai/v1/chat/completions"
 GROQ_TRANSCRIBE_API = "https://api.groq.com/openai/v1/audio/transcriptions"
 
 # A 503 from Gemini ("model is currently experiencing high demand...") is
@@ -48,6 +56,8 @@ _OVERLOAD_RETRY_DELAY_SECONDS = 2
 
 
 def available() -> bool:
+    if config.AI_CHAT_PROVIDER == "grok":
+        return bool(config.XAI_API_KEY)
     return bool(config.GEMINI_API_KEY)
 
 
@@ -55,8 +65,8 @@ def _generate(payload: dict, want_json: bool = False, timeout: int = 20):
     """Shared plumbing behind every Gemini call in this module — POSTs a
     fully-built request payload and turns it into (result, error_message),
     the same best-effort contract described at the top of this file.
-    Callers (_call for text prompts, transcribe_audio for audio input)
-    only need to build the payload's `contents`; this handles the
+    Callers (_call_gemini for text prompts, transcribe_audio for audio
+    input) only need to build the payload's `contents`; this handles the
     network/HTTP/response-shape parts identically for both."""
     if not config.GEMINI_API_KEY:
         return None, "AI isn't configured on this server."
@@ -132,7 +142,7 @@ def _generate(payload: dict, want_json: bool = False, timeout: int = 20):
         return None, "The AI's response wasn't in the expected format."
 
 
-def _call(system_prompt: str, user_prompt: str, want_json: bool = False, temperature: float = 0.2):
+def _call_gemini(system_prompt: str, user_prompt: str, want_json: bool = False, temperature: float = 0.2):
     """Low-level call to the Gemini API for a plain text prompt. Returns
     (result, error_message) — result is a parsed dict/list when want_json
     is True, else plain text. Exactly one of the two is ever non-None."""
@@ -144,6 +154,85 @@ def _call(system_prompt: str, user_prompt: str, want_json: bool = False, tempera
     if want_json:
         payload["generationConfig"]["responseMimeType"] = "application/json"
     return _generate(payload, want_json=want_json)
+
+
+def _call_grok(system_prompt: str, user_prompt: str, want_json: bool = False, temperature: float = 0.2, timeout: int = 20):
+    """Low-level call to xAI's Grok API — same (result, error_message)
+    contract as _call_gemini above, just against an OpenAI-compatible
+    /v1/chat/completions endpoint instead of Gemini's own request/response
+    shape."""
+    if not config.XAI_API_KEY:
+        return None, "AI isn't configured on this server."
+
+    payload = {
+        "model": config.XAI_MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": temperature,
+    }
+    if want_json:
+        payload["response_format"] = {"type": "json_object"}
+
+    headers = {"Authorization": f"Bearer {config.XAI_API_KEY}"}
+    try:
+        resp = requests.post(XAI_API, json=payload, headers=headers, timeout=timeout)
+    except requests.RequestException as e:
+        logger.warning("Grok request failed: %s", e)
+        return None, "Couldn't reach the AI service — try again in a moment."
+
+    if resp.status_code == 429:
+        return None, "AI is rate-limited right now — try again shortly."
+    if resp.status_code == 401 or resp.status_code == 403:
+        logger.error("Grok API rejected the configured key (HTTP %s)", resp.status_code)
+        return None, "AI isn't working right now — ask an admin to check the setup."
+    if resp.status_code >= 400:
+        logger.warning("Grok API error %s: %s", resp.status_code, resp.text[:300])
+        # Same reasoning as the Gemini error branch above: surface Grok's
+        # own explanation instead of a flat, undiagnosable message — its
+        # error responses use the same OpenAI-standard shape as the rest
+        # of this endpoint: {"error": {"message": ..., "type": ...}}.
+        detail = None
+        try:
+            detail = resp.json().get("error", {}).get("message")
+        except ValueError:
+            pass
+        if detail:
+            return None, f"The AI service returned an error: {detail}"
+        return None, f"The AI service returned an error (HTTP {resp.status_code})."
+
+    try:
+        data = resp.json()
+        choices = data.get("choices") or []
+        if not choices:
+            return None, "The AI didn't return a response."
+        text = choices[0]["message"]["content"]
+    except Exception:
+        # Same deliberately-broad reasoning as _generate() above — never
+        # let an odd response shape escape as an unhandled 500.
+        logger.warning("Unexpected Grok response shape: %s", resp.text[:300])
+        return None, "Got an unexpected response from the AI service."
+
+    if not want_json:
+        return text, None
+
+    try:
+        return json.loads(text), None
+    except ValueError:
+        logger.warning("Grok didn't return valid JSON: %s", text[:300])
+        return None, "The AI's response wasn't in the expected format."
+
+
+def _call(system_prompt: str, user_prompt: str, want_json: bool = False, temperature: float = 0.2):
+    """Dispatches to whichever chat provider config.AI_CHAT_PROVIDER
+    selects — every caller in this module (ask, parse_quick_add,
+    suggest_category) goes through this one function rather than picking
+    a provider themselves, so switching providers is a one-line config
+    change with nothing else in this file to touch."""
+    if config.AI_CHAT_PROVIDER == "grok":
+        return _call_grok(system_prompt, user_prompt, want_json=want_json, temperature=temperature)
+    return _call_gemini(system_prompt, user_prompt, want_json=want_json, temperature=temperature)
 
 
 # ── Voice note transcription (Groq / Whisper) ────────────────────────────
