@@ -1286,3 +1286,43 @@ JSON-mode; and all three real callers (`ask`, `parse_quick_add`,
 temperature/want_json settings intact when the switch is flipped.
 
 Changed files: `config.py`, `ai.py`.
+
+## 2026-09-21 (AI chat provider: went with Groq instead of Grok)
+
+Follow-up to the entry just above — flagged that Grok (xAI) has no free
+tier at all, unlike what "we can change the API" made it sound like.
+Real numbers: grok-4-fast is $0.20/$0.50 per million input/output
+tokens, so actual cost for this app's usage would be trivial (well under
+$1/month), but it's still a new paid account from request one, and
+xAI's $150/mo free-credit program requires opting into data-sharing —
+not worth it for an app holding budget/health data over a few dollars.
+
+Pointed out a free alternative that needed no new account: Groq (the
+inference host already providing voice transcription) also hosts chat
+models like Llama, has an actual rate-limited free tier rather than
+trial credit, and its whole selling point is speed. HP picked this over
+paying for Grok.
+
+Added `AI_CHAT_PROVIDER=groq` as a third option alongside `gemini` and
+`grok`:
+- `config.py`: new `GROQ_CHAT_MODEL` (default `llama-3.3-70b-versatile`)
+  alongside the existing `GROQ_API_KEY`/`GROQ_STT_MODEL` — one Groq
+  account, two independent uses (Whisper for transcription, Llama for
+  chat), same key.
+- `ai.py`: new `_call_groq()`, same (result, error) contract and
+  OpenAI-compatible request shape as `_call_grok()` from the entry
+  above, just a different base URL/model and reusing `GROQ_API_KEY`.
+  `_call()`'s dispatcher now branches three ways; `available()` checks
+  whichever provider's key is actually relevant. `ask()`,
+  `parse_quick_add()`, and `suggest_category()` needed no changes again,
+  same as when Grok was added — they only ever call `_call()`.
+
+Verified end-to-end: dispatch routes to `_call_groq` only when selected;
+`available()` correctly reflects Groq's key state; a mocked Groq chat
+response round-trips in both plain-text and JSON mode with the right
+URL/model/auth header; `transcription_available()` stays `True`
+regardless of which chat provider is selected, confirming the
+transcription path is genuinely independent of this switch; and all
+three real callers route through to Groq correctly.
+
+Changed files: `config.py`, `ai.py`.

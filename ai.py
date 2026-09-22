@@ -2,24 +2,30 @@
 quick-add (turn a typed sentence into a transaction/food-log/reminder/todo),
 auto-categorization of transactions, and voice note transcription.
 
-Two separate concerns, two separate provider setups:
-- Chat/quick-add/auto-categorize run on either Google's Gemini API or
-  xAI's Grok API, picked via config.AI_CHAT_PROVIDER ("gemini", the
-  default, or "grok"). Gemini was the original choice for having an
-  actually-free tier (no credit card, no expiring trial credit); Grok is
-  the faster-in-practice option HP switched to for Quick Add specifically
-  (see CHAT_HISTORY.md, 2026-09-21) but is paid per token from the first
-  request. See config.py for GEMINI_API_KEY/GEMINI_MODEL and
-  XAI_API_KEY/XAI_MODEL.
-- Voice note transcription always runs on Groq's hosted Whisper API
-  instead (see config.py for GROQ_API_KEY / GROQ_STT_MODEL) — Gemini's
-  shared free-tier LLM capacity proved too unreliable for that one
-  feature specifically (repeated "high demand" 503s; see
-  CHAT_HISTORY.md, 2026-09-01), while Whisper on Groq is a dedicated
-  speech-to-text model on infrastructure built for exactly that job.
-  Groq (the inference host) and Grok (xAI's chatbot, above) are
-  unrelated products that happen to sound identical — this module talks
-  to both, so don't assume a mention of one is a typo for the other.
+Chat/quick-add/auto-categorize can run on any of three providers, picked
+via config.AI_CHAT_PROVIDER ("gemini", the default, "grok", or "groq"):
+- Gemini — the original choice for having an actually-free tier (no
+  credit card, no expiring trial credit). See config.py for
+  GEMINI_API_KEY/GEMINI_MODEL.
+- Grok (xAI) — genuinely fast, but paid per token from the first request,
+  no free tier at all. See config.py for XAI_API_KEY/XAI_MODEL.
+- Groq — what HP actually settled on for Quick Add speed (see
+  CHAT_HISTORY.md, 2026-09-21): a real free tier, and it reuses the exact
+  same GROQ_API_KEY as voice transcription below rather than needing a
+  new paid account. Groq (the inference host, this one) and Grok (xAI's
+  chatbot, above) are unrelated products from different companies that
+  just happen to sound identical — this module talks to both, so don't
+  assume a mention of one is a typo for the other.
+
+Voice note transcription is a separate concern from all three of the
+above — it always runs on Groq's hosted Whisper API regardless of
+AI_CHAT_PROVIDER (see config.py for GROQ_API_KEY / GROQ_STT_MODEL).
+Gemini's shared free-tier LLM capacity proved too unreliable for that one
+feature specifically (repeated "high demand" 503s; see CHAT_HISTORY.md,
+2026-09-01), while Whisper on Groq is a dedicated speech-to-text model on
+infrastructure built for exactly that job — same GROQ_API_KEY as the
+"groq" chat option above, but a genuinely independent call path: an
+outage or rate-limit on one doesn't affect the other.
 
 Every public function here is best-effort and never raises: a missing key,
 a network hiccup, a rate limit, or a malformed model response all come back
@@ -41,6 +47,7 @@ logger = logging.getLogger(__name__)
 
 GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 XAI_API = "https://api.x.ai/v1/chat/completions"
+GROQ_CHAT_API = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_TRANSCRIBE_API = "https://api.groq.com/openai/v1/audio/transcriptions"
 
 # A 503 from Gemini ("model is currently experiencing high demand...") is
@@ -58,6 +65,8 @@ _OVERLOAD_RETRY_DELAY_SECONDS = 2
 def available() -> bool:
     if config.AI_CHAT_PROVIDER == "grok":
         return bool(config.XAI_API_KEY)
+    if config.AI_CHAT_PROVIDER == "groq":
+        return bool(config.GROQ_API_KEY)
     return bool(config.GEMINI_API_KEY)
 
 
@@ -224,6 +233,77 @@ def _call_grok(system_prompt: str, user_prompt: str, want_json: bool = False, te
         return None, "The AI's response wasn't in the expected format."
 
 
+def _call_groq(system_prompt: str, user_prompt: str, want_json: bool = False, temperature: float = 0.2, timeout: int = 20):
+    """Low-level call to Groq's chat models (Llama etc, via
+    config.GROQ_CHAT_MODEL) — same (result, error_message) contract as
+    _call_gemini/_call_grok above, and the same OpenAI-compatible request
+    shape as _call_grok, just a different base URL and model. Reuses
+    config.GROQ_API_KEY — the same key transcribe_audio() below already
+    uses for Whisper — since Groq hosts both under one account; this is
+    a genuinely separate call path from that one though; a transcription
+    outage or rate-limit on Groq's audio models has no bearing on whether
+    this chat path works, and vice versa."""
+    if not config.GROQ_API_KEY:
+        return None, "AI isn't configured on this server."
+
+    payload = {
+        "model": config.GROQ_CHAT_MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": temperature,
+    }
+    if want_json:
+        payload["response_format"] = {"type": "json_object"}
+
+    headers = {"Authorization": f"Bearer {config.GROQ_API_KEY}"}
+    try:
+        resp = requests.post(GROQ_CHAT_API, json=payload, headers=headers, timeout=timeout)
+    except requests.RequestException as e:
+        logger.warning("Groq chat request failed: %s", e)
+        return None, "Couldn't reach the AI service — try again in a moment."
+
+    if resp.status_code == 429:
+        return None, "AI is rate-limited right now (free tier) — try again shortly."
+    if resp.status_code == 401 or resp.status_code == 403:
+        logger.error("Groq API rejected the configured key (HTTP %s)", resp.status_code)
+        return None, "AI isn't working right now — ask an admin to check the setup."
+    if resp.status_code >= 400:
+        logger.warning("Groq chat API error %s: %s", resp.status_code, resp.text[:300])
+        # Same OpenAI-standard error shape as the Grok branch above:
+        # {"error": {"message": ..., "type": ...}}.
+        detail = None
+        try:
+            detail = resp.json().get("error", {}).get("message")
+        except ValueError:
+            pass
+        if detail:
+            return None, f"The AI service returned an error: {detail}"
+        return None, f"The AI service returned an error (HTTP {resp.status_code})."
+
+    try:
+        data = resp.json()
+        choices = data.get("choices") or []
+        if not choices:
+            return None, "The AI didn't return a response."
+        text = choices[0]["message"]["content"]
+    except Exception:
+        # Same deliberately-broad reasoning as _generate() above — never
+        # let an odd response shape escape as an unhandled 500.
+        logger.warning("Unexpected Groq chat response shape: %s", resp.text[:300])
+        return None, "Got an unexpected response from the AI service."
+
+    if not want_json:
+        return text, None
+
+    try:
+        return json.loads(text), None
+    except ValueError:
+        logger.warning("Groq didn't return valid JSON: %s", text[:300])
+        return None, "The AI's response wasn't in the expected format."
+
+
 def _call(system_prompt: str, user_prompt: str, want_json: bool = False, temperature: float = 0.2):
     """Dispatches to whichever chat provider config.AI_CHAT_PROVIDER
     selects — every caller in this module (ask, parse_quick_add,
@@ -232,6 +312,8 @@ def _call(system_prompt: str, user_prompt: str, want_json: bool = False, tempera
     change with nothing else in this file to touch."""
     if config.AI_CHAT_PROVIDER == "grok":
         return _call_grok(system_prompt, user_prompt, want_json=want_json, temperature=temperature)
+    if config.AI_CHAT_PROVIDER == "groq":
+        return _call_groq(system_prompt, user_prompt, want_json=want_json, temperature=temperature)
     return _call_gemini(system_prompt, user_prompt, want_json=want_json, temperature=temperature)
 
 

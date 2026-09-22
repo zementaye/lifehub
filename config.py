@@ -62,19 +62,27 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 # than always running on the current model.
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 
-# ── AI chat/quick-add provider switch (Gemini vs Grok) ───────────────────
+# ── AI chat/quick-add provider switch (Gemini / Grok / Groq) ─────────────
 # Which provider actually answers Ask questions, parses Quick Add
-# sentences, and auto-categorizes transactions — auto-categorize and the
-# rest all share this one switch, there's no way to run them on different
-# providers. Defaults to "gemini" (above) for its free tier; set
-# AI_CHAT_PROVIDER=grok to run all three on xAI's Grok instead, which HP
-# found noticeably faster for Quick Add specifically (see CHAT_HISTORY.md,
-# 2026-09-21). Trade-off worth knowing before flipping this on a server
-# people actually rely on: unlike Gemini, Grok has no free tier — it's
-# billed per token from the first request (current pricing/models at
-# https://docs.x.ai/developers/models). Voice transcription is unaffected
-# either way — that's always Groq/Whisper (below), a different provider
-# from either of these two chat options despite the near-identical name.
+# sentences, and auto-categorizes transactions — all three share this one
+# switch, there's no way to run them on different providers. Options:
+#   - "gemini" (default) — free tier, see above.
+#   - "grok"   — xAI's Grok. No free tier at all; billed per token from
+#                the first request (current pricing/models at
+#                https://docs.x.ai/developers/models). Genuinely fast, but
+#                costs real (if small) money from day one.
+#   - "groq"   — reuses the SAME account/key as voice transcription below
+#                (GROQ_API_KEY), just calling its chat models (e.g. Llama)
+#                instead of Whisper. Has an actual free tier (rate-limited,
+#                not "free trial credit that runs out"), and Groq's whole
+#                selling point is speed — custom inference chips, not a
+#                general-purpose model juggling shared demand. HP picked
+#                this one on 2026-09-21 specifically because Gemini's
+#                Quick Add felt slow and this needed no new paid account.
+# See CHAT_HISTORY.md, 2026-09-21, for the full back-and-forth on why
+# "groq" ended up the pick over "grok" despite the near-identical name —
+# they're unrelated products from different companies (xAI vs Groq Inc.)
+# that just happen to sound the same.
 AI_CHAT_PROVIDER = os.environ.get("AI_CHAT_PROVIDER", "gemini").strip().lower()
 
 # Key (paid — see the note above) at https://console.x.ai. The default
@@ -89,13 +97,13 @@ AI_CHAT_PROVIDER = os.environ.get("AI_CHAT_PROVIDER", "gemini").strip().lower()
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "").strip()
 XAI_MODEL = os.environ.get("XAI_MODEL", "grok-4-fast")
 
-# ── Voice note transcription (Groq) ──────────────────────────────────────
+# ── Voice note transcription (Groq) — and now, optionally, chat too ──────
 # A deliberately separate provider from the Gemini features above — Gemini's
 # shared free-tier LLM capacity turned out to be too unreliable for voice
 # note transcription specifically (repeated "high demand" 503s; see
 # CHAT_HISTORY.md, 2026-09-01), so that one feature now goes through Groq's
 # hosted Whisper API instead: a dedicated speech-to-text model on
-# infrastructure built for exactly this job, not a general-purpose chat
+# infrastructure built for exactly that job, not a general-purpose chat
 # model juggling everyone's demand at once. Same optional pattern as
 # everything else here — unset and the "Record & Transcribe" option simply
 # doesn't show up (see transcription_available() in ai.py). Free key at
@@ -103,8 +111,19 @@ XAI_MODEL = os.environ.get("XAI_MODEL", "grok-4-fast")
 # 28,800 audio-seconds/day, far more than a personal voice-notes feature
 # will realistically use; confirm at signup whether a card is currently
 # required, since that detail can change.
+#
+# This same GROQ_API_KEY doubles as the "groq" AI_CHAT_PROVIDER option
+# above once set — one key, two different Groq-hosted model types (Whisper
+# for audio, Llama for chat), not two separate accounts to manage.
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 GROQ_STT_MODEL = os.environ.get("GROQ_STT_MODEL", "whisper-large-v3-turbo")
+# llama-3.3-70b-versatile: a solid quality/speed balance for both parsing
+# Quick Add sentences into structured JSON and answering Ask questions
+# over the data digest. llama-3.1-8b-instant is available too and even
+# faster/cheaper if 70B-level quality turns out to be more than this app's
+# fairly narrow prompts actually need — see current model list/pricing at
+# https://console.groq.com/docs/models.
+GROQ_CHAT_MODEL = os.environ.get("GROQ_CHAT_MODEL", "llama-3.3-70b-versatile")
 
 # ── Habit nudge / reminder scheduling ───────────────────────────────────
 TIMEZONE = os.environ.get("TIMEZONE", "Africa/Addis_Ababa")
