@@ -6,10 +6,33 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-09-14 12:03
+Last updated: 2026-10-21 13:32
 
 ---
 
+- **2026-10-21** d0c3533 - Remove in-app self-ping job from scheduler (Zemen)
+- **2026-09-22** bacc815 - Add Groq (free tier, existing key) as a third AI chat provider option (Zemen)
+- **2026-09-21** 2d6a838 - Add Grok as a switchable AI chat provider alongside Gemini (Zemen)
+- **2026-09-21** 7926222 - Add mic voice input to the AI assistant popup (Ask + Quick Add) (Zemen)
+- **2026-09-20** d6018fb - Calendar: fetch month as an AJAX fragment instead of a full page reload (Zemen)
+- **2026-09-20** ff9a055 - Load weekly-activity data once, page between weeks instantly via JS (Zemen)
+- **2026-09-16** dde2dfc - Mute 'Jump to today' link ΓÇö remove underline, drop bright cyan (Zemen)
+- **2026-09-16** 7c3057a - Fix underline bleeding onto week-nav buttons, swap hover color to amber (Zemen)
+- **2026-09-16** 9ebe8f5 - Rebuild week nav as a full-width date-range bar (Zemen)
+- **2026-09-16** f294175 - Pill-style week toggle, hide abandoned empty sessions from Recent Workouts (Zemen)
+- **2026-09-16** 07fe8cd - Sun-Sat navigable weekly chart, brighter CTA, past-empty sessions show 'No session' (Zemen)
+- **2026-09-16** 22078ac - Brighter Start Workout CTA, fix clipped exercise dropdown, weekly activity chart (Zemen)
+- **2026-09-15** c97a0ed - Give the workout meta-form inputs depth instead of flat borders (Zemen)
+- **2026-09-15** 8c2782a - Replace native datalist with a custom-styled exercise autocomplete (Zemen)
+- **2026-09-15** be90d74 - Style the workout meta form as a card, add built-in exercise autocomplete (Zemen)
+- **2026-09-15** db71437 - Split gym workouts into their own section with a one-click Start Workout flow (Zemen)
+- **2026-09-15** a267717 - Add workout endpoints to api_health.py, fix delete_session cascade bug (Zemen)
+- **2026-09-15** f799864 - Add exercise/set-level workout logging with automatic PR detection (Zemen)
+- **2026-09-15** 489dcbb - Cap Upcoming To-Dos to a real 14-day window instead of no filter at all (Zemen)
+- **2026-09-15** b4efc95 - Drop time period from remember-me checkbox label (Zemen)
+- **2026-09-15** 26562ce - Add remember-me checkbox to login, raise default session to 14 days (Zemen)
+- **2026-09-15** f308d11 - Add admin panel API with step-up re-auth (Zemen)
+- **2026-09-14** e566ab3 - Update commit history (Zemen)
 - **2026-09-14** 5b74f13 - Add in-app self-ping job as alternative to external uptime pinger (Zemen)
 - **2026-09-14** f685a90 - Add passwords API (Zemen)
 - **2026-09-14** e2fe9fc - Add API blueprints through the Notes slice (auth, dashboard, habits, reminders, calendar, budget, nutrition, health, vault, notifications, notes) (Zemen)
