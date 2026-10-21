@@ -1341,3 +1341,15 @@ spell takes 30-60 seconds, and scheduled Telegram reminders/nudges only run
 while the service is awake.
 
 Changed files: `scheduler.py`, `CHAT_HISTORY.md`.
+
+**Vercel copy for the portfolio link.** Added a second host on Vercel,
+used only as the public link from the portfolio (Render stays the real,
+scheduled host). `app.py` no longer starts the APScheduler thread when the
+`VERCEL` env var is set, since Vercel functions are short-lived and could
+never run reminders anyway; on Render and locally nothing changes. Added
+`.python-version` (3.12). Vercel needs `FLASK_SECRET_KEY` and
+`DATA_DIR=/tmp` set as project env vars (its disk is read-only except
+`/tmp`, so data on that copy resets on cold starts). It uses its own empty
+database and secret key, never the Render/Turso ones.
+
+Changed files: `app.py`, `.python-version`, `CHAT_HISTORY.md`.

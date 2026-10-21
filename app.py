@@ -4488,6 +4488,8 @@ if __name__ == "__main__":
     scheduler.start_scheduler()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-else:
+elif not os.environ.get("VERCEL"):
     # Under gunicorn, __main__ isn't executed — start the scheduler here instead.
+    # Skipped on Vercel: functions there are short-lived, so a background
+    # scheduler thread can't run reminders (Render stays the scheduled host).
     scheduler.start_scheduler()
