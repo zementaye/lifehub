@@ -1326,3 +1326,18 @@ transcription path is genuinely independent of this switch; and all
 three real callers route through to Groq correctly.
 
 Changed files: `config.py`, `ai.py`.
+
+## 2026-10-21
+
+**Removed the in-app self-ping.** The `self_ping()` job added on 2026-09-14
+(outbound `requests.get()` to `APP_BASE_URL/healthz` every 10 minutes, to
+keep Render's free tier awake) is gone from `scheduler.py`, along with its
+`sched.add_job(...)` registration and the now-unused `import requests`.
+The public `/healthz` route in `app.py` stays, so an external uptime
+pinger can still be pointed at it if wanted. Side effect to remember: with
+nothing keeping the service awake, Render's free tier spins it down after
+15 minutes without incoming traffic, so the first visit after a quiet
+spell takes 30-60 seconds, and scheduled Telegram reminders/nudges only run
+while the service is awake.
+
+Changed files: `scheduler.py`, `CHAT_HISTORY.md`.
