@@ -6,10 +6,12 @@ Auto-generated from git log - do not hand-edit. Regenerate with:
 .\scripts\Update-CommitHistory.ps1
 ```
 
-Last updated: 2026-10-21 13:32
+Last updated: 2026-10-21 14:01
 
 ---
 
+- **2026-10-21** 6e665a8 - Skip scheduler on Vercel, pin Python 3.12 for the Vercel copy (Zemen)
+- **2026-10-21** aa8ec02 - Refresh commit history (Zemen)
 - **2026-10-21** d0c3533 - Remove in-app self-ping job from scheduler (Zemen)
 - **2026-09-22** bacc815 - Add Groq (free tier, existing key) as a third AI chat provider option (Zemen)
 - **2026-09-21** 2d6a838 - Add Grok as a switchable AI chat provider alongside Gemini (Zemen)
